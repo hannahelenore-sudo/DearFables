@@ -18,6 +18,10 @@ public class BattleManager : MonoBehaviour
     public ScoreToBeatUI scoreToBeatUI;
     public NumberSpinnerUI numberSpinnerUI;
 
+    [Header("Current Round Text References")]
+    public TextMeshProUGUI currentRoundText1;
+    public TextMeshProUGUI currentRoundText2;
+
     [Tooltip("Panel or Image used to dim the screen for the round intro.")]
     public Image roundDimOverlay;
 
@@ -66,7 +70,10 @@ public class BattleManager : MonoBehaviour
         if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
         if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
 
-        
+        // Hide current round texts initially during Awake
+        if (currentRoundText1 != null) currentRoundText1.gameObject.SetActive(false);
+        if (currentRoundText2 != null) currentRoundText2.gameObject.SetActive(false);
+
         SetBattleUIInteractable(false);
     }
 
@@ -203,8 +210,19 @@ public class BattleManager : MonoBehaviour
     {
         if (scoreToBeatUI != null && scoreToBeatUI.scoreText != null)
         {
-            scoreToBeatUI.scoreText.text = "Score To Beat:\n" + Mathf.Max(0, remainingScore).ToString();
+            scoreToBeatUI.scoreText.text = Mathf.Max(0, remainingScore).ToString();
         }
+    }
+
+    public void UpdateCurrentRoundDisplays()
+    {
+        string roundString = (currentRoundNumber >= maxRounds) ? "Final Round" : "Round " + currentRoundNumber;
+
+        if (currentRoundText1 != null)
+            currentRoundText1.text = roundString;
+
+        if (currentRoundText2 != null)
+            currentRoundText2.text = roundString;
     }
 
     private IEnumerator RunBattleOpeningSequence()
@@ -255,6 +273,7 @@ public class BattleManager : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.4f);
 
         currentRoundNumber = 1;
+        UpdateCurrentRoundDisplays();
 
         if (playerRollUI != null)
         {
@@ -274,6 +293,9 @@ public class BattleManager : MonoBehaviour
     public IEnumerator PlayRoundIntroSequence(int roundNum)
     {
         if (roundDimOverlay == null || roundPopupText == null || isMatchOver) yield break;
+
+        currentRoundNumber = roundNum;
+        UpdateCurrentRoundDisplays();
 
         SetBattleUIInteractable(false);
 
@@ -382,9 +404,17 @@ public class BattleManager : MonoBehaviour
         if (deckManager.targetScoreText != null)
             deckManager.targetScoreText.gameObject.SetActive(isActive);
 
+        // Control the visibility of round texts alongside the persistent UI
+        if (currentRoundText1 != null)
+            currentRoundText1.gameObject.SetActive(isActive);
+
+        if (currentRoundText2 != null)
+            currentRoundText2.gameObject.SetActive(isActive);
+
         if (isActive)
         {
             deckManager.UpdateTargetScoreDisplay();
+            UpdateCurrentRoundDisplays();
         }
     }
 }

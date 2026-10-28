@@ -219,7 +219,7 @@ public class DeckManager : MonoBehaviour
 
     public void UpdateTargetScoreDisplay()
     {
-        string scoreString = "Score To Beat:\n" + Mathf.Max(0, currentRemainingScore).ToString();
+        string scoreString = Mathf.Max(0, currentRemainingScore).ToString();
 
         if (targetScoreText != null && (battleManager == null || !battleManager.isOpeningSequenceActive))
         {
