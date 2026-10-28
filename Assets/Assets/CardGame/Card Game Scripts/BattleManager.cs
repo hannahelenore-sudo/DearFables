@@ -70,7 +70,6 @@ public class BattleManager : MonoBehaviour
         if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
         if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
 
-        // Hide current round texts initially during Awake
         if (currentRoundText1 != null) currentRoundText1.gameObject.SetActive(false);
         if (currentRoundText2 != null) currentRoundText2.gameObject.SetActive(false);
 
@@ -404,7 +403,6 @@ public class BattleManager : MonoBehaviour
         if (deckManager.targetScoreText != null)
             deckManager.targetScoreText.gameObject.SetActive(isActive);
 
-        // Control the visibility of round texts alongside the persistent UI
         if (currentRoundText1 != null)
             currentRoundText1.gameObject.SetActive(isActive);
 

@@ -32,6 +32,14 @@ public class DeckManager : MonoBehaviour
     public TextMeshProUGUI targetScoreText;
     public TextMeshProUGUI battleTargetScoreText;
 
+    [Header("Scoring Animation Settings")]
+    [Tooltip("Choose how many seconds the score countdown and shake animation take.")]
+    public float scoreCountdownDuration = 1.0f;
+
+    [Header("Effect References")]
+    [Tooltip("Attach a ScoreShakeEffect component here to shake/tint a sprite during scoring.")]
+    public ScoreShakeEffect scoreShakeEffect;
+
     [Header("Manager References")]
     public BattleManager battleManager;
 
@@ -62,12 +70,19 @@ public class DeckManager : MonoBehaviour
     private Button confirmButtonComp;
     private Button discardButtonComp;
 
+    private Transform originalTotalValueParent;
+
     void Awake()
     {
         currentRemainingScore = targetScore;
         if (battleManager == null)
         {
             battleManager = Object.FindAnyObjectByType<BattleManager>();
+        }
+
+        if (totalValueText != null)
+        {
+            originalTotalValueParent = totalValueText.transform.parent;
         }
     }
 
@@ -139,7 +154,6 @@ public class DeckManager : MonoBehaviour
 
     private void ResetRoundState()
     {
-        // Only count available cards (excluding discardPile so discarded cards remain removed)
         cardsRemainingInRound = Mathf.Min(totalDeckCards, drawPile.Count + hand.Count);
         remainingDiscards = maxDiscardsAllowed;
 
@@ -374,9 +388,6 @@ public class DeckManager : MonoBehaviour
         StartCoroutine(DiscardAndRedrawRoutine());
     }
 
-    /// <summary>
-    /// RECYCLES: Selected cards go back into the draw pile, get reshuffled, and replacement cards are drawn.
-    /// </summary>
     private IEnumerator DiscardAndRedrawRoutine()
     {
         isDiscarding = true;
@@ -437,7 +448,6 @@ public class DeckManager : MonoBehaviour
                 spawnedCardUIList.Remove(card);
                 if (hand.Contains(card.cardData)) hand.Remove(card.cardData);
 
-                // Return cards to draw pile instead of discard pile
                 drawPile.Add(card.cardData);
                 cardsRemainingInRound++;
 
@@ -445,7 +455,6 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Reshuffle draw pile with returned cards
         ShuffleDrawPile();
 
         spawnedCardUIList.RemoveAll(item => item == null);
@@ -467,12 +476,6 @@ public class DeckManager : MonoBehaviour
         UpdateSelectedTotal();
     }
 
-    /// <summary>
-    /// PLAYS: Scores points, permanently moves played cards to discardPile, and returns to battle without recycling discarded cards.
-    /// </summary>
-    /// <summary>
-    /// PLAYS: Scores points, permanently moves played cards to discardPile, and returns to battle without recycling discarded cards.
-    /// </summary>
     private IEnumerator ScoreAndDiscardRoutine()
     {
         isScoring = true;
@@ -510,7 +513,6 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Animate unselected cards back
         if (remainingCards.Count > 0)
         {
             float handStartX = -((remainingCards.Count - 1) * remainingHandSpacing / 2f);
@@ -523,7 +525,6 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Animate selected cards to scoring center
         float startX = -((selectedCards.Count - 1) * scoringCardSpacing / 2f);
 
         for (int i = 0; i < selectedCards.Count; i++)
@@ -570,20 +571,71 @@ public class DeckManager : MonoBehaviour
         {
             if (card.cardData != null)
             {
-                // Calls each card's specific script logic (e.g. SolarCard, WindCard, etc.)
                 finalScore = card.cardData.EvaluateScore(finalScore, selectedCards);
             }
         }
 
-        // Update score UI to show final calculated score
         if (totalValueText != null) totalValueText.text = finalScore.ToString();
-
-        currentRemainingScore -= finalScore;
-        UpdateTargetScoreDisplay();
-
         yield return new WaitForSeconds(0.4f);
 
-        // --- STEP 3: DISCARD ANIMATIONS ---
+        // --- STEP 3: SWITCH CAMERA & REPARENT TEXT TO BATTLE CANVAS ---
+        SetCameraState(false);
+
+        if (totalValueText != null)
+        {
+            if (battleManager != null && battleManager.battleUIParent != null)
+            {
+                totalValueText.transform.SetParent(battleManager.battleUIParent.transform, false);
+            }
+            totalValueText.gameObject.SetActive(true);
+        }
+
+        // --- TRIGGER SHAKE & RED EFFECT SYNCHRONIZED WITH COUNTDOWN ---
+        if (scoreShakeEffect != null)
+        {
+            scoreShakeEffect.TriggerScoreEffect(scoreCountdownDuration);
+        }
+
+        // --- STEP 4: COUNTDOWN ANIMATION ---
+        int startRemainingScore = currentRemainingScore;
+        int targetRemainingScore = currentRemainingScore - finalScore;
+        float elapsed = 0f;
+
+        while (elapsed < scoreCountdownDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / scoreCountdownDuration);
+
+            int currentDisplayScore = Mathf.RoundToInt(Mathf.Lerp(finalScore, 0, t));
+            int currentDisplayRemaining = Mathf.RoundToInt(Mathf.Lerp(startRemainingScore, targetRemainingScore, t));
+
+            if (totalValueText != null)
+                totalValueText.text = currentDisplayScore.ToString();
+
+            currentRemainingScore = currentDisplayRemaining;
+            UpdateTargetScoreDisplay();
+
+            yield return null;
+        }
+
+        if (totalValueText != null)
+            totalValueText.text = "0";
+
+        currentRemainingScore = targetRemainingScore;
+        UpdateTargetScoreDisplay();
+
+        yield return new WaitForSeconds(0.3f);
+
+        if (totalValueText != null)
+        {
+            totalValueText.text = "";
+            if (originalTotalValueParent != null)
+            {
+                totalValueText.transform.SetParent(originalTotalValueParent, false);
+            }
+        }
+
+        // --- STEP 5: USUAL ROUND ENDING SEQUENCE ---
         float discardTargetY = -(Screen.height * 0.75f);
 
         foreach (CardUI card in selectedCards)
@@ -616,14 +668,12 @@ public class DeckManager : MonoBehaviour
 
         yield return new WaitForSeconds(discardFlyDuration + 0.05f);
 
-        // --- STEP 4: CLEANUP & STATE RESET ---
         List<CardUI> allCards = new List<CardUI>(spawnedCardUIList);
         foreach (CardUI card in allCards)
         {
             if (card != null)
             {
                 if (hand.Contains(card.cardData)) hand.Remove(card.cardData);
-                // Played cards go to discardPile PERMANENTLY
                 discardPile.Add(card.cardData);
                 Destroy(card.gameObject);
             }
@@ -634,10 +684,7 @@ public class DeckManager : MonoBehaviour
 
         if (layoutGroup != null) layoutGroup.enabled = true;
 
-        // Reset state for new round WITHOUT recycling discard pile back to draw pile
         ResetRoundState();
-
-        SetCameraState(inCardView: false);
 
         if (currentRemainingScore <= 0)
         {
@@ -668,9 +715,6 @@ public class DeckManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Resets full deck for match restart or new game.
-    /// </summary>
     public void ResetFullDeckForNewGame()
     {
         if (discardPile.Count > 0)
