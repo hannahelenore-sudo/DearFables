@@ -190,7 +190,6 @@ public class DeckManager : MonoBehaviour
             backButton.SetActive(true);
         }
 
-        // Handle high roll banner carry over on top of card view
         if (cardGameNotificationText != null)
         {
             if (PlayerRollUI.isHighRollActive)
@@ -577,27 +576,26 @@ public class DeckManager : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         yield return new WaitForSeconds(0.4f);
 
-        // --- STEP 1: BALATRO STYLE CALCULATION ON BALATRO TEXT ---
+        // --- STEP 1: CALCULATE BASE SCORE WITH CARD MULTIPLIER FIRST ---
         int baseScore = 0;
-        float currentMult = 1f;
+        float cardMult = 1f;
 
-        if (balatroScoreText != null)
-        {
-            balatroScoreText.gameObject.SetActive(true);
-            balatroScoreText.text = "0 x 1";
-        }
-
-        float targetMult = 1f;
         if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
         {
             if (selectedCards[0].cardData is SolarCard solar && selectedCards.Count >= solar.requiredCards)
             {
-                targetMult = solar.multiplier;
+                cardMult = solar.multiplier;
             }
             else if (selectedCards[0].cardData is WindCard wind && selectedCards.Count >= wind.requiredCards)
             {
-                targetMult = wind.multiplier;
+                cardMult = wind.multiplier;
             }
+        }
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.gameObject.SetActive(true);
+            balatroScoreText.text = "0 x " + cardMult.ToString("0.##");
         }
 
         foreach (CardUI card in selectedCards)
@@ -610,7 +608,7 @@ public class DeckManager : MonoBehaviour
                 baseScore += card.cardData.primaryValue;
                 if (balatroScoreText != null)
                 {
-                    balatroScoreText.text = baseScore + " x " + currentMult;
+                    balatroScoreText.text = baseScore + " x " + cardMult.ToString("0.##");
                 }
 
                 yield return new WaitForSeconds(0.15f);
@@ -619,39 +617,38 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 2: APPLY MULTIPLIER ---
-        int finalScore = baseScore;
-        if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
-        {
-            finalScore = selectedCards[0].cardData.EvaluateScore(baseScore, selectedCards);
-        }
+        yield return new WaitForSeconds(0.3f);
 
-        // Apply high roll 1.5x score bonus if active from PlayerRollUI
+        // --- STEP 2: AFTER BASE SCORE, ADD HIGH ROLL BONUS ADDITIVELY (Balatro Style) ---
+        float finalMult = cardMult;
+        float highRollBonusMult = 1.5f;
+
         if (PlayerRollUI.isHighRollActive)
         {
-            finalScore = Mathf.RoundToInt(finalScore * 1.5f);
-        }
+            finalMult += highRollBonusMult; // Additive stack (e.g., 1.5 + 1.5 = 3.0)
 
-        if (targetMult > 1f || PlayerRollUI.isHighRollActive)
-        {
             if (balatroScoreText != null)
             {
-                balatroScoreText.text = finalScore.ToString();
+                balatroScoreText.text = baseScore + " x " + finalMult.ToString("0.##");
             }
-            yield return new WaitForSeconds(0.9f);
+            yield return new WaitForSeconds(0.6f);
         }
-        else
+
+        // --- STEP 3: CALCULATE AND DISPLAY FINAL PRODUCT SCORE ---
+        int finalScore = Mathf.RoundToInt(baseScore * finalMult);
+
+        if (balatroScoreText != null)
         {
-            if (balatroScoreText != null) balatroScoreText.text = finalScore.ToString();
-            yield return new WaitForSeconds(0.4f);
+            balatroScoreText.text = finalScore.ToString();
         }
+        yield return new WaitForSeconds(0.9f);
 
         if (balatroScoreText != null)
         {
             balatroScoreText.text = "1 x 1";
         }
 
-        // --- STEP 3: SHOW FINAL SCORE POP-OUT & SHAKE ANIMATION IN CARD VIEW ---
+        // --- STEP 4: SHOW FINAL SCORE POP-OUT & SHAKE ANIMATION IN CARD VIEW ---
         if (totalValueText != null)
         {
             totalValueText.text = finalScore.ToString();
@@ -687,10 +684,9 @@ public class DeckManager : MonoBehaviour
 
         yield return new WaitForSeconds(cameraSwitchDelay);
 
-        // --- STEP 4: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
+        // --- STEP 5: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
         SetCameraState(false);
 
-        // Clear high roll notification banner once cards are submitted and scored
         if (cardGameNotificationText != null)
         {
             cardGameNotificationText.text = "";
@@ -712,7 +708,7 @@ public class DeckManager : MonoBehaviour
             scoreShakeEffect.TriggerScoreEffect(scoreCountdownDuration);
         }
 
-        // --- STEP 5: COUNTDOWN ANIMATION ---
+        // --- STEP 6: COUNTDOWN ANIMATION ---
         int startRemainingScore = currentRemainingScore;
         int targetRemainingScore = currentRemainingScore - finalScore;
         float elapsed = 0f;
@@ -726,7 +722,9 @@ public class DeckManager : MonoBehaviour
             int currentDisplayRemaining = Mathf.RoundToInt(Mathf.Lerp(startRemainingScore, targetRemainingScore, t));
 
             if (totalValueText != null)
+            {
                 totalValueText.text = currentDisplayScore.ToString();
+            }
 
             currentRemainingScore = currentDisplayRemaining;
             UpdateTargetScoreDisplay();
@@ -735,7 +733,9 @@ public class DeckManager : MonoBehaviour
         }
 
         if (totalValueText != null)
+        {
             totalValueText.text = "0";
+        }
 
         currentRemainingScore = targetRemainingScore;
         UpdateTargetScoreDisplay();
@@ -751,7 +751,7 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 6: USUAL ROUND ENDING SEQUENCE ---
+        // --- STEP 7: USUAL ROUND ENDING SEQUENCE ---
         float discardTargetY = -(Screen.height * 0.75f);
 
         foreach (CardUI card in selectedCards)
