@@ -29,7 +29,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     public float hoverScaleBonus = 0.05f;
 
     [Header("Hover Bubble Customization")]
-    public Vector2 bubbleOffset = new Vector2(0f, 75f);
+    public Vector2 bubbleOffset = new Vector2(0f, 35f); // Lowered closer to the card
     public Color bubbleBackgroundColor = new Color(0f, 0f, 0f, 0.85f);
     public Color bubbleTextColor = Color.yellow;
 
@@ -137,13 +137,12 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
             bubbleBgImage = activeValueBubble.AddComponent<Image>();
 
-            // Text Element
             GameObject textObj = new GameObject("BubbleText", typeof(RectTransform));
             textObj.transform.SetParent(activeValueBubble.transform, false);
 
             bubbleTextComponent = textObj.AddComponent<TextMeshProUGUI>();
             bubbleTextComponent.alignment = TextAlignmentOptions.Center;
-            bubbleTextComponent.fontSize = 14;
+            bubbleTextComponent.fontSize = 20;
             bubbleTextComponent.fontStyle = FontStyles.Bold;
 
             RectTransform textRect = textObj.GetComponent<RectTransform>();
@@ -152,16 +151,10 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             textRect.sizeDelta = Vector2.zero;
             textRect.anchoredPosition = Vector2.zero;
 
-            // Image Icon Element inside the bubble
             GameObject iconObj = new GameObject("BubbleIcon", typeof(RectTransform));
             iconObj.transform.SetParent(activeValueBubble.transform, false);
             bubbleIconImage = iconObj.AddComponent<Image>();
-            bubbleIconImage.preserveAspect = true;
-
-            RectTransform iconRect = iconObj.GetComponent<RectTransform>();
-            iconRect.anchorMin = new Vector2(0.75f, 0.1f);
-            iconRect.anchorMax = new Vector2(0.95f, 0.5f);
-            iconRect.sizeDelta = Vector2.zero;
+            bubbleIconImage.gameObject.SetActive(false);
         }
 
         RectTransform bubbleRect = activeValueBubble.GetComponent<RectTransform>();
@@ -171,7 +164,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             bubbleRect.anchorMax = new Vector2(0.5f, 1f);
             bubbleRect.pivot = new Vector2(0.5f, 0.5f);
             bubbleRect.anchoredPosition = bubbleOffset;
-            bubbleRect.sizeDelta = new Vector2(130f, 60f); // Expanded dimensions for multiline text
+            bubbleRect.sizeDelta = new Vector2(220f, 95f);
         }
 
         UpdateBubbleVisuals();
@@ -191,12 +184,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             UpdateBubbleText();
         }
 
-        if (bubbleIconImage != null && cardData != null && cardData.hoverIcon != null)
-        {
-            bubbleIconImage.gameObject.SetActive(true);
-            bubbleIconImage.sprite = cardData.hoverIcon;
-        }
-        else if (bubbleIconImage != null)
+        if (bubbleIconImage != null)
         {
             bubbleIconImage.gameObject.SetActive(false);
         }
@@ -217,11 +205,11 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         {
             if (cardData is SolarCard solar)
             {
-                bubbleTextComponent.text = $"{solar.primaryValue}\n<size=85%>X{solar.multiplier} if 5 selected</size>";
+                bubbleTextComponent.text = $"{solar.primaryValue}\n<size=85%>(X1.5 if 5 solar cards are selected)</size>";
             }
             else if (cardData is WindCard wind)
             {
-                bubbleTextComponent.text = $"{wind.primaryValue}\n<size=85%>X{wind.multiplier} if 5 selected</size>";
+                bubbleTextComponent.text = wind.primaryValue.ToString();
             }
             else
             {

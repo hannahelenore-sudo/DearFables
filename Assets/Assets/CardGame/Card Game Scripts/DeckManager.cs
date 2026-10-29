@@ -565,14 +565,11 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 2: EXECUTE INDIVIDUAL CARD SCRIPT LOGIC ---
+        // --- STEP 2: EXECUTE EVALUATION LOGIC ONLY ONCE FOR THE HAND ---
         int finalScore = baseScore;
-        foreach (CardUI card in selectedCards)
+        if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
         {
-            if (card.cardData != null)
-            {
-                finalScore = card.cardData.EvaluateScore(finalScore, selectedCards);
-            }
+            finalScore = selectedCards[0].cardData.EvaluateScore(finalScore, selectedCards);
         }
 
         if (totalValueText != null) totalValueText.text = finalScore.ToString();

@@ -9,10 +9,23 @@ public class SolarCard : CardData
 
     public override int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
     {
-        if (selectedCards != null && selectedCards.Count == requiredCards)
+        if (selectedCards != null)
         {
-            // Applies a 1.5x multiplier for the current score calculation
-            return Mathf.RoundToInt(currentTotal * multiplier);
+            // Count how many actual Solar cards are in the selection
+            int solarCount = 0;
+            foreach (var card in selectedCards)
+            {
+                if (card != null && card.cardData is SolarCard)
+                {
+                    solarCount++;
+                }
+            }
+
+            // Apply 1.5x only once if exactly 5 solar cards are selected
+            if (solarCount >= requiredCards)
+            {
+                return Mathf.RoundToInt(currentTotal * multiplier);
+            }
         }
         return currentTotal;
     }
