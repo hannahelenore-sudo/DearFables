@@ -25,6 +25,8 @@ public class DeckManager : MonoBehaviour
     public TextMeshProUGUI handCountText;
     public TextMeshProUGUI selectedCardsText;
     public TextMeshProUGUI totalAmountOfCardsLeftText;
+    [Tooltip("Text object shown at the top of the card game screen when a high roll bonus is active.")]
+    public TextMeshProUGUI cardGameNotificationText;
 
     [Header("Target Score Settings")]
     public int targetScore = 100;
@@ -35,6 +37,8 @@ public class DeckManager : MonoBehaviour
     [Header("Scoring Animation Settings")]
     [Tooltip("Choose how many seconds the score countdown and shake animation take.")]
     public float scoreCountdownDuration = 1.0f;
+    [Tooltip("Delay in seconds before switching cameras after score calculation and pop animation.")]
+    public float cameraSwitchDelay = 0.6f;
 
     [Header("Effect References")]
     [Tooltip("Attach a ScoreShakeEffect component here to shake/tint a sprite during scoring.")]
@@ -47,6 +51,7 @@ public class DeckManager : MonoBehaviour
     public Transform handParentContainer;
     public GameObject cardPrefab;
     public TextMeshProUGUI totalValueText;
+    public TextMeshProUGUI balatroScoreText;
     public GameObject confirmButton;
     public GameObject discardButton;
     public GameObject backButton;
@@ -91,6 +96,12 @@ public class DeckManager : MonoBehaviour
         ResetRoundState();
 
         if (totalValueText != null) totalValueText.text = "";
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = "1 x 1";
+            balatroScoreText.gameObject.SetActive(true);
+        }
 
         if (battleManager != null)
         {
@@ -162,6 +173,12 @@ public class DeckManager : MonoBehaviour
         UpdateSelectedCountDisplay(0);
         UpdateDeckLeftDisplay();
         ShuffleDrawPile();
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = "1 x 1";
+            balatroScoreText.gameObject.SetActive(true);
+        }
     }
 
     public void OpenCardGameView()
@@ -171,6 +188,21 @@ public class DeckManager : MonoBehaviour
         if (backButton != null)
         {
             backButton.SetActive(true);
+        }
+
+        // Handle high roll banner carry over on top of card view
+        if (cardGameNotificationText != null)
+        {
+            if (PlayerRollUI.isHighRollActive)
+            {
+                cardGameNotificationText.text = "X1.5 on this round";
+                cardGameNotificationText.gameObject.SetActive(true);
+            }
+            else
+            {
+                cardGameNotificationText.text = "";
+                cardGameNotificationText.gameObject.SetActive(false);
+            }
         }
 
         if (hand.Count == 0 && cardsRemainingInRound > 0)
@@ -545,9 +577,28 @@ public class DeckManager : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         yield return new WaitForSeconds(0.4f);
 
-        // --- STEP 1: CALCULATE BASE POINTS ---
+        // --- STEP 1: BALATRO STYLE CALCULATION ON BALATRO TEXT ---
         int baseScore = 0;
-        if (totalValueText != null) totalValueText.text = "0";
+        float currentMult = 1f;
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.gameObject.SetActive(true);
+            balatroScoreText.text = "0 x 1";
+        }
+
+        float targetMult = 1f;
+        if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
+        {
+            if (selectedCards[0].cardData is SolarCard solar && selectedCards.Count >= solar.requiredCards)
+            {
+                targetMult = solar.multiplier;
+            }
+            else if (selectedCards[0].cardData is WindCard wind && selectedCards.Count >= wind.requiredCards)
+            {
+                targetMult = wind.multiplier;
+            }
+        }
 
         foreach (CardUI card in selectedCards)
         {
@@ -557,7 +608,10 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale * 1.25f;
 
                 baseScore += card.cardData.primaryValue;
-                if (totalValueText != null) totalValueText.text = baseScore.ToString();
+                if (balatroScoreText != null)
+                {
+                    balatroScoreText.text = baseScore + " x " + currentMult;
+                }
 
                 yield return new WaitForSeconds(0.15f);
                 card.transform.localScale = origScale;
@@ -565,18 +619,83 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 2: EXECUTE EVALUATION LOGIC ONLY ONCE FOR THE HAND ---
+        // --- STEP 2: APPLY MULTIPLIER ---
         int finalScore = baseScore;
         if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
         {
-            finalScore = selectedCards[0].cardData.EvaluateScore(finalScore, selectedCards);
+            finalScore = selectedCards[0].cardData.EvaluateScore(baseScore, selectedCards);
         }
 
-        if (totalValueText != null) totalValueText.text = finalScore.ToString();
-        yield return new WaitForSeconds(0.4f);
+        // Apply high roll 1.5x score bonus if active from PlayerRollUI
+        if (PlayerRollUI.isHighRollActive)
+        {
+            finalScore = Mathf.RoundToInt(finalScore * 1.5f);
+        }
 
-        // --- STEP 3: SWITCH CAMERA & REPARENT TEXT TO BATTLE CANVAS ---
+        if (targetMult > 1f || PlayerRollUI.isHighRollActive)
+        {
+            if (balatroScoreText != null)
+            {
+                balatroScoreText.text = finalScore.ToString();
+            }
+            yield return new WaitForSeconds(0.9f);
+        }
+        else
+        {
+            if (balatroScoreText != null) balatroScoreText.text = finalScore.ToString();
+            yield return new WaitForSeconds(0.4f);
+        }
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = "1 x 1";
+        }
+
+        // --- STEP 3: SHOW FINAL SCORE POP-OUT & SHAKE ANIMATION IN CARD VIEW ---
+        if (totalValueText != null)
+        {
+            totalValueText.text = finalScore.ToString();
+            totalValueText.gameObject.SetActive(true);
+
+            Transform textTransform = totalValueText.transform;
+            Vector3 originalScale = textTransform.localScale;
+            Vector3 originalPos = textTransform.localPosition;
+
+            float popElapsed = 0f;
+            float popDuration = 0.25f;
+
+            while (popElapsed < popDuration)
+            {
+                popElapsed += Time.unscaledDeltaTime;
+                float t = popElapsed / popDuration;
+                textTransform.localScale = Vector3.Lerp(originalScale, originalScale * 1.4f, Mathf.Sin(t * Mathf.PI));
+                yield return null;
+            }
+            textTransform.localScale = originalScale;
+
+            float shakeElapsed = 0f;
+            float shakeDuration = 0.2f;
+            while (shakeElapsed < shakeDuration)
+            {
+                shakeElapsed += Time.unscaledDeltaTime;
+                Vector3 randomOffset = Random.insideUnitSphere * 8f;
+                textTransform.localPosition = originalPos + new Vector3(randomOffset.x, randomOffset.y, 0f);
+                yield return null;
+            }
+            textTransform.localPosition = originalPos;
+        }
+
+        yield return new WaitForSeconds(cameraSwitchDelay);
+
+        // --- STEP 4: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
         SetCameraState(false);
+
+        // Clear high roll notification banner once cards are submitted and scored
+        if (cardGameNotificationText != null)
+        {
+            cardGameNotificationText.text = "";
+            cardGameNotificationText.gameObject.SetActive(false);
+        }
 
         if (totalValueText != null)
         {
@@ -584,16 +703,16 @@ public class DeckManager : MonoBehaviour
             {
                 totalValueText.transform.SetParent(battleManager.battleUIParent.transform, false);
             }
+            totalValueText.text = finalScore.ToString();
             totalValueText.gameObject.SetActive(true);
         }
 
-        // --- TRIGGER SHAKE & RED EFFECT SYNCHRONIZED WITH COUNTDOWN ---
         if (scoreShakeEffect != null)
         {
             scoreShakeEffect.TriggerScoreEffect(scoreCountdownDuration);
         }
 
-        // --- STEP 4: COUNTDOWN ANIMATION ---
+        // --- STEP 5: COUNTDOWN ANIMATION ---
         int startRemainingScore = currentRemainingScore;
         int targetRemainingScore = currentRemainingScore - finalScore;
         float elapsed = 0f;
@@ -632,7 +751,7 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 5: USUAL ROUND ENDING SEQUENCE ---
+        // --- STEP 6: USUAL ROUND ENDING SEQUENCE ---
         float discardTargetY = -(Screen.height * 0.75f);
 
         foreach (CardUI card in selectedCards)
