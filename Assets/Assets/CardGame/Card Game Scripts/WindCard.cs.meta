@@ -1,2 +1,13 @@
 fileFormatVersion: 2
 guid: c9130352086aae342ab116cecde4cbd1
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - cardArt: {fileID: 21300000, guid: 3618ea7765bdc14429a638384a4d5112, type: 3}
+  - hoverIcon: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

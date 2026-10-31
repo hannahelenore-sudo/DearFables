@@ -25,12 +25,24 @@ public class DeckManager : MonoBehaviour
     public TextMeshProUGUI handCountText;
     public TextMeshProUGUI selectedCardsText;
     public TextMeshProUGUI totalAmountOfCardsLeftText;
+    [Tooltip("Text object shown at the top of the card game screen when a roll bonus/penalty is active.")]
+    public TextMeshProUGUI cardGameNotificationText;
 
     [Header("Target Score Settings")]
     public int targetScore = 100;
     public int currentRemainingScore;
     public TextMeshProUGUI targetScoreText;
     public TextMeshProUGUI battleTargetScoreText;
+
+    [Header("Scoring Animation Settings")]
+    [Tooltip("Choose how many seconds the score countdown and shake animation take.")]
+    public float scoreCountdownDuration = 1.0f;
+    [Tooltip("Delay in seconds before switching cameras after score calculation and pop animation.")]
+    public float cameraSwitchDelay = 0.6f;
+
+    [Header("Effect References")]
+    [Tooltip("Attach a ScoreShakeEffect component here to shake/tint a sprite during scoring.")]
+    public ScoreShakeEffect scoreShakeEffect;
 
     [Header("Manager References")]
     public BattleManager battleManager;
@@ -39,6 +51,7 @@ public class DeckManager : MonoBehaviour
     public Transform handParentContainer;
     public GameObject cardPrefab;
     public TextMeshProUGUI totalValueText;
+    public TextMeshProUGUI balatroScoreText;
     public GameObject confirmButton;
     public GameObject discardButton;
     public GameObject backButton;
@@ -62,12 +75,19 @@ public class DeckManager : MonoBehaviour
     private Button confirmButtonComp;
     private Button discardButtonComp;
 
+    private Transform originalTotalValueParent;
+
     void Awake()
     {
         currentRemainingScore = targetScore;
         if (battleManager == null)
         {
             battleManager = Object.FindAnyObjectByType<BattleManager>();
+        }
+
+        if (totalValueText != null)
+        {
+            originalTotalValueParent = totalValueText.transform.parent;
         }
     }
 
@@ -76,6 +96,12 @@ public class DeckManager : MonoBehaviour
         ResetRoundState();
 
         if (totalValueText != null) totalValueText.text = "";
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = "1 x 1";
+            balatroScoreText.gameObject.SetActive(true);
+        }
 
         if (battleManager != null)
         {
@@ -139,7 +165,6 @@ public class DeckManager : MonoBehaviour
 
     private void ResetRoundState()
     {
-        // Only count available cards (excluding discardPile so discarded cards remain removed)
         cardsRemainingInRound = Mathf.Min(totalDeckCards, drawPile.Count + hand.Count);
         remainingDiscards = maxDiscardsAllowed;
 
@@ -148,6 +173,12 @@ public class DeckManager : MonoBehaviour
         UpdateSelectedCountDisplay(0);
         UpdateDeckLeftDisplay();
         ShuffleDrawPile();
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = "1 x 1";
+            balatroScoreText.gameObject.SetActive(true);
+        }
     }
 
     public void OpenCardGameView()
@@ -157,6 +188,25 @@ public class DeckManager : MonoBehaviour
         if (backButton != null)
         {
             backButton.SetActive(true);
+        }
+
+        if (cardGameNotificationText != null)
+        {
+            if (PlayerRollUI.isHighRollActive)
+            {
+                cardGameNotificationText.text = "X1.5 on this round";
+                cardGameNotificationText.gameObject.SetActive(true);
+            }
+            else if (PlayerRollUI.isLowRollActive)
+            {
+                cardGameNotificationText.text = "-10% on the total score";
+                cardGameNotificationText.gameObject.SetActive(true);
+            }
+            else
+            {
+                cardGameNotificationText.text = "";
+                cardGameNotificationText.gameObject.SetActive(false);
+            }
         }
 
         if (hand.Count == 0 && cardsRemainingInRound > 0)
@@ -219,7 +269,7 @@ public class DeckManager : MonoBehaviour
 
     public void UpdateTargetScoreDisplay()
     {
-        string scoreString = "Score To Beat:\n" + Mathf.Max(0, currentRemainingScore).ToString();
+        string scoreString = Mathf.Max(0, currentRemainingScore).ToString();
 
         if (targetScoreText != null && (battleManager == null || !battleManager.isOpeningSequenceActive))
         {
@@ -374,9 +424,6 @@ public class DeckManager : MonoBehaviour
         StartCoroutine(DiscardAndRedrawRoutine());
     }
 
-    /// <summary>
-    /// RECYCLES: Selected cards go back into the draw pile, get reshuffled, and replacement cards are drawn.
-    /// </summary>
     private IEnumerator DiscardAndRedrawRoutine()
     {
         isDiscarding = true;
@@ -437,7 +484,6 @@ public class DeckManager : MonoBehaviour
                 spawnedCardUIList.Remove(card);
                 if (hand.Contains(card.cardData)) hand.Remove(card.cardData);
 
-                // Return cards to draw pile instead of discard pile
                 drawPile.Add(card.cardData);
                 cardsRemainingInRound++;
 
@@ -445,7 +491,6 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Reshuffle draw pile with returned cards
         ShuffleDrawPile();
 
         spawnedCardUIList.RemoveAll(item => item == null);
@@ -467,18 +512,18 @@ public class DeckManager : MonoBehaviour
         UpdateSelectedTotal();
     }
 
-    /// <summary>
-    /// PLAYS: Scores points, permanently moves played cards to discardPile, and returns to battle without recycling discarded cards.
-    /// </summary>
-    /// <summary>
-    /// PLAYS: Scores points, permanently moves played cards to discardPile, and returns to battle without recycling discarded cards.
-    /// </summary>
     private IEnumerator ScoreAndDiscardRoutine()
     {
         isScoring = true;
 
         if (confirmButtonComp != null) confirmButtonComp.interactable = false;
         if (discardButtonComp != null) discardButtonComp.interactable = false;
+
+        // Prevent button interactions on Battle View during scoring and transition animations
+        if (battleManager != null)
+        {
+            battleManager.SetBattleUIInteractable(false);
+        }
 
         List<CardUI> selectedCards = new List<CardUI>();
         List<CardUI> remainingCards = new List<CardUI>();
@@ -495,6 +540,7 @@ public class DeckManager : MonoBehaviour
         if (selectedCards.Count == 0)
         {
             isScoring = false;
+            if (battleManager != null) battleManager.SetBattleUIInteractable(true);
             yield break;
         }
 
@@ -510,7 +556,6 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Animate unselected cards back
         if (remainingCards.Count > 0)
         {
             float handStartX = -((remainingCards.Count - 1) * remainingHandSpacing / 2f);
@@ -523,7 +568,6 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Animate selected cards to scoring center
         float startX = -((selectedCards.Count - 1) * scoringCardSpacing / 2f);
 
         for (int i = 0; i < selectedCards.Count; i++)
@@ -544,9 +588,30 @@ public class DeckManager : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         yield return new WaitForSeconds(0.4f);
 
-        // --- STEP 1: CALCULATE BASE POINTS ---
+        // --- STEP 1: CALCULATE BASE SCORE WITH CARD MULTIPLIER ---
         int baseScore = 0;
-        if (totalValueText != null) totalValueText.text = "0";
+        float cardMult = 1f;
+        bool hasSetBonus = false;
+
+        if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
+        {
+            if (selectedCards[0].cardData is SolarCard solar && selectedCards.Count >= solar.requiredCards)
+            {
+                cardMult = solar.multiplier;
+                hasSetBonus = true;
+            }
+            else if (selectedCards[0].cardData is WindCard wind && selectedCards.Count >= wind.requiredCards)
+            {
+                cardMult = wind.multiplier;
+                hasSetBonus = true;
+            }
+        }
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.gameObject.SetActive(true);
+            balatroScoreText.text = "0 x " + cardMult.ToString("0.##");
+        }
 
         foreach (CardUI card in selectedCards)
         {
@@ -556,7 +621,10 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale * 1.25f;
 
                 baseScore += card.cardData.primaryValue;
-                if (totalValueText != null) totalValueText.text = baseScore.ToString();
+                if (balatroScoreText != null)
+                {
+                    balatroScoreText.text = baseScore + " x " + cardMult.ToString("0.##");
+                }
 
                 yield return new WaitForSeconds(0.15f);
                 card.transform.localScale = origScale;
@@ -564,26 +632,178 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 2: EXECUTE INDIVIDUAL CARD SCRIPT LOGIC ---
-        int finalScore = baseScore;
-        foreach (CardUI card in selectedCards)
+        yield return new WaitForSeconds(0.3f);
+
+        // --- STEP 2: APPLY ROLL BONUSES / PENALTIES ---
+        float finalMult = cardMult;
+
+        if (PlayerRollUI.isHighRollActive)
         {
-            if (card.cardData != null)
+            if (hasSetBonus)
             {
-                // Calls each card's specific script logic (e.g. SolarCard, WindCard, etc.)
-                finalScore = card.cardData.EvaluateScore(finalScore, selectedCards);
+                finalMult += 1.5f; // Additive stack on top of triggering set bonus
+            }
+            else
+            {
+                finalMult = 1.5f; // Pure 1.5x on a standard hand/untriggered set
+            }
+
+            if (balatroScoreText != null)
+            {
+                balatroScoreText.text = baseScore + " x " + finalMult.ToString("0.##");
+            }
+            yield return new WaitForSeconds(0.6f);
+        }
+
+        // --- STEP 3: CALCULATE AND DISPLAY FINAL PRODUCT SCORE ---
+        int rawFinalScore = Mathf.RoundToInt(baseScore * finalMult);
+        int finalScore = rawFinalScore;
+
+        if (PlayerRollUI.isLowRollActive)
+        {
+            finalScore = Mathf.RoundToInt(rawFinalScore * 0.9f);
+
+            if (balatroScoreText != null)
+            {
+                balatroScoreText.text = rawFinalScore + " (-10% = " + finalScore + ")";
+            }
+            yield return new WaitForSeconds(0.6f);
+        }
+        else
+        {
+            if (balatroScoreText != null)
+            {
+                balatroScoreText.text = finalScore.ToString();
+            }
+        }
+        yield return new WaitForSeconds(0.9f);
+
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = "1 x 1";
+        }
+
+        // --- STEP 4: SHOW FINAL SCORE POP-OUT & SHAKE ANIMATION IN CARD VIEW ---
+        if (totalValueText != null)
+        {
+            totalValueText.text = finalScore.ToString();
+            if (PlayerRollUI.isLowRollActive)
+            {
+                totalValueText.text = finalScore.ToString() + " (-10%)";
+            }
+
+            totalValueText.gameObject.SetActive(true);
+
+            Transform textTransform = totalValueText.transform;
+            Vector3 originalScale = textTransform.localScale;
+            Vector3 originalPos = textTransform.localPosition;
+
+            float popElapsed = 0f;
+            float popDuration = 0.25f;
+
+            while (popElapsed < popDuration)
+            {
+                popElapsed += Time.unscaledDeltaTime;
+                float t = popElapsed / popDuration;
+                textTransform.localScale = Vector3.Lerp(originalScale, originalScale * 1.4f, Mathf.Sin(t * Mathf.PI));
+                yield return null;
+            }
+            textTransform.localScale = originalScale;
+
+            float shakeElapsed = 0f;
+            float shakeDuration = 0.2f;
+            while (shakeElapsed < shakeDuration)
+            {
+                shakeElapsed += Time.unscaledDeltaTime;
+                Vector3 randomOffset = Random.insideUnitSphere * 8f;
+                textTransform.localPosition = originalPos + new Vector3(randomOffset.x, randomOffset.y, 0f);
+                yield return null;
+            }
+            textTransform.localPosition = originalPos;
+        }
+
+        yield return new WaitForSeconds(cameraSwitchDelay);
+
+        // --- STEP 5: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
+        SetCameraState(false);
+
+        if (cardGameNotificationText != null)
+        {
+            cardGameNotificationText.text = "";
+            cardGameNotificationText.gameObject.SetActive(false);
+        }
+
+        if (totalValueText != null)
+        {
+            if (battleManager != null && battleManager.battleUIParent != null)
+            {
+                totalValueText.transform.SetParent(battleManager.battleUIParent.transform, false);
+            }
+            totalValueText.text = finalScore.ToString();
+            if (PlayerRollUI.isLowRollActive)
+            {
+                totalValueText.text = finalScore.ToString() + " (-10%)";
+            }
+            totalValueText.gameObject.SetActive(true);
+        }
+
+        if (scoreShakeEffect != null)
+        {
+            scoreShakeEffect.TriggerScoreEffect(scoreCountdownDuration);
+        }
+
+        // --- STEP 6: COUNTDOWN ANIMATION ---
+        int startRemainingScore = currentRemainingScore;
+        int targetRemainingScore = currentRemainingScore - finalScore;
+        float elapsed = 0f;
+
+        while (elapsed < scoreCountdownDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / scoreCountdownDuration);
+
+            int currentDisplayScore = Mathf.RoundToInt(Mathf.Lerp(finalScore, 0, t));
+            int currentDisplayRemaining = Mathf.RoundToInt(Mathf.Lerp(startRemainingScore, targetRemainingScore, t));
+
+            if (totalValueText != null)
+            {
+                totalValueText.text = currentDisplayScore.ToString();
+                if (PlayerRollUI.isLowRollActive)
+                {
+                    totalValueText.text = currentDisplayScore.ToString() + " (-10%)";
+                }
+            }
+
+            currentRemainingScore = currentDisplayRemaining;
+            UpdateTargetScoreDisplay();
+
+            yield return null;
+        }
+
+        if (totalValueText != null)
+        {
+            totalValueText.text = "0";
+            if (PlayerRollUI.isLowRollActive)
+            {
+                totalValueText.text = "0 (-10%)";
             }
         }
 
-        // Update score UI to show final calculated score
-        if (totalValueText != null) totalValueText.text = finalScore.ToString();
-
-        currentRemainingScore -= finalScore;
+        currentRemainingScore = targetRemainingScore;
         UpdateTargetScoreDisplay();
 
-        yield return new WaitForSeconds(0.4f);
+        yield return new WaitForSeconds(0.3f);
 
-        // --- STEP 3: DISCARD ANIMATIONS ---
+        if (totalValueText != null)
+        {
+            totalValueText.text = "";
+            if (originalTotalValueParent != null)
+            {
+                totalValueText.transform.SetParent(originalTotalValueParent, false);
+            }
+        }
+
+        // --- STEP 7: USUAL ROUND ENDING SEQUENCE ---
         float discardTargetY = -(Screen.height * 0.75f);
 
         foreach (CardUI card in selectedCards)
@@ -616,14 +836,12 @@ public class DeckManager : MonoBehaviour
 
         yield return new WaitForSeconds(discardFlyDuration + 0.05f);
 
-        // --- STEP 4: CLEANUP & STATE RESET ---
         List<CardUI> allCards = new List<CardUI>(spawnedCardUIList);
         foreach (CardUI card in allCards)
         {
             if (card != null)
             {
                 if (hand.Contains(card.cardData)) hand.Remove(card.cardData);
-                // Played cards go to discardPile PERMANENTLY
                 discardPile.Add(card.cardData);
                 Destroy(card.gameObject);
             }
@@ -634,10 +852,13 @@ public class DeckManager : MonoBehaviour
 
         if (layoutGroup != null) layoutGroup.enabled = true;
 
-        // Reset state for new round WITHOUT recycling discard pile back to draw pile
         ResetRoundState();
 
-        SetCameraState(inCardView: false);
+        // Re-enable battle camera button interactions now that full countdown and animation sequence ended
+        if (battleManager != null)
+        {
+            battleManager.SetBattleUIInteractable(true);
+        }
 
         if (currentRemainingScore <= 0)
         {
@@ -668,9 +889,6 @@ public class DeckManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Resets full deck for match restart or new game.
-    /// </summary>
     public void ResetFullDeckForNewGame()
     {
         if (discardPile.Count > 0)

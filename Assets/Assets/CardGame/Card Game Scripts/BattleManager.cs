@@ -17,6 +17,11 @@ public class BattleManager : MonoBehaviour
     public GameObject battleUIParent;
     public ScoreToBeatUI scoreToBeatUI;
     public NumberSpinnerUI numberSpinnerUI;
+    public ScoreShakeEffect scoreShakeEffect; // Reference to the score shake/fall script
+
+    [Header("Current Round Text References")]
+    public TextMeshProUGUI currentRoundText1;
+    public TextMeshProUGUI currentRoundText2;
 
     [Tooltip("Panel or Image used to dim the screen for the round intro.")]
     public Image roundDimOverlay;
@@ -24,12 +29,28 @@ public class BattleManager : MonoBehaviour
     [Tooltip("TextMeshProUGUI element that displays text like 'ROUND 1/5'.")]
     public TextMeshProUGUI roundPopupText;
 
+    [Header("Ending Sequence UI References")]
+    public GameObject endingRootObject;         // The ENDING parent GameObject
+    public RectTransform paperImgTransform;     // PAPERIMG RectTransform
+    public TextMeshProUGUI targetScoreTxt;      // TARGETSCORETXT
+    public TextMeshProUGUI yourScoreTxt;        // YOURSCORETXT
+    public TextMeshProUGUI starsGainedTxt;      // STARSGAINEDTEXT
+    public GameObject winGameObject;            // WIN parent object
+    public GameObject lostGameObject;           // LOST parent object
+
+    [Header("Ending Settings")]
+    public int starsGainedOnWin = 1;            // Configurable stars in inspector
+    public float paperFlyDuration = 0.5f;
+    public float countAnimationDuration = 0.8f; // Duration per individual stat count
+    public float stampAnimationDuration = 0.35f;
+    public float delayBeforeStamp = 1.0f;      // Wait time after stars gained before stamp plays
+
     [Header("Round Settings")]
     [Tooltip("Total number of rounds in this battle.")]
     public int maxRounds = 5;
     [Range(0f, 1f)]
     [Tooltip("Transparency of the dim overlay.")]
-    public float dimOverlayAlpha = 0.75f;
+    public float dimOverlayAlpha = 0.95f;
     public float roundFadeInDuration = 0.3f;
     public float roundDisplayDuration = 1.0f;
     public float roundFadeOutDuration = 0.3f;
@@ -52,6 +73,7 @@ public class BattleManager : MonoBehaviour
     private int currentRoundNumber = 1;
     private bool hasMatchStartedOnce = false;
     private bool isMatchOver = false;
+    private bool isWaitingForClickToExit = false;
 
     private void Awake()
     {
@@ -59,6 +81,7 @@ public class BattleManager : MonoBehaviour
         isMatchOver = false;
         hasPlayerWon = false;
         hasPlayerLost = false;
+        isWaitingForClickToExit = false;
 
         if (scoreToBeatUI != null) SetCanvasGroupState(scoreToBeatUI.gameObject, false, 0f);
         if (numberSpinnerUI != null) SetCanvasGroupState(numberSpinnerUI.gameObject, false, 0f);
@@ -66,8 +89,23 @@ public class BattleManager : MonoBehaviour
         if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
         if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
 
-        
+        if (endingRootObject != null) endingRootObject.SetActive(false);
+        if (winGameObject != null) winGameObject.SetActive(false);
+        if (lostGameObject != null) lostGameObject.SetActive(false);
+
+        if (currentRoundText1 != null) currentRoundText1.gameObject.SetActive(false);
+        if (currentRoundText2 != null) currentRoundText2.gameObject.SetActive(false);
+
         SetBattleUIInteractable(false);
+    }
+
+    private void Update()
+    {
+        if (isWaitingForClickToExit && Input.GetMouseButtonDown(0))
+        {
+            isWaitingForClickToExit = false;
+            StartCoroutine(FinalizeAndExitGame());
+        }
     }
 
     private void Start()
@@ -172,7 +210,15 @@ public class BattleManager : MonoBehaviour
         isMatchOver = true;
         hasPlayerWon = true;
         SetBattleUIInteractable(false);
-        StartCoroutine(ExitGameRoutine("Victory! Target score reached. Exiting..."));
+
+        // Trigger the bread-like falling effect when score hits zero
+        if (scoreShakeEffect != null)
+        {
+            scoreShakeEffect.TriggerFallDown();
+        }
+
+        int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
+        StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsGainedOnWin));
     }
 
     public void TriggerLossCondition()
@@ -181,16 +227,235 @@ public class BattleManager : MonoBehaviour
         isMatchOver = true;
         hasPlayerLost = true;
         SetBattleUIInteractable(false);
-        StartCoroutine(ExitGameRoutine("Failed! Out of rounds. Exiting..."));
+
+        int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
+        StartCoroutine(RunEndingSequence(false, battleTargetScore, finalYourScore, 0));
     }
 
-    private IEnumerator ExitGameRoutine(string logMessage)
+    private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained)
     {
-        if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
-        if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
+        if (cardSystemCanvas != null) cardSystemCanvas.gameObject.SetActive(false);
 
-        Debug.Log(logMessage);
-        yield return new WaitForSecondsRealtime(1.5f);
+        // 1. DIM OVERLAY (Sorting Order 500 - Dims background only)
+        if (roundDimOverlay != null)
+        {
+            roundDimOverlay.gameObject.SetActive(true);
+            roundDimOverlay.color = new Color(0f, 0f, 0f, 0.9f);
+
+            Canvas dimCanvas = roundDimOverlay.GetComponent<Canvas>();
+            if (dimCanvas == null) dimCanvas = roundDimOverlay.gameObject.AddComponent<Canvas>();
+            dimCanvas.overrideSorting = true;
+            dimCanvas.sortingOrder = 500;
+
+            if (roundDimOverlay.GetComponent<GraphicRaycaster>() == null)
+                roundDimOverlay.gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        // 2. ENDING ROOT & PAPER (Sorting Order 501 - Sits brightly above dim)
+        if (endingRootObject != null)
+        {
+            endingRootObject.SetActive(true);
+            ConfigureEndingSortingOrders();
+        }
+
+        // Handle Paper Sliding Animation using Anchored Position
+        Vector2 finalAnchoredPos = Vector2.zero;
+        if (paperImgTransform != null)
+        {
+            finalAnchoredPos = paperImgTransform.anchoredPosition;
+            paperImgTransform.anchoredPosition = new Vector2(finalAnchoredPos.x, finalAnchoredPos.y - 600f);
+        }
+
+        if (targetScoreTxt != null) targetScoreTxt.text = "Target Score: 0";
+        if (yourScoreTxt != null) yourScoreTxt.text = "Your Score: 0";
+        if (starsGainedTxt != null) starsGainedTxt.text = "Stars Gained: 0";
+
+        if (winGameObject != null) winGameObject.SetActive(false);
+        if (lostGameObject != null) lostGameObject.SetActive(false);
+
+        // Fly PAPERIMG smoothly from below using local anchoredPosition
+        float elapsed = 0f;
+        Vector2 startAnchoredPos = paperImgTransform != null ? paperImgTransform.anchoredPosition : Vector2.zero;
+
+        while (elapsed < paperFlyDuration && paperImgTransform != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / paperFlyDuration);
+            float smoothT = 1f - (1f - t) * (1f - t);
+            paperImgTransform.anchoredPosition = Vector2.Lerp(startAnchoredPos, finalAnchoredPos, smoothT);
+            yield return null;
+        }
+        if (paperImgTransform != null) paperImgTransform.anchoredPosition = finalAnchoredPos;
+
+        // 1. COUNT TARGET SCORE
+        yield return StartCoroutine(CountStatSequence(targetScoreTxt, "Target Score: ", targetScore));
+
+        // 2. COUNT YOUR SCORE
+        yield return StartCoroutine(CountStatSequence(yourScoreTxt, "Your Score: ", yourScore));
+
+        // 3. COUNT STARS GAINED
+        yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
+
+        // Delay after counting is fully done before the stamp animation plays
+        yield return new WaitForSecondsRealtime(delayBeforeStamp);
+
+        // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top - Sorting Order 503)
+        GameObject targetStampObj = isWin ? winGameObject : lostGameObject;
+        if (targetStampObj != null)
+        {
+            targetStampObj.SetActive(true);
+
+            Canvas stampCanvas = targetStampObj.GetComponent<Canvas>();
+            if (stampCanvas == null) stampCanvas = targetStampObj.AddComponent<Canvas>();
+            stampCanvas.overrideSorting = true;
+            stampCanvas.sortingOrder = 503;
+
+            SpriteRenderer[] stampRenders = targetStampObj.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in stampRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 504);
+            }
+
+            yield return StartCoroutine(StampDropAnimation(targetStampObj.transform));
+        }
+
+        isWaitingForClickToExit = true;
+    }
+
+    private void ConfigureEndingSortingOrders()
+    {
+        // 1. Paper / Root Canvas (Sorting Order 501 - Above dim overlay 500)
+        if (endingRootObject != null)
+        {
+            Canvas rootCanvas = endingRootObject.GetComponent<Canvas>();
+            if (rootCanvas == null) rootCanvas = endingRootObject.AddComponent<Canvas>();
+            rootCanvas.overrideSorting = true;
+            rootCanvas.sortingOrder = 501;
+
+            if (endingRootObject.GetComponent<CanvasScaler>() == null)
+                endingRootObject.AddComponent<CanvasScaler>();
+            if (endingRootObject.GetComponent<GraphicRaycaster>() == null)
+                endingRootObject.AddComponent<GraphicRaycaster>();
+
+            SpriteRenderer[] paperRenders = endingRootObject.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in paperRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 501);
+            }
+        }
+
+        // 2. Text Canvas/Layer (Sorting Order 502 - Directly above paper)
+        SetCanvasOrder(targetScoreTxt, 502);
+        SetCanvasOrder(yourScoreTxt, 502);
+        SetCanvasOrder(starsGainedTxt, 502);
+
+        // 3. Win / Lose GameObjects (Sorting Order 503 - Absolute front of everything)
+        if (winGameObject != null)
+        {
+            Canvas winCanvas = winGameObject.GetComponent<Canvas>();
+            if (winCanvas == null) winCanvas = winGameObject.AddComponent<Canvas>();
+            winCanvas.overrideSorting = true;
+            winCanvas.sortingOrder = 503;
+
+            SpriteRenderer[] winRenders = winGameObject.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in winRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 504);
+            }
+        }
+
+        if (lostGameObject != null)
+        {
+            Canvas loseCanvas = lostGameObject.GetComponent<Canvas>();
+            if (loseCanvas == null) loseCanvas = lostGameObject.AddComponent<Canvas>();
+            loseCanvas.overrideSorting = true;
+            loseCanvas.sortingOrder = 503;
+
+            SpriteRenderer[] loseRenders = lostGameObject.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in loseRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 504);
+            }
+        }
+    }
+
+    private void SetCanvasOrder(Component comp, int order)
+    {
+        if (comp == null) return;
+        Canvas canvas = comp.GetComponent<Canvas>();
+        if (canvas == null) canvas = comp.gameObject.AddComponent<Canvas>();
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = order;
+
+        SpriteRenderer[] renderers = comp.GetComponentsInChildren<SpriteRenderer>(true);
+        foreach (SpriteRenderer sr in renderers)
+        {
+            sr.sortingOrder = Mathf.Max(sr.sortingOrder, order + 1);
+        }
+    }
+
+    private IEnumerator CountStatSequence(TextMeshProUGUI textComponent, string labelPrefix, int targetValue)
+    {
+        float elapsed = 0f;
+        while (elapsed < countAnimationDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / countAnimationDuration);
+            int currentDisplay = Mathf.RoundToInt(Mathf.Lerp(0, targetValue, t));
+
+            if (textComponent != null)
+            {
+                textComponent.text = labelPrefix + currentDisplay;
+            }
+            yield return null;
+        }
+
+        if (textComponent != null)
+        {
+            textComponent.text = labelPrefix + targetValue;
+            yield return StartCoroutine(WiggleTransform(textComponent.transform));
+        }
+    }
+
+    private IEnumerator WiggleTransform(Transform targetTransform)
+    {
+        if (targetTransform == null) yield break;
+        Vector3 originalScale = targetTransform.localScale;
+        float elapsed = 0f;
+        float duration = 0.25f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = elapsed / duration;
+            targetTransform.localScale = originalScale * Mathf.Lerp(1f, 1.25f, Mathf.Sin(t * Mathf.PI));
+            yield return null;
+        }
+        targetTransform.localScale = originalScale;
+    }
+
+    private IEnumerator StampDropAnimation(Transform stampTransform)
+    {
+        if (stampTransform == null) yield break;
+
+        Vector3 originalScale = stampTransform.localScale;
+        stampTransform.localScale = originalScale * 2.5f;
+
+        float elapsed = 0f;
+        while (elapsed < stampAnimationDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / stampAnimationDuration);
+            stampTransform.localScale = Vector3.Lerp(originalScale * 2.5f, originalScale, t * t);
+            yield return null;
+        }
+        stampTransform.localScale = originalScale;
+    }
+
+    private IEnumerator FinalizeAndExitGame()
+    {
+        Debug.Log("Ending sequence completed. Exiting game...");
+        yield return new WaitForSecondsRealtime(0.1f);
 
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
@@ -203,8 +468,19 @@ public class BattleManager : MonoBehaviour
     {
         if (scoreToBeatUI != null && scoreToBeatUI.scoreText != null)
         {
-            scoreToBeatUI.scoreText.text = "Score To Beat:\n" + Mathf.Max(0, remainingScore).ToString();
+            scoreToBeatUI.scoreText.text = Mathf.Max(0, remainingScore).ToString();
         }
+    }
+
+    public void UpdateCurrentRoundDisplays()
+    {
+        string roundString = (currentRoundNumber >= maxRounds) ? "Final Round" : "Round " + currentRoundNumber;
+
+        if (currentRoundText1 != null)
+            currentRoundText1.text = roundString;
+
+        if (currentRoundText2 != null)
+            currentRoundText2.text = roundString;
     }
 
     private IEnumerator RunBattleOpeningSequence()
@@ -255,6 +531,7 @@ public class BattleManager : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.4f);
 
         currentRoundNumber = 1;
+        UpdateCurrentRoundDisplays();
 
         if (playerRollUI != null)
         {
@@ -274,6 +551,9 @@ public class BattleManager : MonoBehaviour
     public IEnumerator PlayRoundIntroSequence(int roundNum)
     {
         if (roundDimOverlay == null || roundPopupText == null || isMatchOver) yield break;
+
+        currentRoundNumber = roundNum;
+        UpdateCurrentRoundDisplays();
 
         SetBattleUIInteractable(false);
 
@@ -382,9 +662,16 @@ public class BattleManager : MonoBehaviour
         if (deckManager.targetScoreText != null)
             deckManager.targetScoreText.gameObject.SetActive(isActive);
 
+        if (currentRoundText1 != null)
+            currentRoundText1.gameObject.SetActive(isActive);
+
+        if (currentRoundText2 != null)
+            currentRoundText2.gameObject.SetActive(isActive);
+
         if (isActive)
         {
             deckManager.UpdateTargetScoreDisplay();
+            UpdateCurrentRoundDisplays();
         }
     }
 }
