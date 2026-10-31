@@ -25,7 +25,7 @@ public class DeckManager : MonoBehaviour
     public TextMeshProUGUI handCountText;
     public TextMeshProUGUI selectedCardsText;
     public TextMeshProUGUI totalAmountOfCardsLeftText;
-    [Tooltip("Text object shown at the top of the card game screen when a high roll bonus is active.")]
+    [Tooltip("Text object shown at the top of the card game screen when a roll bonus/penalty is active.")]
     public TextMeshProUGUI cardGameNotificationText;
 
     [Header("Target Score Settings")]
@@ -195,6 +195,11 @@ public class DeckManager : MonoBehaviour
             if (PlayerRollUI.isHighRollActive)
             {
                 cardGameNotificationText.text = "X1.5 on this round";
+                cardGameNotificationText.gameObject.SetActive(true);
+            }
+            else if (PlayerRollUI.isLowRollActive)
+            {
+                cardGameNotificationText.text = "-10% on the total score";
                 cardGameNotificationText.gameObject.SetActive(true);
             }
             else
@@ -514,6 +519,12 @@ public class DeckManager : MonoBehaviour
         if (confirmButtonComp != null) confirmButtonComp.interactable = false;
         if (discardButtonComp != null) discardButtonComp.interactable = false;
 
+        // Prevent button interactions on Battle View during scoring and transition animations
+        if (battleManager != null)
+        {
+            battleManager.SetBattleUIInteractable(false);
+        }
+
         List<CardUI> selectedCards = new List<CardUI>();
         List<CardUI> remainingCards = new List<CardUI>();
 
@@ -529,6 +540,7 @@ public class DeckManager : MonoBehaviour
         if (selectedCards.Count == 0)
         {
             isScoring = false;
+            if (battleManager != null) battleManager.SetBattleUIInteractable(true);
             yield break;
         }
 
@@ -576,19 +588,22 @@ public class DeckManager : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         yield return new WaitForSeconds(0.4f);
 
-        // --- STEP 1: CALCULATE BASE SCORE WITH CARD MULTIPLIER FIRST ---
+        // --- STEP 1: CALCULATE BASE SCORE WITH CARD MULTIPLIER ---
         int baseScore = 0;
         float cardMult = 1f;
+        bool hasSetBonus = false;
 
         if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
         {
             if (selectedCards[0].cardData is SolarCard solar && selectedCards.Count >= solar.requiredCards)
             {
                 cardMult = solar.multiplier;
+                hasSetBonus = true;
             }
             else if (selectedCards[0].cardData is WindCard wind && selectedCards.Count >= wind.requiredCards)
             {
                 cardMult = wind.multiplier;
+                hasSetBonus = true;
             }
         }
 
@@ -619,13 +634,19 @@ public class DeckManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.3f);
 
-        // --- STEP 2: AFTER BASE SCORE, ADD HIGH ROLL BONUS ADDITIVELY (Balatro Style) ---
+        // --- STEP 2: APPLY ROLL BONUSES / PENALTIES ---
         float finalMult = cardMult;
-        float highRollBonusMult = 1.5f;
 
         if (PlayerRollUI.isHighRollActive)
         {
-            finalMult += highRollBonusMult; // Additive stack (e.g., 1.5 + 1.5 = 3.0)
+            if (hasSetBonus)
+            {
+                finalMult += 1.5f; // Additive stack on top of triggering set bonus
+            }
+            else
+            {
+                finalMult = 1.5f; // Pure 1.5x on a standard hand/untriggered set
+            }
 
             if (balatroScoreText != null)
             {
@@ -635,11 +656,25 @@ public class DeckManager : MonoBehaviour
         }
 
         // --- STEP 3: CALCULATE AND DISPLAY FINAL PRODUCT SCORE ---
-        int finalScore = Mathf.RoundToInt(baseScore * finalMult);
+        int rawFinalScore = Mathf.RoundToInt(baseScore * finalMult);
+        int finalScore = rawFinalScore;
 
-        if (balatroScoreText != null)
+        if (PlayerRollUI.isLowRollActive)
         {
-            balatroScoreText.text = finalScore.ToString();
+            finalScore = Mathf.RoundToInt(rawFinalScore * 0.9f);
+
+            if (balatroScoreText != null)
+            {
+                balatroScoreText.text = rawFinalScore + " (-10% = " + finalScore + ")";
+            }
+            yield return new WaitForSeconds(0.6f);
+        }
+        else
+        {
+            if (balatroScoreText != null)
+            {
+                balatroScoreText.text = finalScore.ToString();
+            }
         }
         yield return new WaitForSeconds(0.9f);
 
@@ -652,6 +687,11 @@ public class DeckManager : MonoBehaviour
         if (totalValueText != null)
         {
             totalValueText.text = finalScore.ToString();
+            if (PlayerRollUI.isLowRollActive)
+            {
+                totalValueText.text = finalScore.ToString() + " (-10%)";
+            }
+
             totalValueText.gameObject.SetActive(true);
 
             Transform textTransform = totalValueText.transform;
@@ -700,6 +740,10 @@ public class DeckManager : MonoBehaviour
                 totalValueText.transform.SetParent(battleManager.battleUIParent.transform, false);
             }
             totalValueText.text = finalScore.ToString();
+            if (PlayerRollUI.isLowRollActive)
+            {
+                totalValueText.text = finalScore.ToString() + " (-10%)";
+            }
             totalValueText.gameObject.SetActive(true);
         }
 
@@ -724,6 +768,10 @@ public class DeckManager : MonoBehaviour
             if (totalValueText != null)
             {
                 totalValueText.text = currentDisplayScore.ToString();
+                if (PlayerRollUI.isLowRollActive)
+                {
+                    totalValueText.text = currentDisplayScore.ToString() + " (-10%)";
+                }
             }
 
             currentRemainingScore = currentDisplayRemaining;
@@ -735,6 +783,10 @@ public class DeckManager : MonoBehaviour
         if (totalValueText != null)
         {
             totalValueText.text = "0";
+            if (PlayerRollUI.isLowRollActive)
+            {
+                totalValueText.text = "0 (-10%)";
+            }
         }
 
         currentRemainingScore = targetRemainingScore;
@@ -801,6 +853,12 @@ public class DeckManager : MonoBehaviour
         if (layoutGroup != null) layoutGroup.enabled = true;
 
         ResetRoundState();
+
+        // Re-enable battle camera button interactions now that full countdown and animation sequence ended
+        if (battleManager != null)
+        {
+            battleManager.SetBattleUIInteractable(true);
+        }
 
         if (currentRemainingScore <= 0)
         {

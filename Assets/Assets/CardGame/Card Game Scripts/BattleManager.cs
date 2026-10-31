@@ -28,12 +28,28 @@ public class BattleManager : MonoBehaviour
     [Tooltip("TextMeshProUGUI element that displays text like 'ROUND 1/5'.")]
     public TextMeshProUGUI roundPopupText;
 
+    [Header("Ending Sequence UI References")]
+    public GameObject endingRootObject;         // The ENDING parent GameObject
+    public Transform paperImgTransform;         // PAPERIMG Transform (SpriteRenderer object)
+    public TextMeshProUGUI targetScoreTxt;      // TARGETSCORETXT
+    public TextMeshProUGUI yourScoreTxt;        // YOURSCORETXT
+    public TextMeshProUGUI starsGainedTxt;      // STARSGAINEDTEXT
+    public GameObject winGameObject;            // WIN parent object
+    public GameObject lostGameObject;           // LOST parent object
+
+    [Header("Ending Settings")]
+    public int starsGainedOnWin = 1;            // Configurable stars in inspector
+    public float paperFlyDuration = 0.5f;
+    public float countAnimationDuration = 0.8f; // Duration per individual stat count
+    public float stampAnimationDuration = 0.35f;
+    public float delayBeforeStamp = 1.0f;      // Wait time after stars gained before stamp plays
+
     [Header("Round Settings")]
     [Tooltip("Total number of rounds in this battle.")]
     public int maxRounds = 5;
     [Range(0f, 1f)]
     [Tooltip("Transparency of the dim overlay.")]
-    public float dimOverlayAlpha = 0.75f;
+    public float dimOverlayAlpha = 0.95f;
     public float roundFadeInDuration = 0.3f;
     public float roundDisplayDuration = 1.0f;
     public float roundFadeOutDuration = 0.3f;
@@ -56,6 +72,7 @@ public class BattleManager : MonoBehaviour
     private int currentRoundNumber = 1;
     private bool hasMatchStartedOnce = false;
     private bool isMatchOver = false;
+    private bool isWaitingForClickToExit = false;
 
     private void Awake()
     {
@@ -63,6 +80,7 @@ public class BattleManager : MonoBehaviour
         isMatchOver = false;
         hasPlayerWon = false;
         hasPlayerLost = false;
+        isWaitingForClickToExit = false;
 
         if (scoreToBeatUI != null) SetCanvasGroupState(scoreToBeatUI.gameObject, false, 0f);
         if (numberSpinnerUI != null) SetCanvasGroupState(numberSpinnerUI.gameObject, false, 0f);
@@ -70,10 +88,23 @@ public class BattleManager : MonoBehaviour
         if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
         if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
 
+        if (endingRootObject != null) endingRootObject.SetActive(false);
+        if (winGameObject != null) winGameObject.SetActive(false);
+        if (lostGameObject != null) lostGameObject.SetActive(false);
+
         if (currentRoundText1 != null) currentRoundText1.gameObject.SetActive(false);
         if (currentRoundText2 != null) currentRoundText2.gameObject.SetActive(false);
 
         SetBattleUIInteractable(false);
+    }
+
+    private void Update()
+    {
+        if (isWaitingForClickToExit && Input.GetMouseButtonDown(0))
+        {
+            isWaitingForClickToExit = false;
+            StartCoroutine(FinalizeAndExitGame());
+        }
     }
 
     private void Start()
@@ -178,7 +209,9 @@ public class BattleManager : MonoBehaviour
         isMatchOver = true;
         hasPlayerWon = true;
         SetBattleUIInteractable(false);
-        StartCoroutine(ExitGameRoutine("Victory! Target score reached. Exiting..."));
+
+        int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
+        StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsGainedOnWin));
     }
 
     public void TriggerLossCondition()
@@ -187,16 +220,155 @@ public class BattleManager : MonoBehaviour
         isMatchOver = true;
         hasPlayerLost = true;
         SetBattleUIInteractable(false);
-        StartCoroutine(ExitGameRoutine("Failed! Out of rounds. Exiting..."));
+
+        int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
+        StartCoroutine(RunEndingSequence(false, battleTargetScore, finalYourScore, 0));
     }
 
-    private IEnumerator ExitGameRoutine(string logMessage)
+    private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained)
     {
-        if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
-        if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
+        if (cardSystemCanvas != null) cardSystemCanvas.gameObject.SetActive(false);
+        if (roundDimOverlay != null)
+        {
+            roundDimOverlay.gameObject.SetActive(true);
+            // 90% black dim overlay (leaving the background barely visible at 10% visibility)
+            roundDimOverlay.color = new Color(0f, 0f, 0f, 0.9f);
+        }
 
-        Debug.Log(logMessage);
-        yield return new WaitForSecondsRealtime(1.5f);
+        if (endingRootObject != null)
+        {
+            endingRootObject.SetActive(true);
+            EnsureEndingIsAboveDim(endingRootObject);
+        }
+
+        Vector3 finalPaperPos = Vector3.zero;
+        if (paperImgTransform != null)
+        {
+            finalPaperPos = paperImgTransform.position;
+            paperImgTransform.position = new Vector3(finalPaperPos.x, finalPaperPos.y - 15f, finalPaperPos.z);
+        }
+
+        if (targetScoreTxt != null) targetScoreTxt.text = "Target Score: 0";
+        if (yourScoreTxt != null) yourScoreTxt.text = "Your Score: 0";
+        if (starsGainedTxt != null) starsGainedTxt.text = "Stars Gained: 0";
+
+        if (winGameObject != null) winGameObject.SetActive(false);
+        if (lostGameObject != null) lostGameObject.SetActive(false);
+
+        // Fly PAPERIMG from below
+        float elapsed = 0f;
+        Vector3 startPaperPos = paperImgTransform != null ? paperImgTransform.position : Vector3.zero;
+
+        while (elapsed < paperFlyDuration && paperImgTransform != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / paperFlyDuration);
+            float smoothT = 1f - (1f - t) * (1f - t);
+            paperImgTransform.position = Vector3.Lerp(startPaperPos, finalPaperPos, smoothT);
+            yield return null;
+        }
+        if (paperImgTransform != null) paperImgTransform.position = finalPaperPos;
+
+        // 1. COUNT TARGET SCORE
+        yield return StartCoroutine(CountStatSequence(targetScoreTxt, "Target Score: ", targetScore));
+
+        // 2. COUNT YOUR SCORE
+        yield return StartCoroutine(CountStatSequence(yourScoreTxt, "Your Score: ", yourScore));
+
+        // 3. COUNT STARS GAINED
+        yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
+
+        // Delay after counting is fully done before the stamp animation plays
+        yield return new WaitForSecondsRealtime(delayBeforeStamp);
+
+        // 4. Enable Win or Lost Stamping Object with Stamping Animation
+        GameObject targetStampObj = isWin ? winGameObject : lostGameObject;
+        if (targetStampObj != null)
+        {
+            targetStampObj.SetActive(true);
+            EnsureEndingIsAboveDim(targetStampObj);
+            yield return StartCoroutine(StampDropAnimation(targetStampObj.transform));
+        }
+
+        isWaitingForClickToExit = true;
+    }
+
+    private IEnumerator CountStatSequence(TextMeshProUGUI textComponent, string labelPrefix, int targetValue)
+    {
+        float elapsed = 0f;
+        while (elapsed < countAnimationDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / countAnimationDuration);
+            int currentDisplay = Mathf.RoundToInt(Mathf.Lerp(0, targetValue, t));
+
+            if (textComponent != null)
+            {
+                textComponent.text = labelPrefix + currentDisplay;
+            }
+            yield return null;
+        }
+
+        if (textComponent != null)
+        {
+            textComponent.text = labelPrefix + targetValue;
+            yield return StartCoroutine(WiggleTransform(textComponent.transform));
+        }
+    }
+
+    private void EnsureEndingIsAboveDim(GameObject obj)
+    {
+        Canvas canvas = obj.GetComponent<Canvas>();
+        if (canvas == null) canvas = obj.AddComponent<Canvas>();
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 100;
+
+        SpriteRenderer[] renderers = obj.GetComponentsInChildren<SpriteRenderer>(true);
+        foreach (SpriteRenderer sr in renderers)
+        {
+            sr.sortingOrder = Mathf.Max(sr.sortingOrder, 101);
+        }
+    }
+
+    private IEnumerator WiggleTransform(Transform targetTransform)
+    {
+        if (targetTransform == null) yield break;
+        Vector3 originalScale = targetTransform.localScale;
+        float elapsed = 0f;
+        float duration = 0.25f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = elapsed / duration;
+            targetTransform.localScale = originalScale * Mathf.Lerp(1f, 1.25f, Mathf.Sin(t * Mathf.PI));
+            yield return null;
+        }
+        targetTransform.localScale = originalScale;
+    }
+
+    private IEnumerator StampDropAnimation(Transform stampTransform)
+    {
+        if (stampTransform == null) yield break;
+
+        Vector3 originalScale = stampTransform.localScale;
+        stampTransform.localScale = originalScale * 2.5f;
+
+        float elapsed = 0f;
+        while (elapsed < stampAnimationDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / stampAnimationDuration);
+            stampTransform.localScale = Vector3.Lerp(originalScale * 2.5f, originalScale, t * t);
+            yield return null;
+        }
+        stampTransform.localScale = originalScale;
+    }
+
+    private IEnumerator FinalizeAndExitGame()
+    {
+        Debug.Log("Ending sequence completed. Exiting game...");
+        yield return new WaitForSecondsRealtime(0.1f);
 
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;

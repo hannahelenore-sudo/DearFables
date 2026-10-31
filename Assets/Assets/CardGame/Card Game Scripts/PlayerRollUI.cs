@@ -14,7 +14,7 @@ public class PlayerRollUI : MonoBehaviour
     public Image playerShieldImage;
     public TextMeshProUGUI enemyNumberText;
     public Image enemyShieldImage;
-    [Tooltip("Text object shown on the roll screen on high rolls.")]
+    [Tooltip("Text object shown on the roll screen on high/low rolls.")]
     public TextMeshProUGUI notificationText;
 
     [Header("Shield State Images")]
@@ -58,6 +58,7 @@ public class PlayerRollUI : MonoBehaviour
 
     [HideInInspector] public bool hasRolledThisRound = false;
     [HideInInspector] public static bool isHighRollActive = false;
+    [HideInInspector] public static bool isLowRollActive = false;
 
     private bool isRolling = false;
     private int currentEnemyDefense = 1;
@@ -116,13 +117,14 @@ public class PlayerRollUI : MonoBehaviour
 
         currentEnemyDefense = enemyRolledDefense;
         isHighRollActive = false;
+        isLowRollActive = false;
         CleanupConfetti();
 
         currentShieldZRotation = 0f;
         if (playerShieldImage != null)
         {
             if (defaultShieldSprite != null) playerShieldImage.sprite = defaultShieldSprite;
-            playerShieldImage.color = new Color(1f, 1f, 1f, 1f); // Always full opacity
+            playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
             playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
         }
 
@@ -192,6 +194,7 @@ public class PlayerRollUI : MonoBehaviour
         hasRolledThisRound = true;
         isRolling = false;
         isHighRollActive = false;
+        isLowRollActive = false;
 
         SetButtonsInteractable(false);
 
@@ -238,7 +241,6 @@ public class PlayerRollUI : MonoBehaviour
         isRolling = true;
         float elapsedTime = 0f;
 
-        // NO DIMMING: Shield stays 100% solid white opacity while rolling numbers
         if (playerShieldImage != null)
         {
             playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
@@ -310,18 +312,32 @@ public class PlayerRollUI : MonoBehaviour
         {
             if (tieShieldSprite != null) playerShieldImage.sprite = tieShieldSprite;
             isHighRollActive = false;
+            isLowRollActive = false;
         }
         else if (difference < -tieThreshold)
         {
             if (lowRollShieldSprite != null) playerShieldImage.sprite = lowRollShieldSprite;
             isHighRollActive = false;
+            isLowRollActive = true;
+
+            TriggerLowRollEffects();
         }
         else
         {
             if (highRollShieldSprite != null) playerShieldImage.sprite = highRollShieldSprite;
             isHighRollActive = true;
+            isLowRollActive = false;
 
             TriggerHighRollEffects();
+        }
+    }
+
+    private void TriggerLowRollEffects()
+    {
+        if (notificationText != null)
+        {
+            notificationText.text = "-10%";
+            notificationText.gameObject.SetActive(true);
         }
     }
 
@@ -556,6 +572,7 @@ public class PlayerRollUI : MonoBehaviour
         isRolling = false;
         hasRolledThisRound = false;
         isHighRollActive = false;
+        isLowRollActive = false;
         CleanupConfetti();
 
         currentShieldZRotation = 0f;
