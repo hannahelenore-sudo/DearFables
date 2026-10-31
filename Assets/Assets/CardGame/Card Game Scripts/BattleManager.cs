@@ -231,14 +231,22 @@ public class BattleManager : MonoBehaviour
         if (roundDimOverlay != null)
         {
             roundDimOverlay.gameObject.SetActive(true);
-            // 90% black dim overlay (leaving the background barely visible at 10% visibility)
             roundDimOverlay.color = new Color(0f, 0f, 0f, 0.9f);
+
+            // Dim overlay sits at sorting order 10 to dim the background canvas battle
+            Canvas dimCanvas = roundDimOverlay.GetComponent<Canvas>();
+            if (dimCanvas == null) dimCanvas = roundDimOverlay.gameObject.AddComponent<Canvas>();
+            dimCanvas.overrideSorting = true;
+            dimCanvas.sortingOrder = 10;
+
+            if (roundDimOverlay.GetComponent<GraphicRaycaster>() == null)
+                roundDimOverlay.gameObject.AddComponent<GraphicRaycaster>();
         }
 
         if (endingRootObject != null)
         {
             endingRootObject.SetActive(true);
-            EnsureEndingIsAboveDim(endingRootObject);
+            ConfigureEndingSortingOrders();
         }
 
         Vector3 finalPaperPos = Vector3.zero;
@@ -281,16 +289,76 @@ public class BattleManager : MonoBehaviour
         // Delay after counting is fully done before the stamp animation plays
         yield return new WaitForSecondsRealtime(delayBeforeStamp);
 
-        // 4. Enable Win or Lost Stamping Object with Stamping Animation
+        // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top)
         GameObject targetStampObj = isWin ? winGameObject : lostGameObject;
         if (targetStampObj != null)
         {
             targetStampObj.SetActive(true);
-            EnsureEndingIsAboveDim(targetStampObj);
+
+            // Stamp canvas at sorting order 30 (front of ending sequence)
+            Canvas stampCanvas = targetStampObj.GetComponent<Canvas>();
+            if (stampCanvas == null) stampCanvas = targetStampObj.AddComponent<Canvas>();
+            stampCanvas.overrideSorting = true;
+            stampCanvas.sortingOrder = 30;
+
             yield return StartCoroutine(StampDropAnimation(targetStampObj.transform));
         }
 
         isWaitingForClickToExit = true;
+    }
+
+    private void ConfigureEndingSortingOrders()
+    {
+        // 1. Paper / Root Canvas (Sorting Order 20 - Back of ending sequence)
+        if (endingRootObject != null)
+        {
+            Canvas rootCanvas = endingRootObject.GetComponent<Canvas>();
+            if (rootCanvas == null) rootCanvas = endingRootObject.AddComponent<Canvas>();
+            rootCanvas.overrideSorting = true;
+            rootCanvas.sortingOrder = 20;
+
+            if (endingRootObject.GetComponent<CanvasScaler>() == null)
+                endingRootObject.AddComponent<CanvasScaler>();
+            if (endingRootObject.GetComponent<GraphicRaycaster>() == null)
+                endingRootObject.AddComponent<GraphicRaycaster>();
+        }
+
+        // 2. Text Canvas/Layer (Sorting Order 25 - Directly above the paper)
+        SetCanvasOrder(targetScoreTxt, 25);
+        SetCanvasOrder(yourScoreTxt, 25);
+        SetCanvasOrder(starsGainedTxt, 25);
+
+        // 3. Win / Lose GameObjects (Sorting Order 30 - Absolute front of ending sequence)
+        if (winGameObject != null)
+        {
+            Canvas winCanvas = winGameObject.GetComponent<Canvas>();
+            if (winCanvas == null) winCanvas = winGameObject.AddComponent<Canvas>();
+            winCanvas.overrideSorting = true;
+            winCanvas.sortingOrder = 30;
+        }
+
+        if (lostGameObject != null)
+        {
+            Canvas loseCanvas = lostGameObject.GetComponent<Canvas>();
+            if (loseCanvas == null) loseCanvas = lostGameObject.AddComponent<Canvas>();
+            loseCanvas.overrideSorting = true;
+            loseCanvas.sortingOrder = 30;
+        }
+    }
+
+    private void SetCanvasOrder(Component comp, int order)
+    {
+        if (comp == null) return;
+        Canvas canvas = comp.GetComponent<Canvas>();
+        if (canvas == null) canvas = comp.gameObject.AddComponent<Canvas>();
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = order;
+
+        SpriteRenderer[] renderers = comp.GetComponentsInChildren<SpriteRenderer>(true);
+        foreach (SpriteRenderer sr in renderers)
+        {
+            sr.sortingOrder = Mathf.Max(sr.sortingOrder, order + 1);
+        }
     }
 
     private IEnumerator CountStatSequence(TextMeshProUGUI textComponent, string labelPrefix, int targetValue)
@@ -313,20 +381,6 @@ public class BattleManager : MonoBehaviour
         {
             textComponent.text = labelPrefix + targetValue;
             yield return StartCoroutine(WiggleTransform(textComponent.transform));
-        }
-    }
-
-    private void EnsureEndingIsAboveDim(GameObject obj)
-    {
-        Canvas canvas = obj.GetComponent<Canvas>();
-        if (canvas == null) canvas = obj.AddComponent<Canvas>();
-        canvas.overrideSorting = true;
-        canvas.sortingOrder = 100;
-
-        SpriteRenderer[] renderers = obj.GetComponentsInChildren<SpriteRenderer>(true);
-        foreach (SpriteRenderer sr in renderers)
-        {
-            sr.sortingOrder = Mathf.Max(sr.sortingOrder, 101);
         }
     }
 
