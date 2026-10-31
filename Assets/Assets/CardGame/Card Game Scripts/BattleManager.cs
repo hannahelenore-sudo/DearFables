@@ -17,6 +17,7 @@ public class BattleManager : MonoBehaviour
     public GameObject battleUIParent;
     public ScoreToBeatUI scoreToBeatUI;
     public NumberSpinnerUI numberSpinnerUI;
+    public ScoreShakeEffect scoreShakeEffect; // Reference to the score shake/fall script
 
     [Header("Current Round Text References")]
     public TextMeshProUGUI currentRoundText1;
@@ -30,7 +31,7 @@ public class BattleManager : MonoBehaviour
 
     [Header("Ending Sequence UI References")]
     public GameObject endingRootObject;         // The ENDING parent GameObject
-    public Transform paperImgTransform;         // PAPERIMG Transform (SpriteRenderer object)
+    public RectTransform paperImgTransform;     // PAPERIMG RectTransform
     public TextMeshProUGUI targetScoreTxt;      // TARGETSCORETXT
     public TextMeshProUGUI yourScoreTxt;        // YOURSCORETXT
     public TextMeshProUGUI starsGainedTxt;      // STARSGAINEDTEXT
@@ -210,6 +211,12 @@ public class BattleManager : MonoBehaviour
         hasPlayerWon = true;
         SetBattleUIInteractable(false);
 
+        // Trigger the bread-like falling effect when score hits zero
+        if (scoreShakeEffect != null)
+        {
+            scoreShakeEffect.TriggerFallDown();
+        }
+
         int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
         StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsGainedOnWin));
     }
@@ -228,32 +235,35 @@ public class BattleManager : MonoBehaviour
     private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained)
     {
         if (cardSystemCanvas != null) cardSystemCanvas.gameObject.SetActive(false);
+
+        // 1. DIM OVERLAY (Sorting Order 500 - Dims background only)
         if (roundDimOverlay != null)
         {
             roundDimOverlay.gameObject.SetActive(true);
             roundDimOverlay.color = new Color(0f, 0f, 0f, 0.9f);
 
-            // Dim overlay sits at sorting order 10 to dim the background canvas battle
             Canvas dimCanvas = roundDimOverlay.GetComponent<Canvas>();
             if (dimCanvas == null) dimCanvas = roundDimOverlay.gameObject.AddComponent<Canvas>();
             dimCanvas.overrideSorting = true;
-            dimCanvas.sortingOrder = 10;
+            dimCanvas.sortingOrder = 500;
 
             if (roundDimOverlay.GetComponent<GraphicRaycaster>() == null)
                 roundDimOverlay.gameObject.AddComponent<GraphicRaycaster>();
         }
 
+        // 2. ENDING ROOT & PAPER (Sorting Order 501 - Sits brightly above dim)
         if (endingRootObject != null)
         {
             endingRootObject.SetActive(true);
             ConfigureEndingSortingOrders();
         }
 
-        Vector3 finalPaperPos = Vector3.zero;
+        // Handle Paper Sliding Animation using Anchored Position
+        Vector2 finalAnchoredPos = Vector2.zero;
         if (paperImgTransform != null)
         {
-            finalPaperPos = paperImgTransform.position;
-            paperImgTransform.position = new Vector3(finalPaperPos.x, finalPaperPos.y - 15f, finalPaperPos.z);
+            finalAnchoredPos = paperImgTransform.anchoredPosition;
+            paperImgTransform.anchoredPosition = new Vector2(finalAnchoredPos.x, finalAnchoredPos.y - 600f);
         }
 
         if (targetScoreTxt != null) targetScoreTxt.text = "Target Score: 0";
@@ -263,19 +273,19 @@ public class BattleManager : MonoBehaviour
         if (winGameObject != null) winGameObject.SetActive(false);
         if (lostGameObject != null) lostGameObject.SetActive(false);
 
-        // Fly PAPERIMG from below
+        // Fly PAPERIMG smoothly from below using local anchoredPosition
         float elapsed = 0f;
-        Vector3 startPaperPos = paperImgTransform != null ? paperImgTransform.position : Vector3.zero;
+        Vector2 startAnchoredPos = paperImgTransform != null ? paperImgTransform.anchoredPosition : Vector2.zero;
 
         while (elapsed < paperFlyDuration && paperImgTransform != null)
         {
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / paperFlyDuration);
             float smoothT = 1f - (1f - t) * (1f - t);
-            paperImgTransform.position = Vector3.Lerp(startPaperPos, finalPaperPos, smoothT);
+            paperImgTransform.anchoredPosition = Vector2.Lerp(startAnchoredPos, finalAnchoredPos, smoothT);
             yield return null;
         }
-        if (paperImgTransform != null) paperImgTransform.position = finalPaperPos;
+        if (paperImgTransform != null) paperImgTransform.anchoredPosition = finalAnchoredPos;
 
         // 1. COUNT TARGET SCORE
         yield return StartCoroutine(CountStatSequence(targetScoreTxt, "Target Score: ", targetScore));
@@ -289,17 +299,22 @@ public class BattleManager : MonoBehaviour
         // Delay after counting is fully done before the stamp animation plays
         yield return new WaitForSecondsRealtime(delayBeforeStamp);
 
-        // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top)
+        // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top - Sorting Order 503)
         GameObject targetStampObj = isWin ? winGameObject : lostGameObject;
         if (targetStampObj != null)
         {
             targetStampObj.SetActive(true);
 
-            // Stamp canvas at sorting order 30 (front of ending sequence)
             Canvas stampCanvas = targetStampObj.GetComponent<Canvas>();
             if (stampCanvas == null) stampCanvas = targetStampObj.AddComponent<Canvas>();
             stampCanvas.overrideSorting = true;
-            stampCanvas.sortingOrder = 30;
+            stampCanvas.sortingOrder = 503;
+
+            SpriteRenderer[] stampRenders = targetStampObj.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in stampRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 504);
+            }
 
             yield return StartCoroutine(StampDropAnimation(targetStampObj.transform));
         }
@@ -309,32 +324,44 @@ public class BattleManager : MonoBehaviour
 
     private void ConfigureEndingSortingOrders()
     {
-        // 1. Paper / Root Canvas (Sorting Order 20 - Back of ending sequence)
+        // 1. Paper / Root Canvas (Sorting Order 501 - Above dim overlay 500)
         if (endingRootObject != null)
         {
             Canvas rootCanvas = endingRootObject.GetComponent<Canvas>();
             if (rootCanvas == null) rootCanvas = endingRootObject.AddComponent<Canvas>();
             rootCanvas.overrideSorting = true;
-            rootCanvas.sortingOrder = 20;
+            rootCanvas.sortingOrder = 501;
 
             if (endingRootObject.GetComponent<CanvasScaler>() == null)
                 endingRootObject.AddComponent<CanvasScaler>();
             if (endingRootObject.GetComponent<GraphicRaycaster>() == null)
                 endingRootObject.AddComponent<GraphicRaycaster>();
+
+            SpriteRenderer[] paperRenders = endingRootObject.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in paperRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 501);
+            }
         }
 
-        // 2. Text Canvas/Layer (Sorting Order 25 - Directly above the paper)
-        SetCanvasOrder(targetScoreTxt, 25);
-        SetCanvasOrder(yourScoreTxt, 25);
-        SetCanvasOrder(starsGainedTxt, 25);
+        // 2. Text Canvas/Layer (Sorting Order 502 - Directly above paper)
+        SetCanvasOrder(targetScoreTxt, 502);
+        SetCanvasOrder(yourScoreTxt, 502);
+        SetCanvasOrder(starsGainedTxt, 502);
 
-        // 3. Win / Lose GameObjects (Sorting Order 30 - Absolute front of ending sequence)
+        // 3. Win / Lose GameObjects (Sorting Order 503 - Absolute front of everything)
         if (winGameObject != null)
         {
             Canvas winCanvas = winGameObject.GetComponent<Canvas>();
             if (winCanvas == null) winCanvas = winGameObject.AddComponent<Canvas>();
             winCanvas.overrideSorting = true;
-            winCanvas.sortingOrder = 30;
+            winCanvas.sortingOrder = 503;
+
+            SpriteRenderer[] winRenders = winGameObject.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in winRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 504);
+            }
         }
 
         if (lostGameObject != null)
@@ -342,7 +369,13 @@ public class BattleManager : MonoBehaviour
             Canvas loseCanvas = lostGameObject.GetComponent<Canvas>();
             if (loseCanvas == null) loseCanvas = lostGameObject.AddComponent<Canvas>();
             loseCanvas.overrideSorting = true;
-            loseCanvas.sortingOrder = 30;
+            loseCanvas.sortingOrder = 503;
+
+            SpriteRenderer[] loseRenders = lostGameObject.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer sr in loseRenders)
+            {
+                sr.sortingOrder = Mathf.Max(sr.sortingOrder, 504);
+            }
         }
     }
 
