@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: dc5b6078032080e4c8370cfbbc3f7701
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures:
+  - _MainTex: {instanceID: 0}
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 281626
+  packageName: Fake Shadow For 2D
+  packageVersion: 1.0
+  assetPath: Assets/TheAnh1402/FakeShadowFor2D/Materials/FakeShadowTest.shader
+  uploadId: 655423

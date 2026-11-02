@@ -1,9 +1,11 @@
+
 using UnityEngine;
 using System.Collections.Generic;
 
 public class TreeSpawner : MonoBehaviour
 {
-    public GameObject treePrefab;
+    [Header("Tree Styles")]
+    public GameObject[] treePrefabs;
 
     [Header("Spawn Area")]
     public BoxCollider spawnArea;
@@ -30,6 +32,9 @@ public class TreeSpawner : MonoBehaviour
 
     void SpawnTree()
     {
+        if (treePrefabs == null || treePrefabs.Length == 0)
+            return;
+
         Bounds bounds = spawnArea.bounds;
 
         Vector3 position = Vector3.zero;
@@ -65,8 +70,13 @@ public class TreeSpawner : MonoBehaviour
 
         spawnedPositions.Add(position);
 
+        GameObject selectedTree = treePrefabs[Random.Range(0, treePrefabs.Length)];
+
+        if (selectedTree == null)
+            return;
+
         GameObject tree = Instantiate(
-            treePrefab,
+            selectedTree,
             position,
             Quaternion.identity,
             transform
@@ -74,11 +84,7 @@ public class TreeSpawner : MonoBehaviour
 
         float scale = Random.Range(minScale, maxScale);
 
-        tree.transform.localScale = new Vector3(
-            scale,
-            scale,
-            scale
-        );
+        tree.transform.localScale = new Vector3(scale, scale, scale);
 
         SpriteRenderer sprite = tree.GetComponent<SpriteRenderer>();
 
