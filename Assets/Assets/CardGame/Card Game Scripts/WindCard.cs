@@ -9,9 +9,21 @@ public class WindCard : CardData
 
     public override int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
     {
-        if (selectedCards != null && selectedCards.Count == requiredCards)
+        if (selectedCards != null)
         {
-            return currentTotal * multiplier;
+            int windCount = 0;
+            foreach (var card in selectedCards)
+            {
+                if (card != null && card.cardData is WindCard)
+                {
+                    windCount++;
+                }
+            }
+
+            if (windCount >= requiredCards)
+            {
+                return currentTotal * multiplier;
+            }
         }
         return currentTotal;
     }

@@ -21,3 +21,4 @@ MonoBehaviour:
   primaryValue: 10
   secondaryValue: 0
   frameColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverIcon: {fileID: 21300000, guid: ff9ca4f39a881694da2d9a9000db015f, type: 3}

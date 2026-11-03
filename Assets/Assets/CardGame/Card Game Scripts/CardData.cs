@@ -22,11 +22,12 @@ public class CardData : ScriptableObject
     public int secondaryValue = 0;
     public Color frameColor = Color.white;
 
-    /// <summary>
-    /// Virtual function that each card script overrides to apply its custom logic.
-    /// </summary>
+    [Header("Hover UI Settings")]
+    [Tooltip("Icon image displayed inside the hover bubble tooltip text.")]
+    public Sprite hoverIcon;
+
     public virtual int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
     {
-        return currentTotal; // Default cards do not alter the score
+        return currentTotal;
     }
 }

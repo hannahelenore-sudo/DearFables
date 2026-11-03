@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -13,16 +14,21 @@ public class PlayerRollUI : MonoBehaviour
     public Image playerShieldImage;
     public TextMeshProUGUI enemyNumberText;
     public Image enemyShieldImage;
+    [Tooltip("Text object shown on the roll screen on high/low rolls.")]
+    public TextMeshProUGUI notificationText;
 
     [Header("Shield State Images")]
-    [Tooltip("Difference within this range counts as a Tie/Close roll during normal spins (e.g., 1 means diff between -1 and +1 is a Tie).")]
+    [Tooltip("Difference within this range counts as a Tie/Close roll during normal spins.")]
     public int tieThreshold = 1;
-    [Tooltip("Sprite used when player skips, or rolls a tie/close number.")]
     public Sprite tieShieldSprite;
-    [Tooltip("Sprite used when player rolls much lower than enemy defense.")]
     public Sprite lowRollShieldSprite;
-    [Tooltip("Sprite used when player rolls much higher than enemy defense.")]
     public Sprite highRollShieldSprite;
+
+    [Header("High Roll Confetti Settings")]
+    [Tooltip("Sprite of the star used for confetti falling on high rolls.")]
+    public Sprite starConfettiSprite;
+    public float confettiSpawnInterval = 0.15f;
+    public float confettiFallDuration = 2.0f;
 
     [Header("Manager References")]
     public BattleManager battleManager;
@@ -36,12 +42,11 @@ public class PlayerRollUI : MonoBehaviour
     [Header("Spin & Roll Settings")]
     public float spinDuration = 1.2f;
     public float spinSpeed = 0.05f;
-    public float lingerDuration = 0.8f;
+    public float lingerDuration = 1.5f;
     public int minRoll = 1;
     public int maxRoll = 10;
 
     [Header("Pop & Wiggle Settings")]
-    [Tooltip("Target RectTransform for pop/wiggle animations. Uses Player Shield/Number container if assigned.")]
     public RectTransform playerRollContainer;
     public float popScaleMultiplier = 1.35f;
     public float wiggleAngle = 10f;
@@ -52,11 +57,17 @@ public class PlayerRollUI : MonoBehaviour
     public float fadeOutDuration = 0.3f;
 
     [HideInInspector] public bool hasRolledThisRound = false;
+    [HideInInspector] public static bool isHighRollActive = false;
+    [HideInInspector] public static bool isLowRollActive = false;
 
     private bool isRolling = false;
     private int currentEnemyDefense = 1;
     private Vector3 initialContainerScale = Vector3.one;
     private Sprite defaultShieldSprite;
+    private Coroutine confettiRoutine;
+    private Coroutine shieldSpinRoutine;
+    private List<GameObject> activeConfettiList = new List<GameObject>();
+    private float currentShieldZRotation = 0f;
 
     private void Awake()
     {
@@ -93,6 +104,11 @@ public class PlayerRollUI : MonoBehaviour
             skipButton.onClick.RemoveAllListeners();
             skipButton.onClick.AddListener(SkipRoll);
         }
+
+        if (notificationText != null)
+        {
+            notificationText.gameObject.SetActive(false);
+        }
     }
 
     public void OpenPlayerRollView(int enemyRolledDefense)
@@ -100,11 +116,27 @@ public class PlayerRollUI : MonoBehaviour
         if (hasRolledThisRound) return;
 
         currentEnemyDefense = enemyRolledDefense;
+        isHighRollActive = false;
+        isLowRollActive = false;
+        CleanupConfetti();
 
-        // Reset player shield sprite back to default when starting a view
-        if (playerShieldImage != null && defaultShieldSprite != null)
+        currentShieldZRotation = 0f;
+        if (playerShieldImage != null)
         {
-            playerShieldImage.sprite = defaultShieldSprite;
+            if (defaultShieldSprite != null) playerShieldImage.sprite = defaultShieldSprite;
+            playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
+            playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
+        }
+
+        if (playerNumberText != null)
+        {
+            playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+        }
+
+        if (notificationText != null)
+        {
+            notificationText.text = "";
+            notificationText.gameObject.SetActive(false);
         }
 
         if (playerRollCanvas != null)
@@ -121,12 +153,13 @@ public class PlayerRollUI : MonoBehaviour
         }
 
         if (enemyNumberText != null) enemyNumberText.text = currentEnemyDefense.ToString();
-        if (playerNumberText != null) playerNumberText.text = "?";
+        if (playerNumberText != null)
+        {
+            playerNumberText.text = "?";
+            playerNumberText.gameObject.SetActive(true);
+        }
 
-        if (rollTriggerButton != null) rollTriggerButton.interactable = true;
-        if (backButton != null) backButton.interactable = true;
-        if (skipButton != null) skipButton.interactable = true;
-
+        SetButtonsInteractable(true);
         isRolling = false;
 
         StartCoroutine(FadeCanvasGroupRoutine(0f, 1f, fadeInDuration));
@@ -145,22 +178,23 @@ public class PlayerRollUI : MonoBehaviour
         if (isRolling) return;
 
         StopAllCoroutines();
+        CleanupConfetti();
         isRolling = false;
 
         StartCoroutine(CloseAndReturnToBattleView());
     }
 
-    /// <summary>
-    /// Forces the outcome to a Tie, updates player UI with enemy's value, replaces shield with tieShieldSprite, and proceeds.
-    /// </summary>
     public void SkipRoll()
     {
         if (hasRolledThisRound) return;
 
         StopAllCoroutines();
+        CleanupConfetti();
 
         hasRolledThisRound = true;
         isRolling = false;
+        isHighRollActive = false;
+        isLowRollActive = false;
 
         SetButtonsInteractable(false);
 
@@ -170,18 +204,25 @@ public class PlayerRollUI : MonoBehaviour
             playerRollContainer.localScale = initialContainerScale;
         }
 
-        // Force rolled value to match enemy's defense for an exact tie
+        currentShieldZRotation = 0f;
+        if (playerShieldImage != null)
+        {
+            playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
+        }
+
         int finalRolledValue = currentEnemyDefense;
 
         if (playerNumberText != null)
         {
             playerNumberText.text = finalRolledValue.ToString();
+            playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+            playerNumberText.gameObject.SetActive(true);
         }
 
-        // Force-apply the Tie shield sprite
-        if (playerShieldImage != null && tieShieldSprite != null)
+        if (playerShieldImage != null)
         {
-            playerShieldImage.sprite = tieShieldSprite;
+            playerShieldImage.sprite = tieShieldSprite != null ? tieShieldSprite : defaultShieldSprite;
+            playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
         }
 
         StartCoroutine(SkipRollRoutine(finalRolledValue));
@@ -200,6 +241,16 @@ public class PlayerRollUI : MonoBehaviour
         isRolling = true;
         float elapsedTime = 0f;
 
+        if (playerShieldImage != null)
+        {
+            playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
+        }
+
+        if (playerNumberText != null)
+        {
+            playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+        }
+
         while (elapsedTime < spinDuration)
         {
             int randomDisplay = Random.Range(minRoll, maxRoll + 1);
@@ -207,6 +258,7 @@ public class PlayerRollUI : MonoBehaviour
             if (playerNumberText != null)
             {
                 playerNumberText.text = randomDisplay.ToString();
+                playerNumberText.gameObject.SetActive(true);
             }
 
             yield return new WaitForSecondsRealtime(spinSpeed);
@@ -218,9 +270,10 @@ public class PlayerRollUI : MonoBehaviour
         if (playerNumberText != null)
         {
             playerNumberText.text = finalRolledValue.ToString();
+            playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+            playerNumberText.gameObject.SetActive(true);
         }
 
-        // Evaluate roll result and replace shield image accordingly
         EvaluateShieldState(finalRolledValue);
 
         yield return StartCoroutine(PopAndWiggleRoutine());
@@ -229,35 +282,180 @@ public class PlayerRollUI : MonoBehaviour
 
         hasRolledThisRound = true;
 
+        CleanupConfetti();
+        if (shieldSpinRoutine != null)
+        {
+            StopCoroutine(shieldSpinRoutine);
+            shieldSpinRoutine = null;
+            currentShieldZRotation = 0f;
+            if (playerShieldImage != null) playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
+        }
+
         yield return StartCoroutine(FadeCanvasGroupRoutine(1f, 0f, fadeOutDuration));
 
         CompleteRollSequence(finalRolledValue);
     }
 
-    /// <summary>
-    /// Swaps the player's shield image depending on roll outcome compared to enemy defense.
-    /// </summary>
     private void EvaluateShieldState(int playerRoll)
     {
         if (playerShieldImage == null) return;
 
         int difference = playerRoll - currentEnemyDefense;
 
-        // State 1: Tie or close roll
+        playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
+        if (playerNumberText != null)
+        {
+            playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+        }
+
         if (Mathf.Abs(difference) <= tieThreshold)
         {
             if (tieShieldSprite != null) playerShieldImage.sprite = tieShieldSprite;
+            isHighRollActive = false;
+            isLowRollActive = false;
         }
-        // State 2: Lower roll than enemy
         else if (difference < -tieThreshold)
         {
             if (lowRollShieldSprite != null) playerShieldImage.sprite = lowRollShieldSprite;
+            isHighRollActive = false;
+            isLowRollActive = true;
+
+            TriggerLowRollEffects();
         }
-        // State 3: Higher roll than enemy
         else
         {
             if (highRollShieldSprite != null) playerShieldImage.sprite = highRollShieldSprite;
+            isHighRollActive = true;
+            isLowRollActive = false;
+
+            TriggerHighRollEffects();
         }
+    }
+
+    private void TriggerLowRollEffects()
+    {
+        if (notificationText != null)
+        {
+            notificationText.text = "-10%";
+            notificationText.gameObject.SetActive(true);
+        }
+    }
+
+    private void TriggerHighRollEffects()
+    {
+        if (notificationText != null)
+        {
+            notificationText.text = "X1.5 on this round";
+            notificationText.gameObject.SetActive(true);
+        }
+
+        if (playerRollCanvas != null && starConfettiSprite != null)
+        {
+            if (confettiRoutine != null) StopCoroutine(confettiRoutine);
+            confettiRoutine = StartCoroutine(InfiniteConfettiLoop());
+        }
+
+        if (playerShieldImage != null)
+        {
+            if (shieldSpinRoutine != null) StopCoroutine(shieldSpinRoutine);
+            shieldSpinRoutine = StartCoroutine(SpinShieldRoutine());
+        }
+    }
+
+    private IEnumerator InfiniteConfettiLoop()
+    {
+        while (true)
+        {
+            SpawnSingleConfetti();
+            yield return new WaitForSecondsRealtime(confettiSpawnInterval);
+        }
+    }
+
+    private void SpawnSingleConfetti()
+    {
+        if (playerRollCanvas == null || starConfettiSprite == null) return;
+
+        RectTransform canvasRect = playerRollCanvas.GetComponent<RectTransform>();
+
+        GameObject confettiObj = new GameObject("StarConfetti", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        confettiObj.transform.SetParent(playerRollCanvas.transform, false);
+
+        Image img = confettiObj.GetComponent<Image>();
+        img.sprite = starConfettiSprite;
+        img.raycastTarget = false;
+
+        RectTransform rect = confettiObj.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(Random.Range(30f, 65f), Random.Range(30f, 65f));
+
+        float randomX = Random.Range(-canvasRect.rect.width / 2f, canvasRect.rect.width / 2f);
+        float startY = canvasRect.rect.height / 2f + 50f;
+        rect.anchoredPosition = new Vector2(randomX, startY);
+
+        activeConfettiList.Add(confettiObj);
+        StartCoroutine(FallConfettiPiece(rect, confettiFallDuration));
+    }
+
+    private IEnumerator FallConfettiPiece(RectTransform rect, float duration)
+    {
+        float elapsed = 0f;
+        float startY = rect != null ? rect.anchoredPosition.y : 0f;
+        float endY = -700f;
+        float rotationSpeed = Random.Range(-180f, 180f);
+        float swaySpeed = Random.Range(2f, 5f);
+        float swayAmount = Random.Range(20f, 60f);
+        float startX = rect != null ? rect.anchoredPosition.x : 0f;
+
+        while (elapsed < duration && rect != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = elapsed / duration;
+
+            float currentY = Mathf.Lerp(startY, endY, t);
+            float currentX = startX + Mathf.Sin(t * Mathf.PI * swaySpeed) * swayAmount;
+
+            rect.anchoredPosition = new Vector2(currentX, currentY);
+            rect.Rotate(0, 0, rotationSpeed * Time.unscaledDeltaTime);
+
+            yield return null;
+        }
+
+        if (rect != null)
+        {
+            activeConfettiList.Remove(rect.gameObject);
+            Destroy(rect.gameObject);
+        }
+    }
+
+    private IEnumerator SpinShieldRoutine()
+    {
+        while (playerShieldImage != null)
+        {
+            currentShieldZRotation -= 120f * Time.unscaledDeltaTime;
+            playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, currentShieldZRotation);
+
+            if (playerNumberText != null)
+            {
+                playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+                playerNumberText.gameObject.SetActive(true);
+            }
+
+            yield return null;
+        }
+    }
+
+    private void CleanupConfetti()
+    {
+        if (confettiRoutine != null)
+        {
+            StopCoroutine(confettiRoutine);
+            confettiRoutine = null;
+        }
+
+        foreach (GameObject confetti in activeConfettiList)
+        {
+            if (confetti != null) Destroy(confetti);
+        }
+        activeConfettiList.Clear();
     }
 
     private IEnumerator PopAndWiggleRoutine()
@@ -325,6 +523,7 @@ public class PlayerRollUI : MonoBehaviour
     private void CompleteRollSequence(int rolledValue)
     {
         isRolling = false;
+        CleanupConfetti();
 
         if (dimOverlay != null) dimOverlay.gameObject.SetActive(false);
         if (playerRollCanvas != null) playerRollCanvas.gameObject.SetActive(false);
@@ -372,10 +571,32 @@ public class PlayerRollUI : MonoBehaviour
     {
         isRolling = false;
         hasRolledThisRound = false;
+        isHighRollActive = false;
+        isLowRollActive = false;
+        CleanupConfetti();
+
+        currentShieldZRotation = 0f;
+        if (playerShieldImage != null)
+        {
+            if (defaultShieldSprite != null) playerShieldImage.sprite = defaultShieldSprite;
+            playerShieldImage.color = new Color(1f, 1f, 1f, 1f);
+            playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
+        }
 
         if (dimOverlay != null) dimOverlay.gameObject.SetActive(false);
         if (playerRollCanvas != null) playerRollCanvas.gameObject.SetActive(false);
 
         if (rollCanvasGroup != null) rollCanvasGroup.alpha = 1f;
+        if (notificationText != null)
+        {
+            notificationText.text = "";
+            notificationText.gameObject.SetActive(false);
+        }
+
+        if (playerNumberText != null)
+        {
+            playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
+            playerNumberText.gameObject.SetActive(true);
+        }
     }
 }

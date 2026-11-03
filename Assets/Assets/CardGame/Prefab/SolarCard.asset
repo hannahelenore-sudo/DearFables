@@ -21,5 +21,6 @@ MonoBehaviour:
   primaryValue: 10
   secondaryValue: 0
   frameColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverIcon: {fileID: 0}
   requiredCards: 3
   multiplier: 2

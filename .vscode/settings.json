@@ -60,13 +60,13 @@
         "*.asset": "yaml",
         "*.meta": "yaml",
         "*.prefab": "yaml",
-        "*.unity": "yaml",
+        "*.unity": "yaml"
     },
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "Dear, Fables-2026-09-16-18-13-32.slnx",
+    "dotnet.defaultSolution": "DearFables.slnx",
     "dotnet.enableWorkspaceBasedDevelopment": false
 }

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -28,7 +29,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     public float hoverScaleBonus = 0.05f;
 
     [Header("Hover Bubble Customization")]
-    public Vector2 bubbleOffset = new Vector2(0f, 130f);
+    public Vector2 bubbleOffset = new Vector2(0f, 35f); // Lowered closer to the card
     public Color bubbleBackgroundColor = new Color(0f, 0f, 0f, 0.85f);
     public Color bubbleTextColor = Color.yellow;
 
@@ -42,6 +43,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     private GameObject activeValueBubble;
     private Image bubbleBgImage;
     private TextMeshProUGUI bubbleTextComponent;
+    private Image bubbleIconImage;
 
     private float currentVisualOffsetY = 0f;
 
@@ -126,6 +128,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             activeValueBubble = Instantiate(valueBubblePrefab, transform);
             bubbleBgImage = activeValueBubble.GetComponent<Image>();
             bubbleTextComponent = activeValueBubble.GetComponentInChildren<TextMeshProUGUI>();
+            bubbleIconImage = activeValueBubble.GetComponentInChildren<Image>();
         }
         else
         {
@@ -139,7 +142,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
             bubbleTextComponent = textObj.AddComponent<TextMeshProUGUI>();
             bubbleTextComponent.alignment = TextAlignmentOptions.Center;
-            bubbleTextComponent.fontSize = 22;
+            bubbleTextComponent.fontSize = 20;
             bubbleTextComponent.fontStyle = FontStyles.Bold;
 
             RectTransform textRect = textObj.GetComponent<RectTransform>();
@@ -147,6 +150,11 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             textRect.anchorMax = Vector2.one;
             textRect.sizeDelta = Vector2.zero;
             textRect.anchoredPosition = Vector2.zero;
+
+            GameObject iconObj = new GameObject("BubbleIcon", typeof(RectTransform));
+            iconObj.transform.SetParent(activeValueBubble.transform, false);
+            bubbleIconImage = iconObj.AddComponent<Image>();
+            bubbleIconImage.gameObject.SetActive(false);
         }
 
         RectTransform bubbleRect = activeValueBubble.GetComponent<RectTransform>();
@@ -156,7 +164,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             bubbleRect.anchorMax = new Vector2(0.5f, 1f);
             bubbleRect.pivot = new Vector2(0.5f, 0.5f);
             bubbleRect.anchoredPosition = bubbleOffset;
-            bubbleRect.sizeDelta = new Vector2(70f, 45f);
+            bubbleRect.sizeDelta = new Vector2(220f, 95f);
         }
 
         UpdateBubbleVisuals();
@@ -173,10 +181,12 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         if (bubbleTextComponent != null)
         {
             bubbleTextComponent.color = bubbleTextColor;
-            if (cardData != null)
-            {
-                bubbleTextComponent.text = cardData.primaryValue.ToString();
-            }
+            UpdateBubbleText();
+        }
+
+        if (bubbleIconImage != null)
+        {
+            bubbleIconImage.gameObject.SetActive(false);
         }
 
         if (activeValueBubble != null)
@@ -193,7 +203,18 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     {
         if (bubbleTextComponent != null && cardData != null)
         {
-            bubbleTextComponent.text = cardData.primaryValue.ToString();
+            if (cardData is SolarCard solar)
+            {
+                bubbleTextComponent.text = $"{solar.primaryValue}\n<size=85%>(X1.5 if 5 solar cards are selected)</size>";
+            }
+            else if (cardData is WindCard wind)
+            {
+                bubbleTextComponent.text = wind.primaryValue.ToString();
+            }
+            else
+            {
+                bubbleTextComponent.text = cardData.primaryValue.ToString();
+            }
         }
     }
 

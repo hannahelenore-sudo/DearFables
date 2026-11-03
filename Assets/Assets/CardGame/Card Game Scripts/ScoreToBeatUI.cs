@@ -46,7 +46,7 @@ public class ScoreToBeatUI : MonoBehaviour
     {
         if (canvasGroup != null) canvasGroup.alpha = 1f;
 
-        if (headerText != null) headerText.text = "SCORE TO BEAT";
+        if (headerText != null) headerText.text = "SCORE TO BEAT"; // Keep the header text during the animation
         if (scoreText != null) scoreText.text = "1";
 
         float elapsed = 0f;
