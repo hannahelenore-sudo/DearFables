@@ -13,10 +13,10 @@ GameObject:
   - component: {fileID: 4720850032852334675}
   - component: {fileID: 5504985026327014764}
   - component: {fileID: 2588652337554921179}
-  - component: {fileID: 9117864097101546128}
+  - component: {fileID: 2320588993632741644}
   m_Layer: 0
   m_Name: StarPrototype
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -109,7 +109,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StarHover
   bounceHeight: 0.15
   bounceSpeed: 3
-  smoothSpeed: 5
   starValue: 1
 --- !u!54 &5504985026327014764
 Rigidbody:
@@ -161,7 +160,7 @@ CapsuleCollider:
   m_Height: 18
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &9117864097101546128
+--- !u!114 &2320588993632741644
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -173,5 +172,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d27871119ebd71e4e87f40bfb4007830, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StarManager
-  totalStars: 0
   starCounterText: {fileID: 0}

@@ -1,4 +1,3 @@
-
 using UnityEngine;
 using TMPro;
 
@@ -6,8 +5,11 @@ public class StarManager : MonoBehaviour
 {
     public static StarManager Instance;
 
-    public int totalStars = 0;
     public TMP_Text starCounterText;
+
+    // Read-only. The real value lives in PlayerProgress so it survives scene loads.
+    // StarGate (and anything else using StarManager.Instance.totalStars) keeps working unchanged.
+    public int totalStars => PlayerProgress.TotalStars;
 
     void Awake()
     {
@@ -17,7 +19,7 @@ public class StarManager : MonoBehaviour
 
     public void CollectStar(int amount)
     {
-        totalStars += amount;
+        PlayerProgress.AddStars(amount);
         UpdateUI();
 
         Debug.Log("Stars collected: " + totalStars);
@@ -27,7 +29,7 @@ public class StarManager : MonoBehaviour
     {
         if (starCounterText != null)
         {
-            starCounterText.text = "Stars: " + totalStars;
+            starCounterText.text = totalStars.ToString();
         }
     }
 }

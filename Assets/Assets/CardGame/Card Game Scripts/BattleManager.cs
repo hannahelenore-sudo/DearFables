@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class BattleManager : MonoBehaviour
 {
@@ -44,6 +45,7 @@ public class BattleManager : MonoBehaviour
     public float countAnimationDuration = 0.8f; // Duration per individual stat count
     public float stampAnimationDuration = 0.35f;
     public float delayBeforeStamp = 1.0f;      // Wait time after stars gained before stamp plays
+    public string returnSceneName = "YourOtherSceneName";
 
     [Header("Round Settings")]
     [Tooltip("Total number of rounds in this battle.")]
@@ -209,6 +211,7 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerWon = true;
+        PlayerProgress.AddStars(starsGainedOnWin);
         SetBattleUIInteractable(false);
 
         // Trigger the bread-like falling effect when score hits zero
@@ -454,14 +457,19 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator FinalizeAndExitGame()
     {
-        Debug.Log("Ending sequence completed. Exiting game...");
         yield return new WaitForSecondsRealtime(0.1f);
+        Time.timeScale = 1f;
 
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
+        if (BattleTransition.IsPlaying)
+        {
+            // Safety: never get stuck in the card game
+            SceneManager.LoadScene(returnSceneName);
+        }
+        else
+        {
+            // Fade to black, load the game scene under the black, then fade back in
+            BattleTransition.PlayFade(() => SceneManager.LoadScene(returnSceneName), 0.6f);
+        }
     }
 
     public void UpdateBattleTargetScoreDisplay(int remainingScore)

@@ -2608,6 +2608,7 @@ MonoBehaviour:
   countAnimationDuration: 0.8
   stampAnimationDuration: 0.35
   delayBeforeStamp: 1
+  returnSceneName: GameScene
   maxRounds: 5
   dimOverlayAlpha: 0.75
   roundFadeInDuration: 0.3
