@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 /// - Player comes within detectionRange  -> enemy starts chasing.
 /// - Player leaves the range for loseSightTime seconds -> enemy stops chasing.
 /// - If the player comes back into range before the timer runs out, the timer resets.
-/// - Enemy touches the player -> Pokemon-style transition, then the card game starts.
+/// - Enemy touches the player -> hit sound, Pokemon-style transition, then the card game starts.
 /// </summary>
 public class EnemyChase : MonoBehaviour
 {
@@ -30,6 +30,13 @@ public class EnemyChase : MonoBehaviour
     public float touchGraceTime = 2f;
     [Tooltip("Play the Pokemon-style transition before the card game. Needs BattleTransition.cs in the project.")]
     public bool useBattleTransition = true;
+
+    [Header("Sound Effects")]
+    [Tooltip("Played the moment the enemy touches / hits the player.")]
+    public AudioClip hitSound;
+    [Range(0f, 1f)] public float hitVolume = 1f;
+    [Tooltip("Small random pitch change so the sound doesn't feel identical every time. 0 = no variation.")]
+    [Range(0f, 0.3f)] public float hitPitchVariation = 0f;
 
     [Header("Persistence")]
     [Tooltip("Unique name used to remember this enemy was caught. Leave empty to use the object's name (so give each enemy a different name).")]
@@ -93,7 +100,7 @@ public class EnemyChase : MonoBehaviour
 
         float distance = GetDistance(transform.position, player.position);
 
-        // Touched the player -> transition, save position and go to the card game
+        // Touched the player -> sound, transition, save position and go to the card game
         if (distance <= touchDistance && Time.timeSinceLevelLoad >= touchGraceTime)
         {
             StartBattle();
@@ -155,6 +162,8 @@ public class EnemyChase : MonoBehaviour
 
         Debug.Log("EnemyChase: '" + name + "' caught the player, starting battle.");
 
+        PlayHitSound();
+
         if (useBattleTransition)
         {
             // Flash + bars, then enter the battle once the screen is black
@@ -164,6 +173,14 @@ public class EnemyChase : MonoBehaviour
         {
             saver.EnterBattle(false);
         }
+    }
+
+    private void PlayHitSound()
+    {
+        if (hitSound == null) return;
+
+        float pitch = 1f + Random.Range(-hitPitchVariation, hitPitchVariation);
+        GameSFX.Play(hitSound, hitVolume, pitch);
     }
 
     private void LateUpdate()

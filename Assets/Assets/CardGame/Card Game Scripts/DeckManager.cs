@@ -68,6 +68,36 @@ public class DeckManager : MonoBehaviour
     public Camera gameCamera;
     public Camera menuCamera;
 
+    [Header("Balatro Score Display")]
+    public Color chipsColor = new Color(0.30f, 0.65f, 1f);
+    public Color multColor = new Color(1f, 0.30f, 0.30f);
+    [Tooltip("ON: the high roll bonus MULTIPLIES the current mult (Balatro-style X mult). OFF: adds on top like the old behaviour.")]
+    public bool rollBonusIsMultiplicative = true;
+    [Tooltip("How big the score text pops when chips or mult change.")]
+    public float scorePulseScale = 1.3f;
+
+    [Header("Sound Effects")]
+    [Range(0f, 1f)] public float sfxVolume = 1f;
+    public AudioClip openCardViewSound;
+    public AudioClip backButtonSound;
+    public AudioClip drawCardSound;
+    public AudioClip cardSelectSound;
+    public AudioClip cardDeselectSound;
+    public AudioClip discardSound;
+    public AudioClip confirmSound;
+    public AudioClip cardSlideSound;
+    [Tooltip("Played for every scored card. The pitch rises with each card (Balatro style).")]
+    public AudioClip cardScoreSound;
+    [Tooltip("Fallback used when the Solar/Wind card asset has no Bonus Sound of its own.")]
+    public AudioClip setBonusSound;
+    public AudioClip highRollBonusSound;
+    public AudioClip lowRollPenaltySound;
+    public AudioClip finalScoreSound;
+    public AudioClip cameraSwitchSound;
+    public AudioClip countdownTickSound;
+    public float countdownTickInterval = 0.06f;
+    public AudioClip countdownEndSound;
+
     private List<CardUI> spawnedCardUIList = new List<CardUI>();
     private bool isScoring = false;
     private bool isDiscarding = false;
@@ -77,8 +107,17 @@ public class DeckManager : MonoBehaviour
 
     private Transform originalTotalValueParent;
 
+    private int lastSelectedCount = 0;
+    private bool suppressSelectSounds = false;
+    private Vector3 balatroBaseScale = Vector3.one;
+
     void Awake()
     {
+        if (balatroScoreText != null)
+        {
+            balatroBaseScale = balatroScoreText.transform.localScale;
+        }
+
         currentRemainingScore = targetScore;
         if (battleManager == null)
         {
@@ -99,7 +138,7 @@ public class DeckManager : MonoBehaviour
 
         if (balatroScoreText != null)
         {
-            balatroScoreText.text = "1 x 1";
+            SetBalatroText(1, 1f);
             balatroScoreText.gameObject.SetActive(true);
         }
 
@@ -165,6 +204,7 @@ public class DeckManager : MonoBehaviour
 
     private void ResetRoundState()
     {
+        lastSelectedCount = 0;
         cardsRemainingInRound = Mathf.Min(totalDeckCards, drawPile.Count + hand.Count);
         remainingDiscards = maxDiscardsAllowed;
 
@@ -176,7 +216,7 @@ public class DeckManager : MonoBehaviour
 
         if (balatroScoreText != null)
         {
-            balatroScoreText.text = "1 x 1";
+            SetBalatroText(1, 1f);
             balatroScoreText.gameObject.SetActive(true);
         }
     }
@@ -184,6 +224,7 @@ public class DeckManager : MonoBehaviour
     public void OpenCardGameView()
     {
         SetCameraState(inCardView: true);
+        PlaySFX(openCardViewSound);
 
         if (backButton != null)
         {
@@ -251,12 +292,15 @@ public class DeckManager : MonoBehaviour
     {
         if (isScoring || isDiscarding) return;
 
+        PlaySFX(backButtonSound);
         DeselectAllCards();
         SetCameraState(inCardView: false);
     }
 
     public void DeselectAllCards()
     {
+        suppressSelectSounds = true;
+
         foreach (CardUI card in spawnedCardUIList)
         {
             if (card != null)
@@ -265,6 +309,8 @@ public class DeckManager : MonoBehaviour
             }
         }
         UpdateSelectedTotal();
+
+        suppressSelectSounds = false;
     }
 
     public void UpdateTargetScoreDisplay()
@@ -339,6 +385,7 @@ public class DeckManager : MonoBehaviour
             cardsRemainingInRound--;
 
             CreateCardUI(drawnCard);
+            PlaySFX(drawCardSound, Random.Range(0.95f, 1.08f));
             UpdateHandCountDisplay();
             UpdateDeckLeftDisplay();
 
@@ -402,6 +449,14 @@ public class DeckManager : MonoBehaviour
         if (isScoring || isDiscarding) return;
 
         int selectedCount = GetSelectedCardCount();
+
+        if (!suppressSelectSounds)
+        {
+            if (selectedCount > lastSelectedCount) PlaySFX(cardSelectSound);
+            else if (selectedCount < lastSelectedCount) PlaySFX(cardDeselectSound);
+        }
+        lastSelectedCount = selectedCount;
+
         UpdateSelectedCountDisplay(selectedCount);
         UpdateHandCountDisplay();
 
@@ -460,6 +515,7 @@ public class DeckManager : MonoBehaviour
             }
         }
 
+        PlaySFX(discardSound);
         float discardTargetY = -(Screen.height * 0.75f);
         foreach (CardUI card in selectedCards)
         {
@@ -498,6 +554,7 @@ public class DeckManager : MonoBehaviour
         {
             if (card != null) card.DeselectCard();
         }
+        lastSelectedCount = 0;
 
         RebuildLayout();
         UpdateHandCountDisplay();
@@ -544,6 +601,8 @@ public class DeckManager : MonoBehaviour
             yield break;
         }
 
+        PlaySFX(confirmSound);
+
         HorizontalLayoutGroup layoutGroup = handParentContainer.GetComponent<HorizontalLayoutGroup>();
         if (layoutGroup != null) layoutGroup.enabled = false;
 
@@ -585,34 +644,52 @@ public class DeckManager : MonoBehaviour
             StartCoroutine(card.MoveToAnchoredPosition(targetAnchoredPos, 0.35f));
         }
 
+        PlaySFX(cardSlideSound);
         Canvas.ForceUpdateCanvases();
         yield return new WaitForSeconds(0.4f);
 
-        // --- STEP 1: CALCULATE BASE SCORE WITH CARD MULTIPLIER ---
-        int baseScore = 0;
-        float cardMult = 1f;
+        // --- STEP 1: ADD UP CHIPS CARD BY CARD (mult stays at 1 until the effects trigger, like Balatro) ---
+        float setMult = 1f;
         bool hasSetBonus = false;
+        AudioClip setBonusClip = null;
+        float setBonusVolume = 1f;
 
         if (selectedCards.Count > 0 && selectedCards[0].cardData != null)
         {
-            if (selectedCards[0].cardData is SolarCard solar && selectedCards.Count >= solar.requiredCards)
+            CardData firstData = selectedCards[0].cardData;
+
+            if (firstData is SolarCard solar)
             {
-                cardMult = solar.multiplier;
-                hasSetBonus = true;
+                if (CountCardsOfType<SolarCard>(selectedCards) >= solar.requiredCards)
+                {
+                    setMult = solar.multiplier;
+                    hasSetBonus = true;
+                    setBonusClip = solar.bonusSound;
+                    setBonusVolume = solar.bonusVolume;
+                }
             }
-            else if (selectedCards[0].cardData is WindCard wind && selectedCards.Count >= wind.requiredCards)
+            else if (firstData is WindCard wind)
             {
-                cardMult = wind.multiplier;
-                hasSetBonus = true;
+                if (CountCardsOfType<WindCard>(selectedCards) >= wind.requiredCards)
+                {
+                    setMult = wind.multiplier;
+                    hasSetBonus = true;
+                    setBonusClip = wind.bonusSound;
+                    setBonusVolume = wind.bonusVolume;
+                }
             }
         }
+
+        int baseScore = 0;
+        float currentMult = 1f;
 
         if (balatroScoreText != null)
         {
             balatroScoreText.gameObject.SetActive(true);
-            balatroScoreText.text = "0 x " + cardMult.ToString("0.##");
+            SetBalatroText(0, currentMult);
         }
 
+        int scoredIndex = 0;
         foreach (CardUI card in selectedCards)
         {
             if (card.cardData != null)
@@ -621,10 +698,12 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale * 1.25f;
 
                 baseScore += card.cardData.primaryValue;
-                if (balatroScoreText != null)
-                {
-                    balatroScoreText.text = baseScore + " x " + cardMult.ToString("0.##");
-                }
+                SetBalatroText(baseScore, currentMult);
+                StartCoroutine(PulseBalatroText());
+
+                // Pitch climbs with every scored card
+                PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f, 2f));
+                scoredIndex++;
 
                 yield return new WaitForSeconds(0.15f);
                 card.transform.localScale = origScale;
@@ -634,26 +713,34 @@ public class DeckManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.3f);
 
-        // --- STEP 2: APPLY ROLL BONUSES / PENALTIES ---
-        float finalMult = cardMult;
+        // --- STEP 2: MULT EFFECTS TRIGGER ONE AFTER ANOTHER ---
+        if (hasSetBonus)
+        {
+            currentMult *= setMult;
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(setBonusClip != null ? setBonusClip : setBonusSound, 1f, setBonusVolume);
+            yield return new WaitForSeconds(0.6f);
+        }
 
         if (PlayerRollUI.isHighRollActive)
         {
-            if (hasSetBonus)
+            if (rollBonusIsMultiplicative)
             {
-                finalMult += 1.5f; // Additive stack on top of triggering set bonus
+                currentMult *= 1.5f; // X1.5 stacks on top of the set bonus, like chained X mult jokers
             }
             else
             {
-                finalMult = 1.5f; // Pure 1.5x on a standard hand/untriggered set
+                currentMult = hasSetBonus ? currentMult + 1.5f : 1.5f; // old additive behaviour
             }
 
-            if (balatroScoreText != null)
-            {
-                balatroScoreText.text = baseScore + " x " + finalMult.ToString("0.##");
-            }
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(highRollBonusSound);
             yield return new WaitForSeconds(0.6f);
         }
+
+        float finalMult = currentMult;
 
         // --- STEP 3: CALCULATE AND DISPLAY FINAL PRODUCT SCORE ---
         int rawFinalScore = Mathf.RoundToInt(baseScore * finalMult);
@@ -667,6 +754,8 @@ public class DeckManager : MonoBehaviour
             {
                 balatroScoreText.text = rawFinalScore + " (-10% = " + finalScore + ")";
             }
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(lowRollPenaltySound);
             yield return new WaitForSeconds(0.6f);
         }
         else
@@ -676,11 +765,13 @@ public class DeckManager : MonoBehaviour
                 balatroScoreText.text = finalScore.ToString();
             }
         }
+        StartCoroutine(PulseBalatroText());
+        PlaySFX(finalScoreSound);
         yield return new WaitForSeconds(0.9f);
 
         if (balatroScoreText != null)
         {
-            balatroScoreText.text = "1 x 1";
+            SetBalatroText(1, 1f);
         }
 
         // --- STEP 4: SHOW FINAL SCORE POP-OUT & SHAKE ANIMATION IN CARD VIEW ---
@@ -725,6 +816,7 @@ public class DeckManager : MonoBehaviour
         yield return new WaitForSeconds(cameraSwitchDelay);
 
         // --- STEP 5: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
+        PlaySFX(cameraSwitchSound);
         SetCameraState(false);
 
         if (cardGameNotificationText != null)
@@ -756,11 +848,19 @@ public class DeckManager : MonoBehaviour
         int startRemainingScore = currentRemainingScore;
         int targetRemainingScore = currentRemainingScore - finalScore;
         float elapsed = 0f;
+        float tickTimer = 0f;
 
         while (elapsed < scoreCountdownDuration)
         {
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / scoreCountdownDuration);
+
+            tickTimer += Time.unscaledDeltaTime;
+            if (tickTimer >= countdownTickInterval)
+            {
+                tickTimer = 0f;
+                PlaySFX(countdownTickSound, Mathf.Lerp(0.9f, 1.4f, t));
+            }
 
             int currentDisplayScore = Mathf.RoundToInt(Mathf.Lerp(finalScore, 0, t));
             int currentDisplayRemaining = Mathf.RoundToInt(Mathf.Lerp(startRemainingScore, targetRemainingScore, t));
@@ -791,6 +891,7 @@ public class DeckManager : MonoBehaviour
 
         currentRemainingScore = targetRemainingScore;
         UpdateTargetScoreDisplay();
+        PlaySFX(countdownEndSound);
 
         yield return new WaitForSeconds(0.3f);
 
@@ -804,6 +905,7 @@ public class DeckManager : MonoBehaviour
         }
 
         // --- STEP 7: USUAL ROUND ENDING SEQUENCE ---
+        PlaySFX(discardSound);
         float discardTargetY = -(Screen.height * 0.75f);
 
         foreach (CardUI card in selectedCards)
@@ -876,6 +978,58 @@ public class DeckManager : MonoBehaviour
         }
 
         isScoring = false;
+    }
+
+    // ------------------------------------------------------------------
+    // Sound + Balatro-style score display helpers
+    // ------------------------------------------------------------------
+    private void PlaySFX(AudioClip clip, float pitch = 1f, float volumeScale = 1f)
+    {
+        GameSFX.Play(clip, sfxVolume * volumeScale, pitch);
+    }
+
+    private int CountCardsOfType<T>(List<CardUI> cards) where T : CardData
+    {
+        int count = 0;
+        foreach (CardUI c in cards)
+        {
+            if (c != null && c.cardData is T) count++;
+        }
+        return count;
+    }
+
+    private string FormatBalatro(int chips, float mult)
+    {
+        string chipsHex = ColorUtility.ToHtmlStringRGB(chipsColor);
+        string multHex = ColorUtility.ToHtmlStringRGB(multColor);
+        return "<color=#" + chipsHex + ">" + chips + "</color> x <color=#" + multHex + ">" + mult.ToString("0.##") + "</color>";
+    }
+
+    private void SetBalatroText(int chips, float mult)
+    {
+        if (balatroScoreText != null)
+        {
+            balatroScoreText.text = FormatBalatro(chips, mult);
+        }
+    }
+
+    private IEnumerator PulseBalatroText()
+    {
+        if (balatroScoreText == null) yield break;
+
+        Transform target = balatroScoreText.transform;
+        float elapsed = 0f;
+        float duration = 0.18f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float p = Mathf.Clamp01(elapsed / duration);
+            target.localScale = balatroBaseScale * Mathf.Lerp(1f, scorePulseScale, Mathf.Sin(p * Mathf.PI));
+            yield return null;
+        }
+
+        target.localScale = balatroBaseScale;
     }
 
     public void ShuffleDrawPile()

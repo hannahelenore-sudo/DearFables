@@ -25,7 +25,7 @@ public class DialogueLine
 
 /// <summary>
 /// Dialogue cutscene. Does NOTHING until PlayCutscene() is called (NPCTrigger calls it when the NPC is clicked).
-/// Flow: fade to black -> show dialogue UI -> fade in -> lines (typewriter) -> fade to black -> hide UI -> fade out.
+/// Flow: fade to black -> show dialogue UI -> fade in -> lines (typewriter + talk ticks) -> fade to black -> hide UI -> fade out.
 /// Advance with Space / Enter or the continue button. First press finishes the typing, second goes to the next line.
 /// </summary>
 public class IntroCutscene : MonoBehaviour
@@ -63,6 +63,15 @@ public class IntroCutscene : MonoBehaviour
     [Header("Typewriter")]
     [Tooltip("Characters per second. Set to 0 to show the whole line instantly.")]
     public float charsPerSecond = 45f;
+
+    [Header("Talking Sound")]
+    [Tooltip("A single short tick that repeats while someone is talking.")]
+    public AudioClip talkSound;
+    [Range(0f, 1f)] public float talkVolume = 1f;
+    [Tooltip("Seconds between each tick while the text is typing.")]
+    public float talkTickInterval = 0.08f;
+    [Tooltip("Small random pitch change so the ticks don't sound robotic. 0 = every tick identical.")]
+    [Range(0f, 0.3f)] public float talkPitchVariation = 0.05f;
 
     [Header("Fade Transition")]
     public Image fadeOverlay;
@@ -295,16 +304,40 @@ public class IntroCutscene : MonoBehaviour
                 dialogueText.maxVisibleCharacters = 0;
 
                 float elapsed = 0f;
+                float tickTimer = talkTickInterval; // makes the first tick play right away
+                int lastVisible = 0;
+
                 while (dialogueText.maxVisibleCharacters < total)
                 {
-                    elapsed += Time.unscaledDeltaTime;
-                    dialogueText.maxVisibleCharacters = Mathf.Min(total, Mathf.FloorToInt(elapsed * charsPerSecond));
+                    float dt = Time.unscaledDeltaTime;
+                    elapsed += dt;
+                    tickTimer += dt;
+
+                    int visible = Mathf.Min(total, Mathf.FloorToInt(elapsed * charsPerSecond));
+                    dialogueText.maxVisibleCharacters = visible;
+
+                    // Tick at a steady interval, only while new characters are appearing
+                    if (visible > lastVisible && tickTimer >= talkTickInterval)
+                    {
+                        tickTimer = 0f;
+                        PlayTalkTick();
+                    }
+                    lastVisible = visible;
+
                     yield return null;
                 }
             }
         }
 
         FinishTyping();
+    }
+
+    private void PlayTalkTick()
+    {
+        if (talkSound == null) return;
+
+        float pitch = 1f + Random.Range(-talkPitchVariation, talkPitchVariation);
+        GameSFX.Play(talkSound, talkVolume, pitch);
     }
 
     private void FinishTyping()

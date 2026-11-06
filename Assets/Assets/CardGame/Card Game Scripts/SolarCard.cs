@@ -4,14 +4,21 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "SolarCard", menuName = "Custom Card System/Cards/Solar Card")]
 public class SolarCard : CardData
 {
+    [Header("Set Bonus")]
+    [Tooltip("How many Solar cards must be selected to trigger the bonus.")]
     public int requiredCards = 5;
+    [Tooltip("Mult applied once when the set bonus triggers.")]
     public float multiplier = 1.5f;
+
+    [Header("Set Bonus Sound")]
+    [Tooltip("Played when the set bonus triggers. If empty, DeckManager's fallback Set Bonus Sound is used.")]
+    public AudioClip bonusSound;
+    [Range(0f, 1f)] public float bonusVolume = 1f;
 
     public override int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
     {
         if (selectedCards != null)
         {
-            // Count how many actual Solar cards are in the selection
             int solarCount = 0;
             foreach (var card in selectedCards)
             {
@@ -21,7 +28,6 @@ public class SolarCard : CardData
                 }
             }
 
-            // Apply 1.5x only once if exactly 5 solar cards are selected
             if (solarCount >= requiredCards)
             {
                 return Mathf.RoundToInt(currentTotal * multiplier);

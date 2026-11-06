@@ -408,7 +408,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 147c642c77696b3479ef7a8e62682d21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BackgroundMusic
-  music: {fileID: 8300000, guid: e7edf46cb9e93af45bdee07556f42395, type: 3}
+  music: {fileID: 8300000, guid: 27f95d9c7252646498cb454490ce44c3, type: 3}
   volume: 0.199
   startFadeIn: 2
   fadeOutDuration: 1.5

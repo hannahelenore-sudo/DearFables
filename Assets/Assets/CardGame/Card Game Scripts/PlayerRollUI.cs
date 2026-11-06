@@ -56,6 +56,18 @@ public class PlayerRollUI : MonoBehaviour
     public float fadeInDuration = 0.3f;
     public float fadeOutDuration = 0.3f;
 
+    [Header("Sound Effects")]
+    [Range(0f, 1f)] public float sfxVolume = 1f;
+    public AudioClip openRollViewSound;
+    public AudioClip rollButtonSound;
+    [Tooltip("Played every time the number flips while spinning.")]
+    public AudioClip spinTickSound;
+    public AudioClip tieRollSound;
+    public AudioClip lowRollSound;
+    public AudioClip highRollSound;
+    public AudioClip skipSound;
+    public AudioClip backSound;
+
     [HideInInspector] public bool hasRolledThisRound = false;
     [HideInInspector] public static bool isHighRollActive = false;
     [HideInInspector] public static bool isLowRollActive = false;
@@ -115,6 +127,8 @@ public class PlayerRollUI : MonoBehaviour
     {
         if (hasRolledThisRound) return;
 
+        PlaySFX(openRollViewSound);
+
         currentEnemyDefense = enemyRolledDefense;
         isHighRollActive = false;
         isLowRollActive = false;
@@ -169,6 +183,7 @@ public class PlayerRollUI : MonoBehaviour
     {
         if (isRolling || hasRolledThisRound) return;
 
+        PlaySFX(rollButtonSound);
         SetButtonsInteractable(false);
         StartCoroutine(AnimatePlayerRollRoutine());
     }
@@ -176,6 +191,8 @@ public class PlayerRollUI : MonoBehaviour
     public void OnBackButtonClicked()
     {
         if (isRolling) return;
+
+        PlaySFX(backSound);
 
         StopAllCoroutines();
         CleanupConfetti();
@@ -187,6 +204,8 @@ public class PlayerRollUI : MonoBehaviour
     public void SkipRoll()
     {
         if (hasRolledThisRound) return;
+
+        PlaySFX(skipSound);
 
         StopAllCoroutines();
         CleanupConfetti();
@@ -261,6 +280,8 @@ public class PlayerRollUI : MonoBehaviour
                 playerNumberText.gameObject.SetActive(true);
             }
 
+            PlaySFX(spinTickSound, Random.Range(0.95f, 1.1f));
+
             yield return new WaitForSecondsRealtime(spinSpeed);
             elapsedTime += spinSpeed;
         }
@@ -311,6 +332,7 @@ public class PlayerRollUI : MonoBehaviour
         if (Mathf.Abs(difference) <= tieThreshold)
         {
             if (tieShieldSprite != null) playerShieldImage.sprite = tieShieldSprite;
+            PlaySFX(tieRollSound);
             isHighRollActive = false;
             isLowRollActive = false;
         }
@@ -334,6 +356,8 @@ public class PlayerRollUI : MonoBehaviour
 
     private void TriggerLowRollEffects()
     {
+        PlaySFX(lowRollSound);
+
         if (notificationText != null)
         {
             notificationText.text = "-10%";
@@ -343,6 +367,8 @@ public class PlayerRollUI : MonoBehaviour
 
     private void TriggerHighRollEffects()
     {
+        PlaySFX(highRollSound);
+
         if (notificationText != null)
         {
             notificationText.text = "X1.5 on this round";
@@ -558,6 +584,11 @@ public class PlayerRollUI : MonoBehaviour
         {
             Debug.LogError("[PlayerRollUI] DeckManager reference could not be found in the scene!", this);
         }
+    }
+
+    private void PlaySFX(AudioClip clip, float pitch = 1f)
+    {
+        GameSFX.Play(clip, sfxVolume, pitch);
     }
 
     private void SetButtonsInteractable(bool state)

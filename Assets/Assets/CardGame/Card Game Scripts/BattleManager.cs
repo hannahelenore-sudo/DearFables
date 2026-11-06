@@ -67,6 +67,23 @@ public class BattleManager : MonoBehaviour
     [Header("Deck Manager Link")]
     public DeckManager deckManager;
 
+    [Header("Sound Effects")]
+    [Range(0f, 1f)] public float sfxVolume = 1f;
+    public AudioClip buttonClickSound;
+    public AudioClip scoreToBeatSound;
+    public AudioClip spinnerResultSound;
+    public AudioClip roundIntroSound;
+    [Tooltip("Optional. Played instead of the round intro sound on the final round.")]
+    public AudioClip finalRoundSound;
+    public AudioClip paperSlideSound;
+    public AudioClip countTickSound;
+    public float countTickInterval = 0.05f;
+    public AudioClip statDoneSound;
+    public AudioClip stampSound;
+    public AudioClip victorySound;
+    public AudioClip lossSound;
+    public AudioClip exitClickSound;
+
     [HideInInspector] public bool isOpeningSequenceActive = true;
     [HideInInspector] public bool hasPlayerWon = false;
     [HideInInspector] public bool hasPlayerLost = false;
@@ -106,6 +123,7 @@ public class BattleManager : MonoBehaviour
         if (isWaitingForClickToExit && Input.GetMouseButtonDown(0))
         {
             isWaitingForClickToExit = false;
+            PlaySFX(exitClickSound);
             StartCoroutine(FinalizeAndExitGame());
         }
     }
@@ -130,6 +148,8 @@ public class BattleManager : MonoBehaviour
     public void OnCardSystemButtonClicked()
     {
         if (isOpeningSequenceActive || isMatchOver) return;
+
+        PlaySFX(buttonClickSound);
 
         if (playerRollUI != null && playerRollUI.hasRolledThisRound)
         {
@@ -276,6 +296,8 @@ public class BattleManager : MonoBehaviour
         if (winGameObject != null) winGameObject.SetActive(false);
         if (lostGameObject != null) lostGameObject.SetActive(false);
 
+        PlaySFX(paperSlideSound);
+
         // Fly PAPERIMG smoothly from below using local anchoredPosition
         float elapsed = 0f;
         Vector2 startAnchoredPos = paperImgTransform != null ? paperImgTransform.anchoredPosition : Vector2.zero;
@@ -320,6 +342,8 @@ public class BattleManager : MonoBehaviour
             }
 
             yield return StartCoroutine(StampDropAnimation(targetStampObj.transform));
+            PlaySFX(stampSound);
+            PlaySFX(isWin ? victorySound : lossSound);
         }
 
         isWaitingForClickToExit = true;
@@ -400,11 +424,19 @@ public class BattleManager : MonoBehaviour
     private IEnumerator CountStatSequence(TextMeshProUGUI textComponent, string labelPrefix, int targetValue)
     {
         float elapsed = 0f;
+        float tickTimer = 0f;
         while (elapsed < countAnimationDuration)
         {
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / countAnimationDuration);
             int currentDisplay = Mathf.RoundToInt(Mathf.Lerp(0, targetValue, t));
+
+            tickTimer += Time.unscaledDeltaTime;
+            if (targetValue > 0 && tickTimer >= countTickInterval)
+            {
+                tickTimer = 0f;
+                PlaySFX(countTickSound, Mathf.Lerp(0.9f, 1.3f, t));
+            }
 
             if (textComponent != null)
             {
@@ -416,6 +448,7 @@ public class BattleManager : MonoBehaviour
         if (textComponent != null)
         {
             textComponent.text = labelPrefix + targetValue;
+            if (targetValue > 0) PlaySFX(statDoneSound);
             yield return StartCoroutine(WiggleTransform(textComponent.transform));
         }
     }
@@ -472,6 +505,11 @@ public class BattleManager : MonoBehaviour
         }
     }
 
+    private void PlaySFX(AudioClip clip, float pitch = 1f)
+    {
+        GameSFX.Play(clip, sfxVolume, pitch);
+    }
+
     public void UpdateBattleTargetScoreDisplay(int remainingScore)
     {
         if (scoreToBeatUI != null && scoreToBeatUI.scoreText != null)
@@ -503,6 +541,7 @@ public class BattleManager : MonoBehaviour
         {
             yield return StartCoroutine(FadeCanvasGroup(scoreToBeatUI.gameObject, 0f, 1f, fadeDuration));
 
+            PlaySFX(scoreToBeatSound);
             bool isScoreComplete = false;
             scoreToBeatUI.StartSequence(battleTargetScore, () => isScoreComplete = true);
             while (!isScoreComplete) yield return null;
@@ -524,6 +563,7 @@ public class BattleManager : MonoBehaviour
             numberSpinnerUI.StartSequence((resultNumber) =>
             {
                 rolledNumber = resultNumber;
+                PlaySFX(spinnerResultSound);
                 isSpinnerComplete = true;
             });
             while (!isSpinnerComplete) yield return null;
@@ -575,6 +615,8 @@ public class BattleManager : MonoBehaviour
 
         roundPopupText.text = "ROUND " + roundNum + "/" + maxRounds;
         roundPopupText.alignment = TextAlignmentOptions.Center;
+
+        PlaySFX((roundNum >= maxRounds && finalRoundSound != null) ? finalRoundSound : roundIntroSound);
 
         roundDimOverlay.gameObject.SetActive(true);
         roundPopupText.gameObject.SetActive(true);

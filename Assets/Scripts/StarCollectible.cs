@@ -1,4 +1,3 @@
-
 using UnityEngine;
 
 public class StarHover : MonoBehaviour
@@ -6,6 +5,10 @@ public class StarHover : MonoBehaviour
     public float bounceHeight = 0.15f;
     public float bounceSpeed = 3f;
     public float starValue = 1f;
+
+    [Header("Audio")]
+    public AudioClip collectSound;
+    [Range(0f, 1f)] public float collectVolume = 1f;
 
     private Vector3 originalPosition;
     private float bounceTime;
@@ -54,6 +57,11 @@ public class StarHover : MonoBehaviour
         else
         {
             Debug.LogWarning("StarManager is missing!");
+        }
+
+        if (collectSound != null)
+        {
+            AudioSource.PlayClipAtPoint(collectSound, transform.position, collectVolume);
         }
 
         Debug.Log("Star collected!");

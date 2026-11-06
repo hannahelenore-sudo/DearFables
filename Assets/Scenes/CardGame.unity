@@ -1775,6 +1775,15 @@ MonoBehaviour:
   wiggleDuration: 0.35
   fadeInDuration: 0.3
   fadeOutDuration: 0.3
+  sfxVolume: 1
+  openRollViewSound: {fileID: 0}
+  rollButtonSound: {fileID: 0}
+  spinTickSound: {fileID: 0}
+  tieRollSound: {fileID: 0}
+  lowRollSound: {fileID: 0}
+  highRollSound: {fileID: 0}
+  skipSound: {fileID: 0}
+  backSound: {fileID: 0}
   hasRolledThisRound: 0
 --- !u!114 &341337228
 MonoBehaviour:
@@ -2126,6 +2135,15 @@ MonoBehaviour:
   wiggleDuration: 0.35
   fadeInDuration: 0.3
   fadeOutDuration: 0.3
+  sfxVolume: 1
+  openRollViewSound: {fileID: 0}
+  rollButtonSound: {fileID: 0}
+  spinTickSound: {fileID: 0}
+  tieRollSound: {fileID: 0}
+  lowRollSound: {fileID: 0}
+  highRollSound: {fileID: 0}
+  skipSound: {fileID: 0}
+  backSound: {fileID: 0}
   hasRolledThisRound: 0
 --- !u!114 &356508973
 MonoBehaviour:
@@ -2614,10 +2632,24 @@ MonoBehaviour:
   roundFadeInDuration: 0.3
   roundDisplayDuration: 1
   roundFadeOutDuration: 0.3
-  battleTargetScore: 10
+  battleTargetScore: 400
   delayBetweenSequences: 0.2
   fadeDuration: 0.25
   deckManager: {fileID: 882515594}
+  sfxVolume: 1
+  buttonClickSound: {fileID: 8300000, guid: b42ae12879968b8489f1daaa94b8e675, type: 3}
+  scoreToBeatSound: {fileID: 8300000, guid: d30a041c5ac894f4bb07a2c3589a5970, type: 3}
+  spinnerResultSound: {fileID: 8300000, guid: 93641c916e6809a4094a0d856e7e66cc, type: 3}
+  roundIntroSound: {fileID: 8300000, guid: e649e26439b90984fa42230f5f9b1db5, type: 3}
+  finalRoundSound: {fileID: 8300000, guid: 41652b97b5cae4540be56f11777b4358, type: 3}
+  paperSlideSound: {fileID: 8300000, guid: a729c611c095b16488da9363736110fd, type: 3}
+  countTickSound: {fileID: 8300000, guid: a11c1d551e6ad174a98fcfa307567fff, type: 3}
+  countTickInterval: 0.05
+  statDoneSound: {fileID: 0}
+  stampSound: {fileID: 8300000, guid: 6afcd000996410f489bb2c514c10a6f5, type: 3}
+  victorySound: {fileID: 8300000, guid: 506e8c8d3b5c07041992ab3ed03aea1d, type: 3}
+  lossSound: {fileID: 8300000, guid: d0aefc1bf4be7124893a0158eb3ec2ac, type: 3}
+  exitClickSound: {fileID: 0}
   isOpeningSequenceActive: 1
   hasPlayerWon: 0
   hasPlayerLost: 0
@@ -4695,6 +4727,28 @@ MonoBehaviour:
   remainingHandSpacing: 220
   gameCamera: {fileID: 288812202}
   menuCamera: {fileID: 1239587810}
+  chipsColor: {r: 0.3, g: 0.65, b: 1, a: 1}
+  multColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  rollBonusIsMultiplicative: 1
+  scorePulseScale: 1.3
+  sfxVolume: 1
+  openCardViewSound: {fileID: 0}
+  backButtonSound: {fileID: 8300000, guid: 6a2014cca793b9e41a8081310971ae06, type: 3}
+  drawCardSound: {fileID: 8300000, guid: 42ab56856b262b94e85cf4d8c3be17d1, type: 3}
+  cardSelectSound: {fileID: 8300000, guid: f8d71db15a599e94badf6d839b93d242, type: 3}
+  cardDeselectSound: {fileID: 8300000, guid: b42ae12879968b8489f1daaa94b8e675, type: 3}
+  discardSound: {fileID: 8300000, guid: 2bb1433d2c209094c9609c1a239d89ff, type: 3}
+  confirmSound: {fileID: 8300000, guid: e52d090f9ea6beb4da5055ad42638f0c, type: 3}
+  cardSlideSound: {fileID: 8300000, guid: 4a1e7d77a27656c419e15a0b9e4a6120, type: 3}
+  cardScoreSound: {fileID: 8300000, guid: 828b2a937a8fdff40bdc959a7eb22ca4, type: 3}
+  setBonusSound: {fileID: 0}
+  highRollBonusSound: {fileID: 0}
+  lowRollPenaltySound: {fileID: 0}
+  finalScoreSound: {fileID: 8300000, guid: e4eaf0680572b3445a8a48e544d5397d, type: 3}
+  cameraSwitchSound: {fileID: 0}
+  countdownTickSound: {fileID: 8300000, guid: 10e96640319215b4286761d1859d979d, type: 3}
+  countdownTickInterval: 0.06
+  countdownEndSound: {fileID: 8300000, guid: 60e6c4c15847ab24cb6e975e90d26669, type: 3}
 --- !u!1 &886965175
 GameObject:
   m_ObjectHideFlags: 0
@@ -5004,6 +5058,55 @@ MonoBehaviour:
   enableWiggleOnUnsupportedClick: 1
   wiggleAngle: 8
   wiggleDuration: 0.25
+--- !u!1 &990887746
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 990887748}
+  - component: {fileID: 990887747}
+  m_Layer: 0
+  m_Name: BackGroundMusic
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &990887747
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 990887746}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 147c642c77696b3479ef7a8e62682d21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackgroundMusic
+  music: {fileID: 8300000, guid: e7edf46cb9e93af45bdee07556f42395, type: 3}
+  volume: 0.144
+  startFadeIn: 2
+  fadeOutDuration: 1.5
+  crossfadeDuration: 2
+--- !u!4 &990887748
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 990887746}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 17.40029, y: -0, z: 142.4017}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1002889128
 GameObject:
   m_ObjectHideFlags: 0
@@ -9346,6 +9449,15 @@ MonoBehaviour:
   wiggleDuration: 0.35
   fadeInDuration: 0.3
   fadeOutDuration: 0.3
+  sfxVolume: 1
+  openRollViewSound: {fileID: 8300000, guid: d47739956f73f3b4cbf8ac7287aed9c0, type: 3}
+  rollButtonSound: {fileID: 8300000, guid: e52d090f9ea6beb4da5055ad42638f0c, type: 3}
+  spinTickSound: {fileID: 8300000, guid: a64d2031bf321cb47b5bc8ef2bd586c2, type: 3}
+  tieRollSound: {fileID: 8300000, guid: ed7dc1164edce6c47a834569de599528, type: 3}
+  lowRollSound: {fileID: 8300000, guid: 2467ced9c9cb9dc42b520960d14b650b, type: 3}
+  highRollSound: {fileID: 8300000, guid: fc2b3186924482e4789358a89f06e74b, type: 3}
+  skipSound: {fileID: 0}
+  backSound: {fileID: 8300000, guid: 6a2014cca793b9e41a8081310971ae06, type: 3}
   hasRolledThisRound: 0
 --- !u!114 &2124731808
 MonoBehaviour:
@@ -9568,3 +9680,4 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 581348593}
   - {fileID: 426697762}
+  - {fileID: 990887748}
