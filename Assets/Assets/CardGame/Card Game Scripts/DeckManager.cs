@@ -90,6 +90,8 @@ public class DeckManager : MonoBehaviour
     public AudioClip cardScoreSound;
     [Tooltip("Fallback used when the Solar/Wind card asset has no Bonus Sound of its own.")]
     public AudioClip setBonusSound;
+    [Tooltip("Played when the permanent Wind Power boon adds its flat bonus to your score.")]
+    public AudioClip windPowerBoonSound;
     public AudioClip highRollBonusSound;
     public AudioClip lowRollPenaltySound;
     public AudioClip finalScoreSound;
@@ -113,6 +115,9 @@ public class DeckManager : MonoBehaviour
 
     void Awake()
     {
+        // Permanent boons: +Hand Size (picked from the Choose Your Boon screen)
+        maxHandSize += BoonProgress.ExtraHandSize;
+
         if (balatroScoreText != null)
         {
             balatroBaseScale = balatroScoreText.transform.localScale;
@@ -709,6 +714,16 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale;
                 yield return new WaitForSeconds(0.2f);
             }
+        }
+
+        // Permanent boon: flat Wind Power added once per played hand (after the cards, before the mult effects)
+        if (BoonProgress.BonusWindPower > 0)
+        {
+            baseScore += BoonProgress.BonusWindPower;
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(windPowerBoonSound);
+            yield return new WaitForSeconds(0.4f);
         }
 
         yield return new WaitForSeconds(0.3f);

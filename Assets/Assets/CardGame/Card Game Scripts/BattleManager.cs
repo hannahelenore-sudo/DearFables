@@ -47,8 +47,16 @@ public class BattleManager : MonoBehaviour
     public float delayBeforeStamp = 1.0f;      // Wait time after stars gained before stamp plays
     public string returnSceneName = "YourOtherSceneName";
 
+    [Header("Boon Meter")]
+    [Range(0f, 1f)]
+    [Tooltip("How much of the boon meter a WIN fills. The meter starts half full, so 0.5 means the first battle completes it.")]
+    public float boonMeterFillOnWin = 0.5f;
+    [Range(0f, 1f)]
+    [Tooltip("How much of the boon meter a LOSS fills.")]
+    public float boonMeterFillOnLoss = 0.5f;
+
     [Header("Round Settings")]
-    [Tooltip("Total number of rounds in this battle.")]
+    [Tooltip("Total number of rounds (hands) in this battle. Permanent 'Extra Hand' boons are added on top of this at startup.")]
     public int maxRounds = 5;
     [Range(0f, 1f)]
     [Tooltip("Transparency of the dim overlay.")]
@@ -96,6 +104,9 @@ public class BattleManager : MonoBehaviour
 
     private void Awake()
     {
+        // Permanent boons: +hands per round (extra scoring attempts)
+        maxRounds += BoonProgress.ExtraHands;
+
         isOpeningSequenceActive = true;
         isMatchOver = false;
         hasPlayerWon = false;
@@ -232,6 +243,7 @@ public class BattleManager : MonoBehaviour
         isMatchOver = true;
         hasPlayerWon = true;
         PlayerProgress.AddStars(starsGainedOnWin);
+        BoonProgress.AddMeter(boonMeterFillOnWin); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);
 
         // Trigger the bread-like falling effect when score hits zero
@@ -249,6 +261,7 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerLost = true;
+        BoonProgress.AddMeter(boonMeterFillOnLoss); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);
 
         int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
