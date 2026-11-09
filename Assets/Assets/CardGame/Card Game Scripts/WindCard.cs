@@ -15,6 +15,11 @@ public class WindCard : CardData
     public AudioClip bonusSound;
     [Range(0f, 1f)] public float bonusVolume = 1f;
 
+    public override int GetEffectiveValue()
+    {
+        return primaryValue + BoonProgress.BonusWindPower;
+    }
+
     public override int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
     {
         if (selectedCards != null)

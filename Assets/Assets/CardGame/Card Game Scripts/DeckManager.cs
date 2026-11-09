@@ -64,6 +64,52 @@ public class DeckManager : MonoBehaviour
     public float remainingHandOffsetY = -150f;
     public float remainingHandSpacing = 220f;
 
+    [Header("Hand Layout (Balatro style)")]
+    [Tooltip("Preferred distance between cards. It shrinks automatically so a big hand still fits.")]
+    public float handCardSpacing = 200f;
+    [Tooltip("Widest the hand may spread. 0 = use the width of the hand container.")]
+    public float handMaxWidth = 0f;
+    [Tooltip("Tilt (degrees) of the outermost cards. The hand fans out like held cards.")]
+    public float fanMaxAngle = 6f;
+    [Tooltip("How much lower the outermost cards sit, creating the arc.")]
+    public float fanArcHeight = 25f;
+
+    [Header("Draw / Discard Motion")]
+    [Tooltip("Where drawn cards fly in from and discarded cards fly to (relative to the hand container's centre).")]
+    public Vector2 drawSpawnOffset = new Vector2(900f, -150f);
+    [Tooltip("Seconds between each card being dealt.")]
+    public float drawInterval = 0.08f;
+    [Tooltip("Discarded cards fly back to the deck position instead of dropping off the bottom.")]
+    public bool discardFlyToDeck = true;
+    [Tooltip("Delay between each discarded card leaving.")]
+    public float discardStagger = 0.04f;
+
+    [Header("Deck Pile Visual")]
+    [Tooltip("Optional: an object in your card canvas that IS the deck. Cards come out of it and discards fly back into it. Leave empty to build a pile from the Card Back Sprite instead.")]
+    public RectTransform deckPile;
+    [Tooltip("Card back image. If set (and no Deck Pile is assigned), a stack of cards is created automatically at the Draw Spawn Offset. The stack gets thinner as you draw.")]
+    public Sprite cardBackSprite;
+    [Tooltip("How many cards thick the full stack looks.")]
+    public int deckVisualLayers = 8;
+    [Tooltip("Shift between stacked cards, giving the pile its thickness.")]
+    public Vector2 deckLayerOffset = new Vector2(1.5f, 2f);
+    [Tooltip("Size of the auto-built pile. 0,0 = same size as the card prefab.")]
+    public Vector2 deckSize = Vector2.zero;
+
+    [Header("Card Destroy Effect (Balatro style)")]
+    [Tooltip("After scoring, the played cards shake and break apart into pieces instead of flying away.")]
+    public bool dissolveScoredCards = true;
+    public int dissolveColumns = 7;
+    public int dissolveRows = 10;
+    [Tooltip("Shake before the card breaks up.")]
+    public float dissolveShakeTime = 0.18f;
+    [Tooltip("How long the break-up takes.")]
+    public float dissolveDuration = 0.8f;
+    [Tooltip("Delay between each played card starting to dissolve.")]
+    public float dissolveStagger = 0.1f;
+    [Tooltip("How far the pieces drift away.")]
+    public float dissolveDriftDistance = 140f;
+
     [Header("Camera References")]
     public Camera gameCamera;
     public Camera menuCamera;
@@ -81,6 +127,10 @@ public class DeckManager : MonoBehaviour
     public AudioClip openCardViewSound;
     public AudioClip backButtonSound;
     public AudioClip drawCardSound;
+    [Tooltip("Played when the deck is shuffled and a new hand is dealt, and when discards are reshuffled in.")]
+    public AudioClip shuffleSound;
+    [Tooltip("Played as each scored card breaks apart.")]
+    public AudioClip cardDestroySound;
     public AudioClip cardSelectSound;
     public AudioClip cardDeselectSound;
     public AudioClip discardSound;
@@ -258,6 +308,7 @@ public class DeckManager : MonoBehaviour
         if (hand.Count == 0 && cardsRemainingInRound > 0)
         {
             int drawAmount = Mathf.Min(maxHandSize, cardsRemainingInRound);
+            PlaySFX(shuffleSound);
             DrawCards(drawAmount);
         }
         else if (spawnedCardUIList.Count == 0 && hand.Count > 0)
@@ -266,7 +317,7 @@ public class DeckManager : MonoBehaviour
             {
                 CreateCardUI(cardData);
             }
-            RebuildLayout();
+            RebuildLayout(true);
         }
         else
         {
@@ -367,6 +418,8 @@ public class DeckManager : MonoBehaviour
         {
             totalAmountOfCardsLeftText.text = cardsRemainingInRound.ToString() + "/" + totalDeckCards.ToString();
         }
+
+        UpdateDeckVisual();
     }
 
     public void DrawCards(int count)
@@ -376,67 +429,376 @@ public class DeckManager : MonoBehaviour
 
     private IEnumerator DrawCardsRoutine(int count)
     {
-        HorizontalLayoutGroup layoutGroup = handParentContainer.GetComponent<HorizontalLayoutGroup>();
-        if (layoutGroup != null) layoutGroup.enabled = true;
+        DisableHandLayoutGroup();
 
         for (int i = 0; i < count; i++)
         {
             if (drawPile.Count == 0 || cardsRemainingInRound <= 0 || hand.Count >= maxHandSize)
-                yield break;
+                break;
 
             CardData drawnCard = drawPile[0];
             drawPile.RemoveAt(0);
             hand.Add(drawnCard);
             cardsRemainingInRound--;
 
-            CreateCardUI(drawnCard);
-            PlaySFX(drawCardSound, Random.Range(0.95f, 1.08f));
+            // The new card appears at the deck and glides in while the rest of the hand slides aside
+            CreateCardUI(drawnCard, true);
+            RebuildLayout();
+
+            PlaySFX(drawCardSound, Mathf.Min(1f + i * 0.05f, 1.5f) + Random.Range(-0.02f, 0.02f));
             UpdateHandCountDisplay();
             UpdateDeckLeftDisplay();
 
-            yield return new WaitForSeconds(0.12f);
+            yield return new WaitForSeconds(drawInterval);
         }
 
         RebuildLayout();
         UpdateSelectedTotal();
     }
 
-    private void CreateCardUI(CardData data)
+    private CardUI CreateCardUI(CardData data, bool fromDeck = false)
     {
-        if (cardPrefab != null && handParentContainer != null)
-        {
-            GameObject newCardObj = Instantiate(cardPrefab, handParentContainer);
-            CardUI cardUI = newCardObj.GetComponent<CardUI>();
-            if (cardUI != null)
-            {
-                cardUI.LoadCardData(data);
-                spawnedCardUIList.Add(cardUI);
+        if (cardPrefab == null || handParentContainer == null) return null;
 
-                LayoutElement le = newCardObj.GetComponent<LayoutElement>();
-                if (le != null) le.ignoreLayout = false;
-            }
+        GameObject newCardObj = Instantiate(cardPrefab, handParentContainer);
+        CardUI cardUI = newCardObj.GetComponent<CardUI>();
+        if (cardUI == null) return null;
+
+        cardUI.LoadCardData(data);
+        spawnedCardUIList.Add(cardUI);
+
+        // Positions are driven by RebuildLayout, not by the layout group
+        LayoutElement le = newCardObj.GetComponent<LayoutElement>();
+        if (le != null) le.ignoreLayout = true;
+
+        // The hand is positioned from the centre of the container, so make sure the card is anchored there
+        RectTransform cardRect = newCardObj.GetComponent<RectTransform>();
+        if (cardRect != null)
+        {
+            cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.pivot = new Vector2(0.5f, 0.5f);
+        }
+
+        cardUI.followSlot = true;
+        if (fromDeck)
+        {
+            EnsureDeckVisual();
+            cardUI.SnapTo(GetDeckPosition(), 1f, 0f); // starts exactly on top of the deck
+        }
+
+        return cardUI;
+    }
+
+    private void DisableHandLayoutGroup()
+    {
+        if (handParentContainer == null) return;
+        HorizontalLayoutGroup layoutGroup = handParentContainer.GetComponent<HorizontalLayoutGroup>();
+        if (layoutGroup != null) layoutGroup.enabled = false;
+    }
+
+    /// <summary>
+    /// Works out where every card in the hand belongs (an evenly spaced, slightly fanned row)
+    /// and tells each card. The cards glide there on their own. instant = true places them with no animation.
+    /// </summary>
+    private void RebuildLayout(bool instant = false)
+    {
+        spawnedCardUIList.RemoveAll(item => item == null);
+        if (handParentContainer == null) return;
+
+        DisableHandLayoutGroup();
+
+        int n = spawnedCardUIList.Count;
+        if (n == 0) return;
+
+        float cardWidth = 0f;
+        RectTransform firstRect = spawnedCardUIList[0].GetComponent<RectTransform>();
+        if (firstRect != null) cardWidth = firstRect.rect.width;
+
+        float available = handMaxWidth;
+        if (available <= 0f && handParentContainer is RectTransform handRect) available = handRect.rect.width;
+        if (available < 100f) available = float.MaxValue; // container has no usable width: don't squeeze
+
+        float spacing = handCardSpacing;
+        if (n > 1 && available < float.MaxValue)
+            spacing = Mathf.Min(handCardSpacing, Mathf.Max(30f, (available - cardWidth) / (n - 1)));
+
+        float half = (n - 1) / 2f;
+
+        for (int i = 0; i < n; i++)
+        {
+            CardUI card = spawnedCardUIList[i];
+            if (card == null || card.isAnimatingToLayout) continue;
+
+            float norm = n > 1 ? (i - half) / half : 0f; // -1 (left) .. +1 (right)
+
+            card.followSlot = true;
+            card.slotPosition = new Vector2((i - half) * spacing, -(norm * norm) * fanArcHeight);
+            card.slotRotation = -norm * fanMaxAngle;
+
+            if (card.transform.parent != handParentContainer) card.transform.SetParent(handParentContainer, false);
+            LayoutElement le = card.GetComponent<LayoutElement>();
+            if (le != null) le.ignoreLayout = true;
+
+            if (instant) card.SnapToSlot();
         }
     }
 
-    private void RebuildLayout()
+    // ------------------------------------------------------------------
+    // Deck pile
+    // ------------------------------------------------------------------
+
+    private RectTransform autoDeckRoot;
+    private readonly List<Image> deckLayers = new List<Image>();
+
+    private bool HasDeckVisual()
     {
-        spawnedCardUIList.RemoveAll(item => item == null);
+        return deckPile != null || autoDeckRoot != null;
+    }
 
-        HorizontalLayoutGroup layoutGroup = handParentContainer.GetComponent<HorizontalLayoutGroup>();
-        if (layoutGroup != null) layoutGroup.enabled = true;
-
-        foreach (CardUI card in spawnedCardUIList)
+    /// <summary>Where the deck is, in the hand container's anchored space (cards spawn here and discards fly back here).</summary>
+    private Vector2 GetDeckPosition()
+    {
+        if (deckPile != null && handParentContainer is RectTransform handRect)
         {
-            if (card != null)
+            Vector3 local = handRect.InverseTransformPoint(deckPile.position);
+            return new Vector2(local.x, local.y) - handRect.rect.center;
+        }
+
+        if (autoDeckRoot != null) return autoDeckRoot.anchoredPosition;
+        return drawSpawnOffset;
+    }
+
+    private void EnsureDeckVisual()
+    {
+        if (deckPile != null || autoDeckRoot != null) return;
+        if (cardBackSprite == null || handParentContainer == null) return;
+
+        Vector2 size = deckSize;
+        if (size == Vector2.zero && cardPrefab != null)
+        {
+            RectTransform prefabRect = cardPrefab.GetComponent<RectTransform>();
+            if (prefabRect != null) size = prefabRect.rect.size;
+        }
+        if (size == Vector2.zero) size = new Vector2(200f, 300f);
+
+        GameObject root = new GameObject("DeckPile", typeof(RectTransform));
+        root.transform.SetParent(handParentContainer, false);
+        root.transform.SetAsFirstSibling(); // always behind the cards
+
+        autoDeckRoot = root.GetComponent<RectTransform>();
+        autoDeckRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        autoDeckRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        autoDeckRoot.pivot = new Vector2(0.5f, 0.5f);
+        autoDeckRoot.sizeDelta = size;
+        autoDeckRoot.anchoredPosition = drawSpawnOffset;
+
+        int layers = Mathf.Max(1, deckVisualLayers);
+        for (int i = 0; i < layers; i++)
+        {
+            GameObject layer = new GameObject("Layer" + i, typeof(RectTransform), typeof(Image));
+            layer.transform.SetParent(root.transform, false);
+
+            RectTransform lr = layer.GetComponent<RectTransform>();
+            lr.anchorMin = new Vector2(0.5f, 0.5f);
+            lr.anchorMax = new Vector2(0.5f, 0.5f);
+            lr.pivot = new Vector2(0.5f, 0.5f);
+            lr.sizeDelta = size;
+            lr.anchoredPosition = deckLayerOffset * i;
+
+            Image img = layer.GetComponent<Image>();
+            img.sprite = cardBackSprite;
+            img.raycastTarget = false;
+            deckLayers.Add(img);
+        }
+    }
+
+    /// <summary>The auto-built pile shrinks as cards are drawn and disappears when the deck is empty.</summary>
+    private void UpdateDeckVisual()
+    {
+        EnsureDeckVisual();
+        if (autoDeckRoot == null || deckLayers.Count == 0) return;
+
+        int total = Mathf.Max(1, totalDeckCards);
+        int visible = 0;
+        if (cardsRemainingInRound > 0)
+            visible = Mathf.Clamp(Mathf.CeilToInt((float)cardsRemainingInRound / total * deckLayers.Count), 1, deckLayers.Count);
+
+        for (int i = 0; i < deckLayers.Count; i++)
+            deckLayers[i].gameObject.SetActive(i < visible);
+    }
+
+    // ------------------------------------------------------------------
+    // Destroy effect: the card shakes, then breaks into pieces that fade away
+    // ------------------------------------------------------------------
+
+    private float GetDissolveTotalTime(int cardCount)
+    {
+        return Mathf.Max(0, cardCount - 1) * dissolveStagger + dissolveShakeTime + dissolveDuration + 0.05f;
+    }
+
+    private IEnumerator DissolveCard(CardUI card, float startDelay, float pitch)
+    {
+        if (startDelay > 0f) yield return new WaitForSeconds(startDelay);
+        if (card == null) yield break;
+
+        RectTransform cardRect = card.GetComponent<RectTransform>();
+        Image img = card.cardImage != null ? card.cardImage : card.GetComponent<Image>();
+        if (cardRect == null) yield break;
+
+        PlaySFX(cardDestroySound, pitch);
+
+        // 1. Shake
+        Vector2 basePos = cardRect.anchoredPosition;
+        Quaternion baseRot = cardRect.localRotation;
+        float t = 0f;
+        while (t < dissolveShakeTime)
+        {
+            if (card == null) yield break;
+            t += Time.deltaTime;
+            float strength = Mathf.Lerp(2f, 9f, t / Mathf.Max(0.0001f, dissolveShakeTime));
+            cardRect.anchoredPosition = basePos + Random.insideUnitCircle * strength;
+            cardRect.localRotation = baseRot * Quaternion.Euler(0f, 0f, Random.Range(-2.5f, 2.5f));
+            yield return null;
+        }
+        if (card == null) yield break;
+        cardRect.anchoredPosition = basePos;
+        cardRect.localRotation = baseRot;
+
+        // No usable sprite to cut up: just fade the card out
+        if (img == null || img.sprite == null || img.sprite.texture == null)
+        {
+            CanvasGroup fade = card.GetComponent<CanvasGroup>();
+            if (fade == null) fade = card.gameObject.AddComponent<CanvasGroup>();
+            float f = 0f;
+            while (f < dissolveDuration && card != null)
             {
-                if (card.transform.parent != handParentContainer) card.transform.SetParent(handParentContainer, false);
-                LayoutElement le = card.GetComponent<LayoutElement>();
-                if (le != null) le.ignoreLayout = false;
+                f += Time.deltaTime;
+                fade.alpha = 1f - Mathf.Clamp01(f / dissolveDuration);
+                yield return null;
+            }
+            yield break;
+        }
+
+        // 2. Cut the card image into a grid of pieces, laid exactly over the card
+        int cols = Mathf.Max(1, dissolveColumns);
+        int rows = Mathf.Max(1, dissolveRows);
+
+        Sprite sprite = img.sprite;
+        Texture tex = sprite.texture;
+        Rect tr = sprite.textureRect;
+        Rect uv = new Rect(tr.x / tex.width, tr.y / tex.height, tr.width / tex.width, tr.height / tex.height);
+
+        GameObject fxObj = new GameObject("CardDissolveFX", typeof(RectTransform));
+        RectTransform fx = fxObj.GetComponent<RectTransform>();
+        fx.SetParent(cardRect.parent, false);
+        fx.anchorMin = cardRect.anchorMin;
+        fx.anchorMax = cardRect.anchorMax;
+        fx.pivot = cardRect.pivot;
+        fx.sizeDelta = cardRect.sizeDelta;
+        fx.anchoredPosition = cardRect.anchoredPosition;
+        fx.localRotation = cardRect.localRotation;
+        fx.localScale = cardRect.localScale;
+        fx.SetSiblingIndex(Mathf.Min(card.transform.GetSiblingIndex() + 1, cardRect.parent.childCount - 1));
+
+        Vector2 size = cardRect.rect.size;
+        float cw = size.x / cols;
+        float ch = size.y / rows;
+
+        int count = cols * rows;
+        RectTransform[] rts = new RectTransform[count];
+        RawImage[] raws = new RawImage[count];
+        Vector2[] startPos = new Vector2[count];
+        Vector2[] drift = new Vector2[count];
+        float[] delay = new float[count];
+        float[] spin = new float[count];
+        Color baseColor = img.color;
+
+        int k = 0;
+        for (int x = 0; x < cols; x++)
+        {
+            for (int y = 0; y < rows; y++)
+            {
+                GameObject piece = new GameObject("Piece", typeof(RectTransform), typeof(RawImage));
+                RectTransform pr = piece.GetComponent<RectTransform>();
+                pr.SetParent(fx, false);
+                pr.anchorMin = Vector2.zero;
+                pr.anchorMax = Vector2.zero;
+                pr.pivot = new Vector2(0.5f, 0.5f);
+                pr.sizeDelta = new Vector2(cw + 0.75f, ch + 0.75f); // tiny overlap hides seams
+                startPos[k] = new Vector2((x + 0.5f) * cw, (y + 0.5f) * ch);
+                pr.anchoredPosition = startPos[k];
+
+                RawImage raw = piece.GetComponent<RawImage>();
+                raw.texture = tex;
+                raw.uvRect = new Rect(uv.x + uv.width * x / cols, uv.y + uv.height * y / rows, uv.width / cols, uv.height / rows);
+                raw.color = baseColor;
+                raw.raycastTarget = false;
+
+                // Pieces break off at random moments (not all at once) and drift up and outward, like dust
+                delay[k] = Random.value * dissolveDuration * 0.6f;
+                drift[k] = new Vector2(Random.Range(-1f, 1f), Random.Range(0.15f, 1f)).normalized * dissolveDriftDistance * Random.Range(0.35f, 1f);
+                spin[k] = Random.Range(-140f, 140f);
+
+                rts[k] = pr;
+                raws[k] = raw;
+                k++;
             }
         }
 
-        Canvas.ForceUpdateCanvases();
-        if (handParentContainer is RectTransform handRect) LayoutRebuilder.ForceRebuildLayoutImmediate(handRect);
+        // Hide the real card now that the pieces sit exactly on top of it
+        CanvasGroup cg = card.GetComponent<CanvasGroup>();
+        if (cg == null) cg = card.gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+        cg.blocksRaycasts = false;
+
+        // 3. Pieces break away one after another
+        float elapsed = 0f;
+        while (elapsed < dissolveDuration)
+        {
+            elapsed += Time.deltaTime;
+
+            for (int i = 0; i < count; i++)
+            {
+                float life = Mathf.Max(0.05f, dissolveDuration - delay[i]);
+                float p = Mathf.Clamp01((elapsed - delay[i]) / life);
+                if (p <= 0f) continue;
+
+                float ease = 1f - (1f - p) * (1f - p);
+                rts[i].anchoredPosition = startPos[i] + drift[i] * ease;
+                rts[i].localRotation = Quaternion.Euler(0f, 0f, spin[i] * ease);
+                rts[i].localScale = Vector3.one * Mathf.Lerp(1f, 0.15f, p);
+
+                Color c = baseColor;
+                c.a = baseColor.a * (1f - p * p);
+                raws[i].color = c;
+            }
+
+            yield return null;
+        }
+
+        Destroy(fxObj);
+    }
+
+    private IEnumerator FlyCardAway(CardUI card, float delay = 0f)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        if (card == null) yield break;
+
+        if (discardFlyToDeck)
+        {
+            if (HasDeckVisual())
+                yield return StartCoroutine(card.MoveToAnchoredPosition(GetDeckPosition(), discardFlyDuration, 1f, 0f));
+            else
+                yield return StartCoroutine(card.MoveToAnchoredPosition(GetDeckPosition(), discardFlyDuration, 0.55f, 12f));
+        }
+        else
+        {
+            RectTransform cardRect = card.GetComponent<RectTransform>();
+            if (cardRect == null) yield break;
+            Vector2 offscreenPos = new Vector2(cardRect.anchoredPosition.x, -(Screen.height * 0.75f));
+            yield return StartCoroutine(card.MoveToAnchoredPosition(offscreenPos, discardFlyDuration));
+        }
     }
 
     public int GetSelectedCardCount()
@@ -521,21 +883,10 @@ public class DeckManager : MonoBehaviour
         }
 
         PlaySFX(discardSound);
-        float discardTargetY = -(Screen.height * 0.75f);
-        foreach (CardUI card in selectedCards)
-        {
-            if (card != null)
-            {
-                RectTransform cardRect = card.GetComponent<RectTransform>();
-                if (cardRect != null)
-                {
-                    Vector2 offscreenPos = new Vector2(cardRect.anchoredPosition.x, discardTargetY);
-                    StartCoroutine(card.MoveToAnchoredPosition(offscreenPos, discardFlyDuration));
-                }
-            }
-        }
+        for (int fi = 0; fi < selectedCards.Count; fi++)
+            StartCoroutine(FlyCardAway(selectedCards[fi], fi * discardStagger));
 
-        yield return new WaitForSeconds(discardFlyDuration + 0.05f);
+        yield return new WaitForSeconds(discardFlyDuration + 0.05f + selectedCards.Count * discardStagger);
 
         int recycledCount = selectedCards.Count;
         foreach (CardUI card in selectedCards)
@@ -553,6 +904,8 @@ public class DeckManager : MonoBehaviour
         }
 
         ShuffleDrawPile();
+        PlaySFX(shuffleSound);
+        UpdateDeckLeftDisplay();
 
         spawnedCardUIList.RemoveAll(item => item == null);
         foreach (CardUI card in remainingCards)
@@ -564,6 +917,7 @@ public class DeckManager : MonoBehaviour
         RebuildLayout();
         UpdateHandCountDisplay();
 
+        yield return new WaitForSeconds(0.25f); // let the hand close up before dealing
         int cardsToDraw = Mathf.Min(recycledCount, cardsRemainingInRound);
         if (cardsToDraw > 0)
         {
@@ -695,6 +1049,7 @@ public class DeckManager : MonoBehaviour
         }
 
         int scoredIndex = 0;
+        bool windBoonSoundPlayed = false;
         foreach (CardUI card in selectedCards)
         {
             if (card.cardData != null)
@@ -702,7 +1057,13 @@ public class DeckManager : MonoBehaviour
                 Vector3 origScale = card.transform.localScale;
                 card.transform.localScale = origScale * 1.25f;
 
-                baseScore += card.cardData.primaryValue;
+                int cardValue = card.cardData.GetEffectiveValue(); // includes the Wind Power boon on Wind cards
+                if (card.cardData is WindCard && BoonProgress.BonusWindPower > 0 && !windBoonSoundPlayed)
+                {
+                    PlaySFX(windPowerBoonSound);
+                    windBoonSoundPlayed = true;
+                }
+                baseScore += cardValue;
                 SetBalatroText(baseScore, currentMult);
                 StartCoroutine(PulseBalatroText());
 
@@ -714,16 +1075,6 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale;
                 yield return new WaitForSeconds(0.2f);
             }
-        }
-
-        // Permanent boon: flat Wind Power added once per played hand (after the cards, before the mult effects)
-        if (BoonProgress.BonusWindPower > 0)
-        {
-            baseScore += BoonProgress.BonusWindPower;
-            SetBalatroText(baseScore, currentMult);
-            StartCoroutine(PulseBalatroText());
-            PlaySFX(windPowerBoonSound);
-            yield return new WaitForSeconds(0.4f);
         }
 
         yield return new WaitForSeconds(0.3f);
@@ -920,38 +1271,31 @@ public class DeckManager : MonoBehaviour
         }
 
         // --- STEP 7: USUAL ROUND ENDING SEQUENCE ---
-        PlaySFX(discardSound);
-        float discardTargetY = -(Screen.height * 0.75f);
+        float endWait = discardFlyDuration + 0.05f;
 
-        foreach (CardUI card in selectedCards)
+        if (dissolveScoredCards)
         {
-            if (card != null)
-            {
-                RectTransform cardRect = card.GetComponent<RectTransform>();
-                if (cardRect != null)
-                {
-                    Vector2 offscreenPos = new Vector2(cardRect.anchoredPosition.x, discardTargetY);
-                    StartCoroutine(card.MoveToAnchoredPosition(offscreenPos, discardFlyDuration));
-                }
-            }
+            // Played cards shake and break apart (Balatro style)
+            for (int di = 0; di < selectedCards.Count; di++)
+                StartCoroutine(DissolveCard(selectedCards[di], di * dissolveStagger, Mathf.Min(1f + di * 0.06f, 1.4f)));
+
+            endWait = Mathf.Max(endWait, GetDissolveTotalTime(selectedCards.Count) - delayBetweenDiscards);
+        }
+        else
+        {
+            PlaySFX(discardSound);
+            for (int fi = 0; fi < selectedCards.Count; fi++)
+                StartCoroutine(FlyCardAway(selectedCards[fi], fi * discardStagger));
         }
 
         yield return new WaitForSeconds(delayBetweenDiscards);
 
+        // The cards you didn't play go back into the deck
+        if (dissolveScoredCards && remainingCards.Count > 0) PlaySFX(discardSound);
         foreach (CardUI card in remainingCards)
-        {
-            if (card != null)
-            {
-                RectTransform cardRect = card.GetComponent<RectTransform>();
-                if (cardRect != null)
-                {
-                    Vector2 offscreenPos = new Vector2(cardRect.anchoredPosition.x, discardTargetY);
-                    StartCoroutine(card.MoveToAnchoredPosition(offscreenPos, discardFlyDuration));
-                }
-            }
-        }
+            StartCoroutine(FlyCardAway(card));
 
-        yield return new WaitForSeconds(discardFlyDuration + 0.05f);
+        yield return new WaitForSeconds(endWait);
 
         List<CardUI> allCards = new List<CardUI>(spawnedCardUIList);
         foreach (CardUI card in allCards)
@@ -967,7 +1311,6 @@ public class DeckManager : MonoBehaviour
         spawnedCardUIList.Clear();
         hand.Clear();
 
-        if (layoutGroup != null) layoutGroup.enabled = true;
 
         ResetRoundState();
 

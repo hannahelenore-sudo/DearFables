@@ -5,6 +5,11 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 
+/// <summary>
+/// One card in the hand. DeckManager decides WHERE the card belongs (slotPosition / slotRotation);
+/// this script makes it glide there with a springy, Balatro-style feel, and adds the
+/// lift / scale / tilt for hover and selection on top of that slot.
+/// </summary>
 public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Data Reference")]
@@ -17,11 +22,22 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     public bool isSelected = false;
     public float selectOffsetY = 40f;
     public float selectScale = 1.08f;
-    public float animationSpeed = 0.15f;
 
     [Header("Card Tint Colors")]
     public Color cardDefaultTint = Color.white;
     public Color cardTintOnSelect = new Color(1f, 0.98f, 0.8f, 1f);
+    [Tooltip("How fast the tint fades between normal and selected.")]
+    public float tintSpeed = 14f;
+
+    [Header("Balatro Motion")]
+    [Tooltip("Higher = snappier. Lower = floatier.")]
+    public float springStiffness = 320f;
+    [Tooltip("Higher = less wobble. ~24 gives a small, pleasant overshoot.")]
+    public float springDamping = 24f;
+    [Tooltip("Little bounce kick when a card is selected.")]
+    public float selectPopKick = 2f;
+    [Tooltip("How far (degrees) a hovered card tilts toward the mouse.")]
+    public float hoverTiltDegrees = 7f;
 
     [Header("Hover Settings")]
     public GameObject valueBubblePrefab;
@@ -33,29 +49,46 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     public Color bubbleBackgroundColor = new Color(0f, 0f, 0f, 0.85f);
     public Color bubbleTextColor = Color.yellow;
 
+    // ---- set by DeckManager.RebuildLayout ----
+    [HideInInspector] public bool followSlot = false;
+    [HideInInspector] public Vector2 slotPosition;
+    [HideInInspector] public float slotRotation;
+
     private RectTransform rectTransform;
     private DeckManager deckManager;
-    private Coroutine currentSelectionAnimation;
-
     private LayoutElement layoutElement;
+    private Canvas parentCanvas;
 
     private bool isHovered = false;
+    private int siblingBeforeHover = -1;
     private GameObject activeValueBubble;
     private Image bubbleBgImage;
     private TextMeshProUGUI bubbleTextComponent;
     private Image bubbleIconImage;
 
-    private float currentVisualOffsetY = 0f;
+    // spring state
+    private Vector2 posVel;
+    private float scaleVel, rotVel;
+    private float curScale = 1f, curRot = 0f;
 
+    private float currentVisualOffsetY = 0f; // legacy (AnimateToLayout)
     public bool isAnimatingToLayout = false;
+
+    private static System.Reflection.FieldInfo scoringField;
+    private static System.Reflection.FieldInfo discardingField;
 
     void Awake()
     {
-        rectTransform = GetComponent<RectTransform>();
-        if (cardImage == null) cardImage = GetComponent<Image>();
+        EnsureRefs();
         layoutElement = GetComponent<LayoutElement>();
         if (layoutElement == null) layoutElement = gameObject.AddComponent<LayoutElement>();
         deckManager = Object.FindAnyObjectByType<DeckManager>();
+    }
+
+    private void EnsureRefs()
+    {
+        if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
+        if (cardImage == null) cardImage = GetComponent<Image>();
     }
 
     void Start()
@@ -72,7 +105,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
     public void ApplySelectionStateImmediately()
     {
-        if (isAnimatingToLayout) return;
+        if (isAnimatingToLayout || followSlot) return; // slot-following cards handle this every frame
 
         if (isSelected)
         {
@@ -93,15 +126,82 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         }
     }
 
+    // ------------------------------------------------------------------
+    // Spring motion toward the slot (runs every frame)
+    // ------------------------------------------------------------------
+
     void LateUpdate()
     {
-        if (isAnimatingToLayout) return;
+        UpdateBubbleOrientation();
 
-        float targetY = isSelected ? selectOffsetY : (isHovered && CanHover() ? hoverOffsetY : 0f);
-        if (Mathf.Abs(rectTransform.anchoredPosition.y - targetY) > 0.01f && currentSelectionAnimation == null)
+        if (!followSlot || isAnimatingToLayout) return;
+        EnsureRefs();
+
+        float dt = Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
+
+        bool hoverLift = isHovered && !isSelected && CanHover();
+
+        float lift = isSelected ? selectOffsetY : (hoverLift ? hoverOffsetY : 0f);
+        float targetScale = isSelected ? selectScale : (hoverLift ? 1f + hoverScaleBonus : 1f);
+        float targetRot = slotRotation + (hoverLift ? GetPointerTilt() : 0f);
+        Vector2 targetPos = slotPosition + new Vector2(0f, lift);
+
+        // position
+        Vector2 pos = rectTransform.anchoredPosition;
+        posVel += ((targetPos - pos) * springStiffness - posVel * springDamping) * dt;
+        pos += posVel * dt;
+        rectTransform.anchoredPosition = pos;
+
+        // scale
+        scaleVel += ((targetScale - curScale) * springStiffness - scaleVel * springDamping) * dt;
+        curScale += scaleVel * dt;
+        transform.localScale = Vector3.one * curScale;
+
+        // rotation
+        rotVel += ((targetRot - curRot) * springStiffness - rotVel * springDamping) * dt;
+        curRot += rotVel * dt;
+        rectTransform.localRotation = Quaternion.Euler(0f, 0f, curRot);
+
+        // tint
+        if (cardImage != null)
         {
-            rectTransform.anchoredPosition = new Vector2(rectTransform.anchoredPosition.x, targetY);
+            Color targetColor = isSelected ? cardTintOnSelect : cardDefaultTint;
+            cardImage.color = Color.Lerp(cardImage.color, targetColor, 1f - Mathf.Exp(-tintSpeed * dt));
         }
+    }
+
+    private float GetPointerTilt()
+    {
+        if (parentCanvas == null) parentCanvas = GetComponentInParent<Canvas>();
+        Camera cam = (parentCanvas != null && parentCanvas.renderMode != RenderMode.ScreenSpaceOverlay) ? parentCanvas.worldCamera : null;
+
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, Input.mousePosition, cam, out Vector2 local))
+        {
+            float half = Mathf.Max(1f, rectTransform.rect.width * 0.5f);
+            return -Mathf.Clamp(local.x / half, -1f, 1f) * hoverTiltDegrees;
+        }
+        return 0f;
+    }
+
+    /// <summary>Instantly places the card (used for spawning a card at the deck before it flies into the hand).</summary>
+    public void SnapTo(Vector2 pos, float scale, float rotZ)
+    {
+        EnsureRefs();
+        posVel = Vector2.zero;
+        scaleVel = 0f;
+        rotVel = 0f;
+        curScale = scale;
+        curRot = rotZ;
+
+        rectTransform.anchoredPosition = pos;
+        transform.localScale = Vector3.one * scale;
+        rectTransform.localRotation = Quaternion.Euler(0f, 0f, rotZ);
+        if (cardImage != null) cardImage.color = isSelected ? cardTintOnSelect : cardDefaultTint;
+    }
+
+    public void SnapToSlot()
+    {
+        SnapTo(slotPosition, 1f, slotRotation);
     }
 
     public void DeselectCard()
@@ -112,6 +212,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     public void LoadCardData(CardData newData)
     {
         cardData = newData;
+        EnsureRefs();
         if (cardImage != null && cardData != null && cardData.cardArt != null)
         {
             cardImage.sprite = cardData.cardArt;
@@ -171,6 +272,15 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         activeValueBubble.SetActive(false);
     }
 
+    // Keeps the tooltip upright while the card tilts
+    private void UpdateBubbleOrientation()
+    {
+        if (activeValueBubble != null && activeValueBubble.activeSelf)
+        {
+            activeValueBubble.transform.rotation = transform.parent != null ? transform.parent.rotation : Quaternion.identity;
+        }
+    }
+
     private void UpdateBubbleVisuals()
     {
         if (bubbleBgImage != null)
@@ -209,7 +319,11 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             }
             else if (cardData is WindCard wind)
             {
-                bubbleTextComponent.text = wind.primaryValue.ToString();
+                int boost = BoonProgress.BonusWindPower;
+                if (boost > 0)
+                    bubbleTextComponent.text = $"{wind.GetEffectiveValue()}\n<size=85%>({wind.primaryValue} base +{boost} Wind Power)</size>";
+                else
+                    bubbleTextComponent.text = wind.primaryValue.ToString();
             }
             else
             {
@@ -224,8 +338,10 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
         if (deckManager != null)
         {
-            var scoringField = deckManager.GetType().GetField("isScoring", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var discardingField = deckManager.GetType().GetField("isDiscarding", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (scoringField == null)
+                scoringField = typeof(DeckManager).GetField("isScoring", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (discardingField == null)
+                discardingField = typeof(DeckManager).GetField("isDiscarding", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
             bool isScoring = scoringField != null && (bool)scoringField.GetValue(deckManager);
             bool isDiscarding = discardingField != null && (bool)discardingField.GetValue(deckManager);
@@ -241,26 +357,37 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         if (!CanHover()) return;
 
         isHovered = true;
+        scaleVel += selectPopKick * 0.4f; // tiny bounce on hover
+
+        // Draw the hovered card on top of its overlapping neighbours
+        siblingBeforeHover = transform.GetSiblingIndex();
+        transform.SetAsLastSibling();
 
         if (activeValueBubble != null)
         {
             UpdateBubbleVisuals();
             activeValueBubble.SetActive(true);
         }
-
-        TriggerAnimation();
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         isHovered = false;
+        RestoreSiblingOrder();
 
         if (activeValueBubble != null)
         {
             activeValueBubble.SetActive(false);
         }
+    }
 
-        TriggerAnimation();
+    private void RestoreSiblingOrder()
+    {
+        if (siblingBeforeHover >= 0 && transform.parent != null)
+        {
+            transform.SetSiblingIndex(Mathf.Min(siblingBeforeHover, transform.parent.childCount - 1));
+        }
+        siblingBeforeHover = -1;
     }
 
     public void OnPointerClick(PointerEventData eventData)
@@ -275,81 +402,30 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
     public void ToggleSelection(bool selected)
     {
+        bool changed = isSelected != selected;
         isSelected = selected;
 
         if (isSelected)
         {
             isHovered = false;
+            RestoreSiblingOrder();
             if (activeValueBubble != null)
             {
                 activeValueBubble.SetActive(false);
             }
         }
 
-        TriggerAnimation();
+        // Balatro-style "pop": a little kick of scale and wobble when the selection changes
+        if (changed && followSlot && !isAnimatingToLayout)
+        {
+            scaleVel += isSelected ? selectPopKick : -selectPopKick * 0.5f;
+            rotVel += Random.Range(-60f, 60f);
+        }
 
         if (deckManager != null)
         {
             deckManager.UpdateSelectedTotal();
         }
-    }
-
-    private void TriggerAnimation()
-    {
-        if (isAnimatingToLayout) return;
-
-        if (currentSelectionAnimation != null)
-            StopCoroutine(currentSelectionAnimation);
-
-        currentSelectionAnimation = StartCoroutine(AnimateSelectionRoutine());
-    }
-
-    private IEnumerator AnimateSelectionRoutine()
-    {
-        float targetOffsetY = 0f;
-        if (isSelected) targetOffsetY += selectOffsetY;
-        else if (isHovered && CanHover()) targetOffsetY += hoverOffsetY;
-
-        float totalScale = 1f;
-        if (isSelected) totalScale *= selectScale;
-        else if (isHovered && CanHover()) totalScale += hoverScaleBonus;
-
-        Vector3 targetScale = Vector3.one * totalScale;
-        Color targetColor = isSelected ? cardTintOnSelect : cardDefaultTint;
-
-        float startOffsetY = currentVisualOffsetY;
-        Vector3 startScale = transform.localScale;
-        Color startColor = cardImage != null ? cardImage.color : Color.white;
-
-        float elapsed = 0f;
-        while (elapsed < animationSpeed)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Sin((elapsed / animationSpeed) * Mathf.PI * 0.5f);
-
-            float nextOffsetY = Mathf.Lerp(startOffsetY, targetOffsetY, t);
-            currentVisualOffsetY = nextOffsetY;
-
-            rectTransform.anchoredPosition = new Vector2(rectTransform.anchoredPosition.x, currentVisualOffsetY);
-
-            transform.localScale = Vector3.Lerp(startScale, targetScale, t);
-            if (cardImage != null) cardImage.color = Color.Lerp(startColor, targetColor, t);
-
-            yield return null;
-        }
-
-        currentVisualOffsetY = targetOffsetY;
-        rectTransform.anchoredPosition = new Vector2(rectTransform.anchoredPosition.x, targetOffsetY);
-
-        transform.localScale = targetScale;
-        if (cardImage != null) cardImage.color = targetColor;
-
-        if (!isSelected)
-        {
-            ResetBaselinePosition();
-        }
-
-        currentSelectionAnimation = null;
     }
 
     public void ResetBaselinePosition()
@@ -363,25 +439,36 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         if (cardImage != null) cardImage.color = cardDefaultTint;
     }
 
-    public IEnumerator MoveToAnchoredPosition(Vector2 targetAnchoredPos, float duration)
+    /// <summary>
+    /// Smoothly flies the card to a position (used for scoring and discarding). Optionally shrinks / rotates it on the way.
+    /// While this runs the card stops following its hand slot.
+    /// </summary>
+    public IEnumerator MoveToAnchoredPosition(Vector2 targetAnchoredPos, float duration, float endScale = 1f, float endRotation = 0f)
     {
         isAnimatingToLayout = true;
         if (activeValueBubble != null) activeValueBubble.SetActive(false);
+        EnsureRefs();
 
         Vector2 startPos = rectTransform.anchoredPosition;
+        float startScale = transform.localScale.x;
+        float startRot = Mathf.DeltaAngle(0f, rectTransform.localEulerAngles.z);
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / duration;
+            float t = Mathf.Clamp01(elapsed / duration);
             t = t * t * (3f - 2f * t);
 
             rectTransform.anchoredPosition = Vector2.Lerp(startPos, targetAnchoredPos, t);
+            transform.localScale = Vector3.one * Mathf.Lerp(startScale, endScale, t);
+            rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(startRot, endRotation, t));
             yield return null;
         }
 
         rectTransform.anchoredPosition = targetAnchoredPos;
+        transform.localScale = Vector3.one * endScale;
+        rectTransform.localRotation = Quaternion.Euler(0f, 0f, endRotation);
     }
 
     public void AnimateToLayout(Vector3 spawnPosition, float duration = 0.35f)

@@ -26,6 +26,12 @@ public class CardData : ScriptableObject
     [Tooltip("Icon image displayed inside the hover bubble tooltip text.")]
     public Sprite hoverIcon;
 
+    /// <summary>Primary value including permanent boons. Used for scoring AND for the hover text.</summary>
+    public virtual int GetEffectiveValue()
+    {
+        return primaryValue;
+    }
+
     public virtual int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
     {
         return currentTotal;
