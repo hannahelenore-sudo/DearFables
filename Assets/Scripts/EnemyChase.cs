@@ -7,7 +7,9 @@ using UnityEngine.SceneManagement;
 /// - Player comes within detectionRange  -> enemy starts chasing.
 /// - Player leaves the range for loseSightTime seconds -> enemy stops chasing.
 /// - If the player comes back into range before the timer runs out, the timer resets.
-/// - Enemy touches the player -> hit sound, Pokemon-style transition, then the card game starts.
+/// - A card thrown by CardShooter hits the enemy (CardProjectile calls HitByCard) -> battle starts.
+/// - Optionally, the enemy touching the player also starts the battle (Touch Starts Battle).
+/// - Battle start = hit sound, Pokemon-style transition, then the card game.
 /// </summary>
 public class EnemyChase : MonoBehaviour
 {
@@ -23,7 +25,11 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("Enemy stops this close to the player.")]
     public float stopDistance = 0.5f;
 
-    [Header("Touch / Card Game")]
+    [Header("Battle Start")]
+    [Tooltip("A card thrown by CardShooter starts the battle when it hits this enemy.")]
+    public bool startBattleOnCardHit = true;
+    [Tooltip("Also start the battle when the enemy touches the player. Turn off if only cards should start fights.")]
+    public bool touchStartsBattle = false;
     [Tooltip("Player this close counts as touching. Keep it a bit larger than Stop Distance.")]
     public float touchDistance = 0.8f;
     [Tooltip("Touching is ignored for this many seconds after the scene loads, so the player isn't instantly sent back into battle.")]
@@ -32,7 +38,7 @@ public class EnemyChase : MonoBehaviour
     public bool useBattleTransition = true;
 
     [Header("Sound Effects")]
-    [Tooltip("Played the moment the enemy touches / hits the player.")]
+    [Tooltip("Played the moment the battle starts (card hit or touch).")]
     public AudioClip hitSound;
     [Range(0f, 1f)] public float hitVolume = 1f;
     [Tooltip("Small random pitch change so the sound doesn't feel identical every time. 0 = no variation.")]
@@ -54,6 +60,7 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("Flip the sprite left/right depending on where the player is. Assumes the image faces right.")]
     public bool flipToFacePlayer = true;
 
+    private static bool battleStarting; // stops two enemies starting a battle at once
     private bool isChasing;
     private bool battleStarted;
     private float outOfRangeTimer;
@@ -75,8 +82,17 @@ public class EnemyChase : MonoBehaviour
         return SceneManager.GetActiveScene().name + "/" + id;
     }
 
+    /// <summary>Called by CardProjectile when the thrown card reaches this enemy.</summary>
+    public void HitByCard()
+    {
+        if (!startBattleOnCardHit) return;
+        StartBattle();
+    }
+
     private void Start()
     {
+        battleStarting = false; // fresh scene -> allow battles again
+
         // This enemy already caught the player earlier -> it's gone
         if (caughtEnemies.Contains(GetId()))
         {
@@ -95,13 +111,12 @@ public class EnemyChase : MonoBehaviour
     {
         // Only ever uses the player assigned in the Inspector
         if (player == null) return;
-
         if (battleStarted) return;
 
         float distance = GetDistance(transform.position, player.position);
 
-        // Touched the player -> sound, transition, save position and go to the card game
-        if (distance <= touchDistance && Time.timeSinceLevelLoad >= touchGraceTime)
+        // Touched the player (optional) -> start the battle
+        if (touchStartsBattle && distance <= touchDistance && Time.timeSinceLevelLoad >= touchGraceTime)
         {
             StartBattle();
             return;
@@ -149,6 +164,10 @@ public class EnemyChase : MonoBehaviour
 
     private void StartBattle()
     {
+        // Already fighting, or another enemy already started a battle this frame
+        if (battleStarted || battleStarting) return;
+        if (player == null) return;
+
         PlayerPositionSaver saver = player.GetComponentInParent<PlayerPositionSaver>();
 
         if (saver == null)
@@ -158,9 +177,10 @@ public class EnemyChase : MonoBehaviour
         }
 
         battleStarted = true;
+        battleStarting = true;
         caughtEnemies.Add(GetId()); // gone when the player comes back
 
-        Debug.Log("EnemyChase: '" + name + "' caught the player, starting battle.");
+        Debug.Log("EnemyChase: '" + name + "' started a battle.");
 
         PlayHitSound();
 
