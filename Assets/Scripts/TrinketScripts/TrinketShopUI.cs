@@ -54,10 +54,15 @@ public class TrinketShopUI : MonoBehaviour
     public AudioClip buySound;
     public AudioClip reshuffleSound;
     public AudioClip closeSound;
+    [Tooltip("Played when you try to take a trinket but already have 5.")]
+    public AudioClip fullSound;
 
     /// <summary>True while any shop is open. Handy to stop player movement: if (TrinketShopUI.IsAnyShopOpen) return;</summary>
     public static bool IsAnyShopOpen { get; private set; }
     public bool IsOpen { get; private set; }
+
+    /// <summary>The shop that is open right now (null if none). The sidebar uses it to react when you sell.</summary>
+    public static TrinketShopUI OpenShop { get; private set; }
 
     private CanvasGroup panelGroup;
     private bool hasStock;
@@ -91,6 +96,7 @@ public class TrinketShopUI : MonoBehaviour
     private void OnDisable()
     {
         if (IsOpen) IsAnyShopOpen = false;
+        if (OpenShop == this) OpenShop = null;
     }
 
     private void Update()
@@ -114,6 +120,7 @@ public class TrinketShopUI : MonoBehaviour
 
         IsOpen = true;
         IsAnyShopOpen = true;
+        OpenShop = this;
 
         PlaySFX(openSound);
         panelRoot.SetActive(true);
@@ -131,6 +138,7 @@ public class TrinketShopUI : MonoBehaviour
 
         IsOpen = false;
         IsAnyShopOpen = false;
+        if (OpenShop == this) OpenShop = null;
 
         PlaySFX(closeSound);
         if (shopkeeper != null) shopkeeper.Clear();
@@ -235,6 +243,15 @@ public class TrinketShopUI : MonoBehaviour
         Slot slot = slots[index];
         if (slot == null || slot.trinket == null || slot.taken) return;
 
+        // Max 5 trinkets: sell one in the sidebar to make room
+        if (TrinketInventory.IsFull)
+        {
+            PlaySFX(fullSound);
+            TrinketSidebar.FlashFull();
+            if (shopkeeper != null) shopkeeper.SayFull();
+            return;
+        }
+
         // Free for now. Costs / ownership checks come later.
         TrinketInventory.Add(slot.trinket);
         slot.taken = true;
@@ -243,6 +260,12 @@ public class TrinketShopUI : MonoBehaviour
         PlaySFX(buySound);
         if (shopkeeper != null) shopkeeper.SayBought(slot.trinket.trinketName);
         Debug.Log("Took trinket: " + slot.trinket.trinketName);
+    }
+
+    /// <summary>Called by the sidebar after the player sells a trinket.</summary>
+    public void NotifySold(TrinketData sold)
+    {
+        if (shopkeeper != null) shopkeeper.SaySold(sold != null ? sold.trinketName : "");
     }
 
     // Little "pop" when a slot is dealt

@@ -142,6 +142,8 @@ public class DeckManager : MonoBehaviour
     public AudioClip setBonusSound;
     [Tooltip("Played when a trinket adds to your mult (Candy, Wind Charm, Wind Fan, Sun Charm, Sun Plushie, Sugar Rush).")]
     public AudioClip trinketTriggerSound;
+    [Tooltip("Pause (seconds) after each trinket triggers while scoring, so you can watch them go from top to bottom.")]
+    public float trinketTriggerDelay = 0.4f;
     [Tooltip("Played when the permanent Wind Power boon adds its flat bonus to your score.")]
     public AudioClip windPowerBoonSound;
     public AudioClip highRollBonusSound;
@@ -963,6 +965,7 @@ public class DeckManager : MonoBehaviour
         }
 
         PlaySFX(confirmSound);
+        TrinketSidebar.BeginScoring(); // locks the trinket order, slides the bar open
 
         HorizontalLayoutGroup layoutGroup = handParentContainer.GetComponent<HorizontalLayoutGroup>();
         if (layoutGroup != null) layoutGroup.enabled = false;
@@ -1050,6 +1053,9 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(0, currentMult);
         }
 
+        // Snapshot of the trinket row: effects trigger from the first (top) to the last (bottom)
+        List<TrinketData> trinketOrder = new List<TrinketData>(TrinketInventory.Owned);
+
         int scoredIndex = 0;
         bool windBoonSoundPlayed = false;
         foreach (CardUI card in selectedCards)
@@ -1067,12 +1073,8 @@ public class DeckManager : MonoBehaviour
                 }
                 baseScore += cardValue;
 
-                // Trinkets that trigger when this card scores (Wind Charm, Sun Charm, Sun Plushie)
-                bool trinketTriggered = TrinketEffects.OnCardScored(card.cardData, ref currentMult);
-
                 SetBalatroText(baseScore, currentMult);
                 StartCoroutine(PulseBalatroText());
-                if (trinketTriggered) PlaySFX(trinketTriggerSound, Mathf.Min(1f + scoredIndex * 0.05f, 1.5f));
 
                 // Pitch climbs with every scored card
                 PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f, 2f));
@@ -1081,6 +1083,23 @@ public class DeckManager : MonoBehaviour
                 yield return new WaitForSeconds(0.15f);
                 card.transform.localScale = origScale;
                 yield return new WaitForSeconds(0.2f);
+
+                // Trinkets that trigger when this card scores, TOP TO BOTTOM (Wind Charm, Sun Charm, Sun Plushie)
+                for (int ti = 0; ti < trinketOrder.Count; ti++)
+                {
+                    string trinketLabel;
+                    bool trinketTriggered = TrinketEffects.ApplyOnCardScored(trinketOrder[ti], card.cardData, ref currentMult, out trinketLabel);
+                    if (trinketLabel == null) continue;
+
+                    TrinketSidebar.Pulse(ti, trinketLabel);
+                    if (trinketTriggered)
+                    {
+                        SetBalatroText(baseScore, currentMult);
+                        StartCoroutine(PulseBalatroText());
+                        PlaySFX(trinketTriggerSound, Mathf.Min(1f + ti * 0.08f, 1.5f));
+                    }
+                    yield return new WaitForSeconds(trinketTriggerDelay);
+                }
             }
         }
 
@@ -1088,26 +1107,30 @@ public class DeckManager : MonoBehaviour
 
         // --- STEP 2: MULT EFFECTS TRIGGER ONE AFTER ANOTHER ---
 
-        // Wind Fan: +Mult if the played hand contains 5 Wind cards
-        float windFanMult = TrinketEffects.GetWindFanMult(CountCardsOfType<WindCard>(selectedCards));
-        if (windFanMult > 0f)
+        // Hand trinkets (Wind Fan, Candy, Sugar Rush) trigger TOP TO BOTTOM in the order of the sidebar
+        int windCardsInHand = CountCardsOfType<WindCard>(selectedCards);
+        int lastCandy = TrinketEffects.LastCandyIndex();
+        for (int ti = 0; ti < trinketOrder.Count; ti++)
         {
-            currentMult += windFanMult;
-            SetBalatroText(baseScore, currentMult);
-            StartCoroutine(PulseBalatroText());
-            PlaySFX(trinketTriggerSound);
-            yield return new WaitForSeconds(0.6f);
-        }
+            string handLabel;
+            if (TrinketEffects.ApplyOnHandScored(trinketOrder[ti], windCardsInHand, ref currentMult, out handLabel))
+            {
+                TrinketSidebar.Pulse(ti, handLabel);
+                SetBalatroText(baseScore, currentMult);
+                StartCoroutine(PulseBalatroText());
+                PlaySFX(trinketTriggerSound, Mathf.Min(1f + ti * 0.08f, 1.5f));
+                yield return new WaitForSeconds(trinketTriggerDelay + 0.2f);
+            }
 
-        // Candy: +Mult for every candy you own
-        float candyMult = TrinketEffects.GetCandyMult();
-        if (candyMult > 0f)
-        {
-            currentMult += candyMult;
-            SetBalatroText(baseScore, currentMult);
-            StartCoroutine(PulseBalatroText());
-            PlaySFX(trinketTriggerSound);
-            yield return new WaitForSeconds(0.6f);
+            // Sugar Rush: the bottom-most Candy also multiplies when you own enough Candies
+            if (ti == lastCandy && TrinketEffects.ApplySugarRush(ref currentMult, out handLabel))
+            {
+                TrinketSidebar.Pulse(ti, handLabel);
+                SetBalatroText(baseScore, currentMult);
+                StartCoroutine(PulseBalatroText());
+                PlaySFX(trinketTriggerSound, 1.25f);
+                yield return new WaitForSeconds(trinketTriggerDelay + 0.2f);
+            }
         }
 
         if (hasSetBonus)
@@ -1116,16 +1139,6 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(baseScore, currentMult);
             StartCoroutine(PulseBalatroText());
             PlaySFX(setBonusClip != null ? setBonusClip : setBonusSound, 1f, setBonusVolume);
-            yield return new WaitForSeconds(0.6f);
-        }
-
-        // Sugar Rush: 6+ candies multiply your mult
-        if (TrinketEffects.SugarRushActive)
-        {
-            currentMult *= TrinketEffects.SugarRushXMult;
-            SetBalatroText(baseScore, currentMult);
-            StartCoroutine(PulseBalatroText());
-            PlaySFX(trinketTriggerSound, 1.25f);
             yield return new WaitForSeconds(0.6f);
         }
 
@@ -1145,6 +1158,8 @@ public class DeckManager : MonoBehaviour
             PlaySFX(highRollBonusSound);
             yield return new WaitForSeconds(0.6f);
         }
+
+        TrinketSidebar.EndScoring(); // unlocks the order again
 
         float finalMult = currentMult;
 

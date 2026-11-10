@@ -51,6 +51,23 @@ public class ShopkeeperDialogue : MonoBehaviour
         "I've got plenty more in the back!"
     };
 
+    [TextArea(1, 3)]
+    [Tooltip("Said when the player already has 5 trinkets.")]
+    public string[] fullLines =
+    {
+        "Your pockets are full! Sell something first.",
+        "Five is the limit, friend. Sell one in your bag!",
+        "No room left! Open your bag and sell a trinket."
+    };
+    [TextArea(1, 3)]
+    [Tooltip("{item} is replaced with the trinket's name.")]
+    public string[] soldLines =
+    {
+        "Hmm, the {item}. I'll take it off your hands.",
+        "Sold! Now you have room for something new.",
+        "The {item}, eh? Fine, fine."
+    };
+
     public bool IsTalking { get; private set; }
 
     private Coroutine typewriter;
@@ -69,6 +86,8 @@ public class ShopkeeperDialogue : MonoBehaviour
     public void SayGreeting() { SayRandom(greetingLines, null); }
     public void SayBought(string itemName) { SayRandom(boughtLines, itemName); }
     public void SayReshuffle() { SayRandom(reshuffleLines, null); }
+    public void SayFull() { SayRandom(fullLines, null); }
+    public void SaySold(string itemName) { SayRandom(soldLines, itemName); }
 
     // -------------------------------------------------------------------
     // Public API

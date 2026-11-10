@@ -22,7 +22,104 @@ public static class TrinketEffects
     public const float TsinelasMinDefence = 0.7f;    // Tsinelas rerolls the score to beat to between
     public const float TsinelasMaxDefence = 1.0f;    // these fractions of itself (once per Tsinelas)
 
-    // ---------------- Card game ----------------
+    // ---------------- Card game: ONE trinket at a time (used for the top-to-bottom Balatro order) ----------------
+
+    /// <summary>
+    /// Applies a single trinket when a played card scores. Returns true if it triggered.
+    /// 'label' is the popup text ("+3 Mult", "X1.5 Mult", "Nope!"), or null if this trinket doesn't care about the card.
+    /// </summary>
+    public static bool ApplyOnCardScored(TrinketData trinket, CardData card, ref float mult, out string label)
+    {
+        label = null;
+        if (trinket == null || card == null) return false;
+
+        switch (trinket.type)
+        {
+            case TrinketType.WindCharm:
+                if (card is WindCard)
+                {
+                    mult += WindCharmMult;
+                    label = "+" + Fmt(WindCharmMult) + " Mult";
+                    return true;
+                }
+                break;
+
+            case TrinketType.SunCharm:
+                if (card is SolarCard)
+                {
+                    mult += SunCharmMult;
+                    label = "+" + Fmt(SunCharmMult) + " Mult";
+                    return true;
+                }
+                break;
+
+            case TrinketType.SunPlushie:
+                if (card is SolarCard)
+                {
+                    if (Random.value < SunPlushieChance)
+                    {
+                        mult *= SunPlushieXMult;
+                        label = "X" + Fmt(SunPlushieXMult) + " Mult";
+                        return true;
+                    }
+                    label = "Nope!";
+                    return false;
+                }
+                break;
+        }
+        return false;
+    }
+
+    /// <summary>Applies a single trinket after all cards scored (Wind Fan, Candy). Returns true if it triggered.</summary>
+    public static bool ApplyOnHandScored(TrinketData trinket, int windCardsInHand, ref float mult, out string label)
+    {
+        label = null;
+        if (trinket == null) return false;
+
+        switch (trinket.type)
+        {
+            case TrinketType.WindFan:
+                if (windCardsInHand >= WindFanRequiredCards)
+                {
+                    mult += WindFanMult;
+                    label = "+" + Fmt(WindFanMult) + " Mult";
+                    return true;
+                }
+                break;
+
+            case TrinketType.Candy:
+                mult += CandyMult;
+                label = "+" + Fmt(CandyMult) + " Mult";
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>Sugar Rush (fires on the last Candy in the row when you own enough Candies).</summary>
+    public static bool ApplySugarRush(ref float mult, out string label)
+    {
+        label = null;
+        if (!SugarRushActive) return false;
+        mult *= SugarRushXMult;
+        label = "X" + Fmt(SugarRushXMult) + " Mult";
+        return true;
+    }
+
+    /// <summary>Index of the bottom-most Candy in the trinket row, or -1.</summary>
+    public static int LastCandyIndex()
+    {
+        var owned = TrinketInventory.Owned;
+        for (int i = owned.Count - 1; i >= 0; i--)
+            if (owned[i] != null && owned[i].type == TrinketType.Candy) return i;
+        return -1;
+    }
+
+    private static string Fmt(float v)
+    {
+        return v.ToString("0.##");
+    }
+
+    // ---------------- Card game: old "all at once" helpers (kept so nothing else breaks) ----------------
 
     /// <summary>
     /// Called as each played card scores. Adds to / multiplies the mult.

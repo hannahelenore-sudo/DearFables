@@ -203,7 +203,8 @@ public class PlayerMovement : MonoBehaviour
             moveDirection = Vector3.zero;
             currentSpeed = 0f;
 
-            if (Input.GetMouseButtonDown(0))
+            // Clicking the trinket bar must not start a mouse-drag walk
+            if (Input.GetMouseButtonDown(0) && !TrinketSidebar.IsPointerOver)
             {
                 mouseStart = Input.mousePosition;
                 isDragging = true;
