@@ -77,6 +77,12 @@ public class PlayerMovement : MonoBehaviour
     public string idleLeft = "IdleLeft";
     public string idleRight = "IdleRight";
 
+    /// <summary>
+    /// While true the player ignores all input (walk, run, mouse-drag, jump, dash) and just stands idle.
+    /// The shop sets this while you talk to the shopkeeper.
+    /// </summary>
+    public bool InputLocked { get; set; }
+
     private Rigidbody rb;
     private Collider col;
     private Animator animator;
@@ -144,13 +150,30 @@ public class PlayerMovement : MonoBehaviour
         if (dashTimer > 0f) dashTimer -= Time.deltaTime;
         if (dashCooldownTimer > 0f) dashCooldownTimer -= Time.deltaTime;
 
-        HandleMoveInput();
-        HandleDash();
-        HandleJump();
+        if (InputLocked)
+        {
+            StopAllActions();
+        }
+        else
+        {
+            HandleMoveInput();
+            HandleDash();
+            HandleJump();
+        }
 
         HandleFootsteps();
         UpdateDust();
         UpdateAnimation();
+    }
+
+    // Cancels everything the player was doing (used while InputLocked)
+    void StopAllActions()
+    {
+        moveDirection = Vector3.zero;
+        currentSpeed = 0f;
+        isDragging = false;
+        dashTimer = 0f;
+        isDashJumping = false;
     }
 
     void HandleMoveInput()

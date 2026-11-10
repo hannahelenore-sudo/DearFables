@@ -140,6 +140,8 @@ public class DeckManager : MonoBehaviour
     public AudioClip cardScoreSound;
     [Tooltip("Fallback used when the Solar/Wind card asset has no Bonus Sound of its own.")]
     public AudioClip setBonusSound;
+    [Tooltip("Played when a trinket adds to your mult (Candy, Wind Charm, Wind Fan, Sun Charm, Sun Plushie, Sugar Rush).")]
+    public AudioClip trinketTriggerSound;
     [Tooltip("Played when the permanent Wind Power boon adds its flat bonus to your score.")]
     public AudioClip windPowerBoonSound;
     public AudioClip highRollBonusSound;
@@ -1064,8 +1066,13 @@ public class DeckManager : MonoBehaviour
                     windBoonSoundPlayed = true;
                 }
                 baseScore += cardValue;
+
+                // Trinkets that trigger when this card scores (Wind Charm, Sun Charm, Sun Plushie)
+                bool trinketTriggered = TrinketEffects.OnCardScored(card.cardData, ref currentMult);
+
                 SetBalatroText(baseScore, currentMult);
                 StartCoroutine(PulseBalatroText());
+                if (trinketTriggered) PlaySFX(trinketTriggerSound, Mathf.Min(1f + scoredIndex * 0.05f, 1.5f));
 
                 // Pitch climbs with every scored card
                 PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f, 2f));
@@ -1080,12 +1087,45 @@ public class DeckManager : MonoBehaviour
         yield return new WaitForSeconds(0.3f);
 
         // --- STEP 2: MULT EFFECTS TRIGGER ONE AFTER ANOTHER ---
+
+        // Wind Fan: +Mult if the played hand contains 5 Wind cards
+        float windFanMult = TrinketEffects.GetWindFanMult(CountCardsOfType<WindCard>(selectedCards));
+        if (windFanMult > 0f)
+        {
+            currentMult += windFanMult;
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(trinketTriggerSound);
+            yield return new WaitForSeconds(0.6f);
+        }
+
+        // Candy: +Mult for every candy you own
+        float candyMult = TrinketEffects.GetCandyMult();
+        if (candyMult > 0f)
+        {
+            currentMult += candyMult;
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(trinketTriggerSound);
+            yield return new WaitForSeconds(0.6f);
+        }
+
         if (hasSetBonus)
         {
             currentMult *= setMult;
             SetBalatroText(baseScore, currentMult);
             StartCoroutine(PulseBalatroText());
             PlaySFX(setBonusClip != null ? setBonusClip : setBonusSound, 1f, setBonusVolume);
+            yield return new WaitForSeconds(0.6f);
+        }
+
+        // Sugar Rush: 6+ candies multiply your mult
+        if (TrinketEffects.SugarRushActive)
+        {
+            currentMult *= TrinketEffects.SugarRushXMult;
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(trinketTriggerSound, 1.25f);
             yield return new WaitForSeconds(0.6f);
         }
 

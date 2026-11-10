@@ -116,6 +116,12 @@ public class BattleManager : MonoBehaviour
         battleTargetScore = DifficultyProgress.ScaleScore(battleTargetScore, maxScoreMultiplier);
         Debug.Log("BattleManager: difficulty " + Mathf.RoundToInt(DifficultyProgress.Meter * 100f) + "% -> target score " + battleTargetScore);
 
+        // Tsinelas trinket: rerolls the enemy's defence (the score to beat)
+        int beforeReroll = battleTargetScore;
+        battleTargetScore = TrinketEffects.RerollEnemyDefence(battleTargetScore);
+        if (battleTargetScore != beforeReroll)
+            Debug.Log("BattleManager: Tsinelas rerolled the target score " + beforeReroll + " -> " + battleTargetScore);
+
         isOpeningSequenceActive = true;
         isMatchOver = false;
         hasPlayerWon = false;
