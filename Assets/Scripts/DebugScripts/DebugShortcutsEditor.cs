@@ -27,6 +27,34 @@ public class DebugShortcutsEditor : Editor
                 t.EndCardGameAndOpenBoons();
         }
 
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Difficulty (Play mode only)", EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledScope(!Application.isPlaying))
+        {
+            float points = DifficultyProgress.Points;
+            float newPoints = EditorGUILayout.Slider("Difficulty points", points, 0f, DifficultyProgress.maxPoints);
+            if (!Mathf.Approximately(newPoints, points))
+                DifficultyProgress.SetDebugPoints(newPoints);
+
+            EditorGUILayout.LabelField("Meter",
+                Mathf.RoundToInt(DifficultyProgress.Meter * 100f) + "%" +
+                (DifficultyProgress.IsOverridden ? "   (debug override)" : "   (real progress)"));
+
+            EditorGUILayout.LabelField("Stars / Fights",
+                PlayerProgress.TotalStars + " / " + DifficultyProgress.BattlesFought);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Min")) DifficultyProgress.SetDebugPoints(0f);
+                if (GUILayout.Button("Mid")) DifficultyProgress.SetDebugPoints(DifficultyProgress.maxPoints * 0.5f);
+                if (GUILayout.Button("Max")) DifficultyProgress.SetDebugPoints(DifficultyProgress.maxPoints);
+            }
+
+            if (GUILayout.Button("Use real progress"))
+                DifficultyProgress.ClearDebugOverride();
+        }
+
         if (!Application.isPlaying)
             EditorGUILayout.HelpBox("Enter Play mode to use the buttons.", MessageType.Info);
     }

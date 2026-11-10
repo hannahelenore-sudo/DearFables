@@ -66,7 +66,12 @@ public class BattleManager : MonoBehaviour
     public float roundFadeOutDuration = 0.3f;
 
     [Header("Battle Target Settings")]
+    [Tooltip("Target score at the EASIEST difficulty. Raised automatically as the difficulty meter fills.")]
     public int battleTargetScore = 400;
+
+    [Header("Difficulty")]
+    [Tooltip("Target score at max difficulty = Battle Target Score x this. At 0 difficulty it stays at Battle Target Score.")]
+    public float maxScoreMultiplier = 3f;
 
     [Header("Sequence Settings")]
     public float delayBetweenSequences = 0.2f;
@@ -106,6 +111,10 @@ public class BattleManager : MonoBehaviour
     {
         // Permanent boons: +hands per round (extra scoring attempts)
         maxRounds += BoonProgress.ExtraHands;
+
+        // Difficulty meter: the more stars / fights, the higher the score to beat
+        battleTargetScore = DifficultyProgress.ScaleScore(battleTargetScore, maxScoreMultiplier);
+        Debug.Log("BattleManager: difficulty " + Mathf.RoundToInt(DifficultyProgress.Meter * 100f) + "% -> target score " + battleTargetScore);
 
         isOpeningSequenceActive = true;
         isMatchOver = false;
@@ -242,6 +251,7 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerWon = true;
+        DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up
         PlayerProgress.AddStars(starsGainedOnWin);
         BoonProgress.AddMeter(boonMeterFillOnWin); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);
@@ -261,6 +271,7 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerLost = true;
+        DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up
         BoonProgress.AddMeter(boonMeterFillOnLoss); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);
 
