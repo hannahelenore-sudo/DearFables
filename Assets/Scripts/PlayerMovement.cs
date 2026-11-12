@@ -26,6 +26,21 @@ public class PlayerMovement : MonoBehaviour
     public float dashJumpSpeed = 12f;
     public float dashJumpVelocity = 8f;
 
+    [Header("Stamina (bar in the HUD)")]
+    public bool useStamina = true;
+    [Tooltip("Fraction of the bar used per second while sprinting. 0.12 = about 8 seconds from full.")]
+    public float sprintDrainPerSecond = 0.12f;
+    [Tooltip("Fraction of the bar each jump takes. 0.08 = about 12 jumps from full.")]
+    public float jumpCost = 0.08f;
+    [Tooltip("Fraction of the bar each dash takes. 0 = dashing is free.")]
+    public float dashCost = 0f;
+    [Tooltip("Fraction of the bar recovered per second.")]
+    public float staminaRegenPerSecond = 0.3f;
+    [Tooltip("Seconds after sprinting / jumping before the bar starts refilling.")]
+    public float regenDelay = 0.7f;
+    [Tooltip("After running out, sprint and jump stay locked until the bar refills to this level.")]
+    [Range(0f, 1f)] public float recoverThreshold = 0.25f;
+
     [Header("Footsteps (only while walking on the ground)")]
     public AudioClip[] footstepClips;
     [Tooltip("Optional. Leave empty and one is created automatically.")]
@@ -104,6 +119,7 @@ public class PlayerMovement : MonoBehaviour
     private float dashTimer;
     private float dashCooldownTimer;
     private Vector3 dashDirection;
+    private float regenTimer;
 
     // Dust (plain sprites, pooled)
     private sealed class Puff
@@ -161,6 +177,7 @@ public class PlayerMovement : MonoBehaviour
             HandleJump();
         }
 
+        UpdateStamina();
         HandleFootsteps();
         UpdateDust();
         UpdateAnimation();
@@ -195,7 +212,7 @@ public class PlayerMovement : MonoBehaviour
             }
 
             moveDirection = keyboardInput.normalized;
-            currentSpeed = IsRunHeld() ? runSpeed : walkSpeed; // Shift = run
+            currentSpeed = LimitSpeed(IsRunHeld() ? runSpeed : walkSpeed); // Shift = run
             isDragging = false;
         }
         else
@@ -219,9 +236,9 @@ public class PlayerMovement : MonoBehaviour
                 {
                     moveDirection = new Vector3(drag.x, 0f, drag.y).normalized;
 
-                    currentSpeed = dragDistance >= runDragDistance
+                    currentSpeed = LimitSpeed(dragDistance >= runDragDistance
                         ? runSpeed
-                        : walkSpeed;
+                        : walkSpeed);
 
                     if (Mathf.Abs(moveDirection.x) > Mathf.Abs(moveDirection.z))
                     {
@@ -252,6 +269,12 @@ public class PlayerMovement : MonoBehaviour
         if (!Input.GetKeyDown(dashKey)) return;
         if (dashTimer > 0f || dashCooldownTimer > 0f || isDashJumping) return;
 
+        if (useStamina && dashCost > 0f)
+        {
+            if (PlayerStamina.Exhausted) return;
+            SpendStamina(dashCost);
+        }
+
         // Dash the way you're moving, or the way you're facing if standing still
         dashDirection = moveDirection.sqrMagnitude > 0.01f ? moveDirection : lastFacing;
         dashTimer = dashDuration;
@@ -269,6 +292,12 @@ public class PlayerMovement : MonoBehaviour
     {
         if (rb == null) return;
         if (!Input.GetKeyDown(jumpKey) || !isGrounded) return;
+
+        if (useStamina)
+        {
+            if (PlayerStamina.Exhausted) return;
+            SpendStamina(jumpCost);
+        }
 
         Vector3 velocity = rb.linearVelocity;
 
@@ -346,6 +375,44 @@ public class PlayerMovement : MonoBehaviour
 
         stepSource.pitch = Random.Range(1f - pitchVariation, 1f + pitchVariation);
         stepSource.PlayOneShot(footstepClips[index], footstepVolume);
+    }
+
+    // ---------------- Stamina ----------------
+
+    // Running needs stamina: when exhausted you can only walk
+    float LimitSpeed(float speed)
+    {
+        if (useStamina && speed > walkSpeed + 0.01f && PlayerStamina.Exhausted)
+            return walkSpeed;
+        return speed;
+    }
+
+    void SpendStamina(float amount)
+    {
+        PlayerStamina.Spend(amount);
+        regenTimer = regenDelay;
+    }
+
+    void UpdateStamina()
+    {
+        if (!useStamina) return;
+
+        float dt = Time.deltaTime;
+
+        bool sprinting = !InputLocked
+            && isGrounded
+            && !isDashJumping
+            && dashTimer <= 0f
+            && currentSpeed > walkSpeed + 0.01f
+            && moveDirection.sqrMagnitude > 0.01f
+            && HorizontalSpeed() > 0.1f;
+
+        if (sprinting)
+            SpendStamina(sprintDrainPerSecond * dt);
+        else if (regenTimer > 0f)
+            regenTimer -= dt;
+        else
+            PlayerStamina.Regen(staminaRegenPerSecond * dt, recoverThreshold);
     }
 
     // ---------------- Sprint dust ----------------

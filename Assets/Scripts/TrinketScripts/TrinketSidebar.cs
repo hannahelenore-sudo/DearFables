@@ -536,6 +536,7 @@ public class TrinketSidebar : MonoBehaviour
         TrinketData sold = TrinketInventory.Owned[index];
         Deselect();
         TrinketInventory.RemoveAt(index);
+        BatteryManager.Add(sold.SellValue); // Balatro: selling gives half the price
         PlaySFX(sellSound);
 
         TrinketShopUI shop = TrinketShopUI.OpenShop;
@@ -769,7 +770,14 @@ public class TrinketSidebar : MonoBehaviour
 
         bool isSelected = selected == target;
         bool shop = TrinketShopUI.IsAnyShopOpen;
-        if (sellButton != null) sellButton.gameObject.SetActive(isSelected && shop);
+        if (sellButton != null)
+        {
+            sellButton.gameObject.SetActive(isSelected && shop);
+
+            // Show what you get: "SELL +2"
+            TMP_Text sellLabel = sellButton.GetComponentInChildren<TMP_Text>(true);
+            if (sellLabel != null && target.data != null) sellLabel.text = "SELL +" + target.data.SellValue;
+        }
         if (infoHint != null)
         {
             infoHint.gameObject.SetActive(isSelected && !shop);

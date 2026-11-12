@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ca5520959459a14a8e0a124de271011, type: 3}
+  m_Name: Angry
+  m_EditorClassIdentifier: Assembly-CSharp::MoodData
+  moodName: Angry
+  description: +50 Power to all Power types. -1 Hand and Reshuffle. Lasts 3 fights.
+  portrait: {fileID: 0}
+  textColor: {r: 1, g: 0.35, b: 0.3, a: 1}
+  isNeutral: 0
+  fights: 3
+  scoreMultiplier: 1
+  powerBonus: 50
+  handsModifier: -1
+  reshufflesModifier: -1
+  candiesNeeded: 6

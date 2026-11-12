@@ -112,6 +112,9 @@ public class BattleManager : MonoBehaviour
         // Permanent boons: +hands per round (extra scoring attempts)
         maxRounds += BoonProgress.ExtraHands;
 
+        // Mood (Angry): -1 hand
+        maxRounds = Mathf.Max(1, maxRounds + MoodManager.HandsModifier);
+
         // Difficulty meter: the more stars / fights, the higher the score to beat
         battleTargetScore = DifficultyProgress.ScaleScore(battleTargetScore, maxScoreMultiplier);
         Debug.Log("BattleManager: difficulty " + Mathf.RoundToInt(DifficultyProgress.Meter * 100f) + "% -> target score " + battleTargetScore);
@@ -259,6 +262,15 @@ public class BattleManager : MonoBehaviour
         hasPlayerWon = true;
         DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up
         PlayerProgress.AddStars(starsGainedOnWin);
+
+        // Batteries: Balatro style - a base reward plus a bonus for every hand you had left.
+        // They drop in the world (BatteryDropper) when you are back in the game scene.
+        int handsLeft = Mathf.Max(0, maxRounds - currentRoundNumber);
+        int batteryReward = BatteryManager.CalculateFightReward(handsLeft);
+        BatteryManager.QueueDrop(batteryReward);
+        Debug.Log("BattleManager: won with " + handsLeft + " hand(s) left -> " + batteryReward + " batteries");
+
+        MoodManager.OnFightEnded(); // timed moods count down
         BoonProgress.AddMeter(boonMeterFillOnWin); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);
 
@@ -277,6 +289,9 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerLost = true;
+
+        PlayerHealth.Lose(1); // losing the card game costs a health card
+        MoodManager.OnFightEnded(); // timed moods count down
         DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up
         BoonProgress.AddMeter(boonMeterFillOnLoss); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);

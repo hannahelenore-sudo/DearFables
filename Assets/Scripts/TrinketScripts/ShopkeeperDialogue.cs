@@ -68,6 +68,22 @@ public class ShopkeeperDialogue : MonoBehaviour
         "The {item}, eh? Fine, fine."
     };
 
+    [TextArea(1, 3)]
+    [Tooltip("Said when the player can't afford something.")]
+    public string[] brokeLines =
+    {
+        "Hmm, you're a few batteries short, friend.",
+        "Come back when you've got more batteries!",
+        "I don't do credit. Batteries first!"
+    };
+    [TextArea(1, 3)]
+    [Tooltip("Said when taking a candy starts Sugar Rush.")]
+    public string[] sugarRushLines =
+    {
+        "Whoa, that's a lot of candy... SUGAR RUSH!",
+        "Careful now, you're vibrating!"
+    };
+
     public bool IsTalking { get; private set; }
 
     private Coroutine typewriter;
@@ -88,6 +104,8 @@ public class ShopkeeperDialogue : MonoBehaviour
     public void SayReshuffle() { SayRandom(reshuffleLines, null); }
     public void SayFull() { SayRandom(fullLines, null); }
     public void SaySold(string itemName) { SayRandom(soldLines, itemName); }
+    public void SayBroke() { SayRandom(brokeLines, null); }
+    public void SaySugarRush() { SayRandom(sugarRushLines, null); }
 
     // -------------------------------------------------------------------
     // Public API

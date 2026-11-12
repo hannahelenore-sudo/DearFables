@@ -26,14 +26,20 @@ public class TrinketData : ScriptableObject
     public string description;
     public Sprite icon;
     public TrinketType type;
+    [Tooltip("Price in batteries. 0 = free. Balatro style: cheap utility 2-3, normal 4-5, strong 6-7.")]
+    public int price = 4;
 
-    public static TrinketData CreateRuntime(string name, string desc, TrinketType type)
+    /// <summary>What you get for selling it (half the price, at least 1 - like Balatro).</summary>
+    public int SellValue { get { return BatteryManager.SellValueFor(price); } }
+
+    public static TrinketData CreateRuntime(string name, string desc, TrinketType type, int price = 4)
     {
         TrinketData data = CreateInstance<TrinketData>();
         data.hideFlags = HideFlags.DontSave;
         data.trinketName = name;
         data.description = desc;
         data.type = type;
+        data.price = price;
         return data;
     }
 
@@ -41,14 +47,16 @@ public class TrinketData : ScriptableObject
     {
         return new List<TrinketData>
         {
-            CreateRuntime("Candy", "+2 Mult.\nSugar Rush: X2 Mult if you have gathered 6 candies.", TrinketType.Candy),
-            CreateRuntime("Tsinelas", "Stuns enemies and rerolls enemy defence.", TrinketType.Tsinelas),
-            CreateRuntime("Wind Charm", "Played cards with Wind Powered give +3 Mult when scored.", TrinketType.WindCharm),
-            CreateRuntime("Wind Fan", "+Dash.\n+10 Mult whenever the played hand contains 5 Wind Powered cards.", TrinketType.WindFan),
-            CreateRuntime("Sun Charm", "Played cards with Sun Powered give +3 Mult when scored.", TrinketType.SunCharm),
-            CreateRuntime("Sun Plushie", "1 in 2 chance for played Sun Powered cards to give X1.5 Mult when scored.", TrinketType.SunPlushie),
-            CreateRuntime("Uncle's Business Card", "Lets you build another Structure.", TrinketType.UnclesBusinessCard),
-            CreateRuntime("Small Rock", "Throw it at an enemy to remove any Moods.", TrinketType.SmallRock)
+            // Prices follow Balatro's jokers: a flat +Mult joker is cheap, a "per scored card" one costs more,
+            // a chance-based X Mult is the most expensive. A fight pays about 3-6 batteries.
+            CreateRuntime("Candy", "+2 Mult.\nGather 6 candies to start Sugar Rush (X2 Mult).", TrinketType.Candy, 3),
+            CreateRuntime("Tsinelas", "Stuns enemies and rerolls enemy defence.", TrinketType.Tsinelas, 5),
+            CreateRuntime("Wind Charm", "Played cards with Wind Powered give +3 Mult when scored.", TrinketType.WindCharm, 5),
+            CreateRuntime("Wind Fan", "+Dash.\n+10 Mult whenever the played hand contains 5 Wind Powered cards.", TrinketType.WindFan, 6),
+            CreateRuntime("Sun Charm", "Played cards with Sun Powered give +3 Mult when scored.", TrinketType.SunCharm, 5),
+            CreateRuntime("Sun Plushie", "1 in 2 chance for played Sun Powered cards to give X1.5 Mult when scored.", TrinketType.SunPlushie, 7),
+            CreateRuntime("Uncle's Business Card", "Lets you build another Structure.", TrinketType.UnclesBusinessCard, 6),
+            CreateRuntime("Small Rock", "Throw it at an enemy to remove any Moods.", TrinketType.SmallRock, 3)
         };
     }
 }

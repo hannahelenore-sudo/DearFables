@@ -17,7 +17,7 @@ public class WindCard : CardData
 
     public override int GetEffectiveValue()
     {
-        return primaryValue + BoonProgress.BonusWindPower;
+        return base.GetEffectiveValue() + BoonProgress.BonusWindPower;
     }
 
     public override int EvaluateScore(int currentTotal, List<CardUI> selectedCards)

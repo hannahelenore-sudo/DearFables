@@ -29,7 +29,7 @@ public class CardData : ScriptableObject
     /// <summary>Primary value including permanent boons. Used for scoring AND for the hover text.</summary>
     public virtual int GetEffectiveValue()
     {
-        return primaryValue;
+        return primaryValue + MoodManager.PowerBonus; // Angry: +Power to every Power type
     }
 
     public virtual int EvaluateScore(int currentTotal, List<CardUI> selectedCards)

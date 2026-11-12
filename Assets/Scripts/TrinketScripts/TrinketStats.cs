@@ -11,7 +11,7 @@ public static class TrinketStats
     /// <summary>Permanent Wind Power (from the Choose Your Boon screen).</summary>
     public static float WindPower
     {
-        get { return BoonProgress.BonusWindPower; }
+        get { return BoonProgress.BonusWindPower + MoodManager.PowerBonus; }
     }
 
     /// <summary>
@@ -21,7 +21,7 @@ public static class TrinketStats
     /// </summary>
     public static float SunPower
     {
-        get { return ReadBoon("BonusSunPower", "BonusSolarPower", "BonusSunnyPower"); }
+        get { return ReadBoon("BonusSunPower", "BonusSolarPower", "BonusSunnyPower") + MoodManager.PowerBonus; }
     }
 
     // ---------------------------------------------------------------

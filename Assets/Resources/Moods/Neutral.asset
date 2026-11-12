@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ca5520959459a14a8e0a124de271011, type: 3}
+  m_Name: Neutral
+  m_EditorClassIdentifier: Assembly-CSharp::MoodData
+  moodName: Neutral
+  description: Feeling normal.
+  portrait: {fileID: 0}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  isNeutral: 1
+  fights: 0
+  scoreMultiplier: 1
+  powerBonus: 0
+  handsModifier: 0
+  reshufflesModifier: 0
+  candiesNeeded: 6

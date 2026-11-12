@@ -76,7 +76,9 @@ public static class ShopBuilder
             TextMeshProUGUI nameText = AddText(slotGO.transform, "Name", "Trinket", 32, ink, FontStyles.Bold,
                 TextAlignmentOptions.Center, new Vector2(0f, -10f), new Vector2(280f, 50f));
             TextMeshProUGUI descText = AddText(slotGO.transform, "Description", "Description", 22, ink, FontStyles.Normal,
-                TextAlignmentOptions.Top, new Vector2(0f, -115f), new Vector2(260f, 170f));
+                TextAlignmentOptions.Top, new Vector2(0f, -100f), new Vector2(260f, 140f));
+            TextMeshProUGUI priceText = AddText(slotGO.transform, "Price", "Cost: 0", 28, new Color(0.15f, 0.4f, 0.15f), FontStyles.Bold,
+                TextAlignmentOptions.Center, new Vector2(0f, -195f), new Vector2(260f, 40f));
 
             GameObject taken = NewUI("TakenOverlay", slotGO.transform);
             Stretch(taken);
@@ -92,6 +94,7 @@ public static class ShopBuilder
                 icon = icon,
                 nameText = nameText,
                 descriptionText = descText,
+                priceText = priceText,
                 takenOverlay = taken
             };
         }

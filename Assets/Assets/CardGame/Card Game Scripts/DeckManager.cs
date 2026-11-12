@@ -172,6 +172,9 @@ public class DeckManager : MonoBehaviour
         // Permanent boons: +Hand Size (picked from the Choose Your Boon screen)
         maxHandSize += BoonProgress.ExtraHandSize;
 
+        // Mood (Angry): -1 reshuffle (discard)
+        maxDiscardsAllowed = Mathf.Max(0, maxDiscardsAllowed + MoodManager.ReshufflesModifier);
+
         if (balatroScoreText != null)
         {
             balatroBaseScale = balatroScoreText.transform.localScale;
@@ -1109,7 +1112,6 @@ public class DeckManager : MonoBehaviour
 
         // Hand trinkets (Wind Fan, Candy, Sugar Rush) trigger TOP TO BOTTOM in the order of the sidebar
         int windCardsInHand = CountCardsOfType<WindCard>(selectedCards);
-        int lastCandy = TrinketEffects.LastCandyIndex();
         for (int ti = 0; ti < trinketOrder.Count; ti++)
         {
             string handLabel;
@@ -1121,16 +1123,6 @@ public class DeckManager : MonoBehaviour
                 PlaySFX(trinketTriggerSound, Mathf.Min(1f + ti * 0.08f, 1.5f));
                 yield return new WaitForSeconds(trinketTriggerDelay + 0.2f);
             }
-
-            // Sugar Rush: the bottom-most Candy also multiplies when you own enough Candies
-            if (ti == lastCandy && TrinketEffects.ApplySugarRush(ref currentMult, out handLabel))
-            {
-                TrinketSidebar.Pulse(ti, handLabel);
-                SetBalatroText(baseScore, currentMult);
-                StartCoroutine(PulseBalatroText());
-                PlaySFX(trinketTriggerSound, 1.25f);
-                yield return new WaitForSeconds(trinketTriggerDelay + 0.2f);
-            }
         }
 
         if (hasSetBonus)
@@ -1139,6 +1131,18 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(baseScore, currentMult);
             StartCoroutine(PulseBalatroText());
             PlaySFX(setBonusClip != null ? setBonusClip : setBonusSound, 1f, setBonusVolume);
+            yield return new WaitForSeconds(0.6f);
+        }
+
+        // Mood (Sugar Rush): multiplies the mult of the whole hand
+        float moodMult = MoodManager.ScoreMultiplier;
+        if (moodMult > 1.001f)
+        {
+            currentMult *= moodMult;
+            MoodHUD.Pulse("X" + moodMult.ToString("0.##") + " Mult");
+            SetBalatroText(baseScore, currentMult);
+            StartCoroutine(PulseBalatroText());
+            PlaySFX(trinketTriggerSound, 1.25f);
             yield return new WaitForSeconds(0.6f);
         }
 

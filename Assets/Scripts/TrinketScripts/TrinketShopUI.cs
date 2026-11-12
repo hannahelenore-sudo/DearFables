@@ -19,6 +19,8 @@ public class TrinketShopUI : MonoBehaviour
         public Image icon;
         public TMP_Text nameText;
         public TMP_Text descriptionText;
+        [Tooltip("Shows the price in batteries.")]
+        public TMP_Text priceText;
         [Tooltip("Shown on top of the slot once the trinket was taken.")]
         public GameObject takenOverlay;
 
@@ -56,6 +58,8 @@ public class TrinketShopUI : MonoBehaviour
     public AudioClip closeSound;
     [Tooltip("Played when you try to take a trinket but already have 5.")]
     public AudioClip fullSound;
+    [Tooltip("Played when you can't afford something.")]
+    public AudioClip cantAffordSound;
 
     /// <summary>True while any shop is open. Handy to stop player movement: if (TrinketShopUI.IsAnyShopOpen) return;</summary>
     public static bool IsAnyShopOpen { get; private set; }
@@ -65,6 +69,9 @@ public class TrinketShopUI : MonoBehaviour
     public static TrinketShopUI OpenShop { get; private set; }
 
     private CanvasGroup panelGroup;
+    private TMP_Text reshuffleLabel;
+    private string reshuffleBaseLabel = "RESHUFFLE";
+    private int rerollsThisVisit;
     private bool hasStock;
     private List<TrinketData> defaultPool;
 
@@ -89,7 +96,12 @@ public class TrinketShopUI : MonoBehaviour
             }
         }
 
-        if (reshuffleButton != null) reshuffleButton.onClick.AddListener(Reshuffle);
+        if (reshuffleButton != null)
+        {
+            reshuffleButton.onClick.AddListener(Reshuffle);
+            reshuffleLabel = reshuffleButton.GetComponentInChildren<TMP_Text>(true);
+            if (reshuffleLabel != null) reshuffleBaseLabel = reshuffleLabel.text;
+        }
         if (closeButton != null) closeButton.onClick.AddListener(Close);
     }
 
@@ -121,6 +133,9 @@ public class TrinketShopUI : MonoBehaviour
         IsOpen = true;
         IsAnyShopOpen = true;
         OpenShop = this;
+
+        rerollsThisVisit = 0; // Balatro: the reroll price starts over in every shop
+        UpdateRerollLabel();
 
         PlaySFX(openSound);
         panelRoot.SetActive(true);
@@ -170,13 +185,42 @@ public class TrinketShopUI : MonoBehaviour
     // Stock
     // -------------------------------------------------------------------
 
+    /// <summary>Balatro: the first reshuffle costs 5 batteries, every one after costs 1 more.</summary>
+    public int CurrentRerollCost
+    {
+        get { return BatteryManager.RerollBaseCost + rerollsThisVisit * BatteryManager.RerollCostIncrease; }
+    }
+
     public void Reshuffle()
     {
         if (!IsOpen) return;
+
+        if (!BatteryManager.TrySpend(CurrentRerollCost))
+        {
+            CantAfford();
+            return;
+        }
+
+        rerollsThisVisit++;
+        UpdateRerollLabel();
+
         PlaySFX(reshuffleSound);
         RollStock();
 
         if (shopkeeper != null) shopkeeper.SayReshuffle();
+    }
+
+    private void UpdateRerollLabel()
+    {
+        if (reshuffleLabel != null)
+            reshuffleLabel.text = reshuffleBaseLabel + " (" + CurrentRerollCost + ")";
+    }
+
+    private void CantAfford()
+    {
+        PlaySFX(cantAffordSound);
+        BatteryHUD.FlashCantAfford();
+        if (shopkeeper != null) shopkeeper.SayBroke();
     }
 
     private void RollStock()
@@ -225,6 +269,8 @@ public class TrinketShopUI : MonoBehaviour
 
         if (slot.nameText != null) slot.nameText.text = slot.trinket.trinketName;
         if (slot.descriptionText != null) slot.descriptionText.text = slot.trinket.description;
+        if (slot.priceText != null)
+            slot.priceText.text = slot.taken ? "" : (slot.trinket.price > 0 ? "Cost: " + slot.trinket.price : "FREE");
 
         if (slot.icon != null)
         {
@@ -252,14 +298,28 @@ public class TrinketShopUI : MonoBehaviour
             return;
         }
 
-        // Free for now. Costs / ownership checks come later.
+        // Pay with batteries
+        if (!BatteryManager.TrySpend(slot.trinket.price))
+        {
+            CantAfford();
+            return;
+        }
+
         TrinketInventory.Add(slot.trinket);
         slot.taken = true;
         RefreshSlot(slot);
 
         PlaySFX(buySound);
-        if (shopkeeper != null) shopkeeper.SayBought(slot.trinket.trinketName);
-        Debug.Log("Took trinket: " + slot.trinket.trinketName);
+
+        // Gathering enough candies starts the Sugar Rush mood
+        bool sugarRush = slot.trinket.type == TrinketType.Candy && MoodManager.AddCandy();
+
+        if (shopkeeper != null)
+        {
+            if (sugarRush) shopkeeper.SaySugarRush();
+            else shopkeeper.SayBought(slot.trinket.trinketName);
+        }
+        Debug.Log("Bought trinket: " + slot.trinket.trinketName + " for " + slot.trinket.price + " batteries");
     }
 
     /// <summary>Called by the sidebar after the player sells a trinket.</summary>

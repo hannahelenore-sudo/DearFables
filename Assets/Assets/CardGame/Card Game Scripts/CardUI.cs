@@ -315,11 +315,11 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         {
             if (cardData is SolarCard solar)
             {
-                bubbleTextComponent.text = $"{solar.primaryValue}\n<size=85%>(X1.5 if 5 solar cards are selected)</size>";
+                bubbleTextComponent.text = $"{solar.GetEffectiveValue()}\n<size=85%>(X1.5 if 5 solar cards are selected)</size>";
             }
             else if (cardData is WindCard wind)
             {
-                int boost = BoonProgress.BonusWindPower;
+                int boost = wind.GetEffectiveValue() - wind.primaryValue; // Wind Power boon + mood Power
                 if (boost > 0)
                     bubbleTextComponent.text = $"{wind.GetEffectiveValue()}\n<size=85%>({wind.primaryValue} base +{boost} Wind Power)</size>";
                 else
@@ -327,7 +327,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             }
             else
             {
-                bubbleTextComponent.text = cardData.primaryValue.ToString();
+                bubbleTextComponent.text = cardData.GetEffectiveValue().ToString();
             }
         }
     }
