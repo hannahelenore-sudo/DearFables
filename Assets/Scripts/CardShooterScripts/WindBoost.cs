@@ -1,7 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// The Wind Card: hold the throw button while it is selected to run faster.
+/// The Wind Card: click once while it is selected and the boost stays on until the bar runs dry
+/// (or you switch to another item).
 /// Drains the same stamina bar as the thrown items, and shows a wind aura around the player.
 /// Added automatically by CardShooter (you can also add it yourself to tweak the values).
 ///
@@ -50,10 +51,23 @@ public class WindBoost : MonoBehaviour
         aura.Init(characterRenderer);
     }
 
-    /// <summary>CardShooter calls this every frame: true while the player holds the button with the Wind Card selected.</summary>
-    public void SetHeld(bool held)
+    /// <summary>True while the boost is switched on (it stays on until the stamina is drained or you switch items).</summary>
+    public bool IsActive { get { return wantBoost; } }
+
+    /// <summary>CardShooter calls this when the player clicks with the Wind Card selected.</summary>
+    public void Activate()
     {
-        wantBoost = held;
+        wantBoost = true;
+    }
+
+    /// <summary>Switching to another item (or anything that should cancel the boost). Stops the drain and the effect.</summary>
+    public void Deactivate()
+    {
+        wantBoost = false;
+        boosting = false;
+        IsBoosting = false;
+        SpeedMultiplier = 1f;
+        if (aura != null) aura.SetActive(false);
     }
 
     private void LateUpdate()
@@ -84,6 +98,9 @@ public class WindBoost : MonoBehaviour
             if (cc != null && cc.enabled) cc.Move(extra);
             else transform.position += extra;
         }
+
+        // Ran dry -> the boost switches itself off (click again once the bar is full)
+        if (wantBoost && !boost && stamina != null && stamina.IsExhausted) wantBoost = false;
 
         boosting = boost;
         IsBoosting = boost;

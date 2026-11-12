@@ -13,6 +13,8 @@ using UnityEngine.SceneManagement;
 /// - A thrown Tsinelas stuns the enemy (Stun): it spins, sees stars and can't move or catch you for a while.
 /// - A thrown Small Rock clears the player's current Mood (MoodManager.Clear).
 /// - Optionally, the enemy touching the player also starts the battle (Touch Starts Battle).
+/// - If your Wind + Sun power beats this enemy's score to beat: an X shows above it, and a thrown card makes it
+///   EXPLODE (drops stars + batteries, no battle). Touching it still starts a normal battle.
 /// - Battle start = hit sound, Pokemon-style transition, then the card game.
 /// </summary>
 public class EnemyChase : MonoBehaviour
@@ -47,6 +49,29 @@ public class EnemyChase : MonoBehaviour
     [Range(0f, 0.9f)]
     [Tooltip("How much of the score to beat is removed. 0.1 = 10% less.")]
     public float scoreReduction = 0.1f;
+
+    [Header("Overpowered (Wind + Sun power > score to beat)")]
+    [Tooltip("If your combined Wind + Sun power beats the score to beat, a thrown card makes the enemy explode instead of starting a battle.")]
+    public bool explodeWhenOverpowered = true;
+    [Tooltip("Same as 'Battle Target Score' on the BattleManager in your battle scene (the EASIEST-difficulty score).")]
+    public int baseTargetScore = 400;
+    [Tooltip("Same as 'Max Score Multiplier' on the BattleManager.")]
+    public float maxScoreMultiplier = 3f;
+    [Tooltip("Optional. Sprite for the X above the enemy. If empty, a red X is drawn automatically.")]
+    public Sprite xIconSprite;
+    public Vector3 xIconOffset = new Vector3(0f, 1.6f, 0f);
+    public float xIconSize = 1f;
+    [Tooltip("Optional. Spawned when the enemy explodes (e.g. a particle burst).")]
+    public GameObject explosionPrefab;
+    public AudioClip explosionSound;
+    [Range(0f, 1f)] public float explosionVolume = 1f;
+    [Tooltip("Stars the enemy drops when it explodes.")]
+    public int starsDropped = 3;
+    [Tooltip("Optional. Star pickup prefab (your StarCollectible). If empty, the stars are added to your total straight away.")]
+    public GameObject starPickupPrefab;
+    [Tooltip("Batteries the enemy drops when it explodes.")]
+    public int batteriesDropped = 5;
+
 
     [Header("Stun (Tsinelas)")]
     [Tooltip("How long the fast spin at the start of the stun lasts.")]
@@ -97,6 +122,11 @@ public class EnemyChase : MonoBehaviour
     private DizzyStars stars;
     private Coroutine flashRoutine;
 
+    // Overpowered
+    private GameObject xIcon;
+    private float powerCheckTimer;
+    private bool overpowered;
+
     /// <summary>True while a Tsinelas has this enemy stunned.</summary>
     public bool IsStunned => stunTimer > 0f;
 
@@ -118,6 +148,15 @@ public class EnemyChase : MonoBehaviour
     /// <summary>Called by CardProjectile when the thrown card reaches this enemy.</summary>
     public void HitByCard()
     {
+        if (battleStarted) return;
+
+        // Strong enough: the card makes the enemy explode instead of starting a battle
+        if (explodeWhenOverpowered && IsOverpowered())
+        {
+            Explode();
+            return;
+        }
+
         if (!startBattleOnCardHit) return;
         StartBattle(true);
     }
@@ -154,6 +193,166 @@ public class EnemyChase : MonoBehaviour
 
         // Cyan flash if a mood was actually removed, a dull grey one if there was nothing to remove
         Flash(hadMood ? new Color(0.6f, 0.95f, 1f) : new Color(0.7f, 0.7f, 0.7f));
+    }
+
+    // ---------------- Overpowered: X icon + explosion ----------------
+
+    /// <summary>The score to beat this enemy would have (difficulty scaling only; the random Tsinelas reroll is ignored).</summary>
+    public int GetScoreToBeat()
+    {
+        return DifficultyProgress.ScaleScore(baseTargetScore, maxScoreMultiplier);
+    }
+
+    /// <summary>True when your combined Wind + Sun power is greater than the score to beat.</summary>
+    public bool IsOverpowered()
+    {
+        return DeckPower.Total > GetScoreToBeat();
+    }
+
+    private void UpdatePowerIcon()
+    {
+        if (!explodeWhenOverpowered) { SetIconVisible(false); return; }
+
+        // No need to recalculate every frame
+        powerCheckTimer -= Time.deltaTime;
+        if (powerCheckTimer > 0f) return;
+        powerCheckTimer = 0.25f;
+
+        overpowered = IsOverpowered();
+        SetIconVisible(overpowered);
+    }
+
+    private void SetIconVisible(bool visible)
+    {
+        if (visible && xIcon == null) xIcon = CreateXIcon();
+        if (xIcon != null && xIcon.activeSelf != visible) xIcon.SetActive(visible);
+    }
+
+    private GameObject CreateXIcon()
+    {
+        GameObject go = new GameObject("PowerX");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = xIconOffset;
+        go.transform.localScale = Vector3.one * xIconSize;
+
+        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = xIconSprite != null ? xIconSprite : GetDefaultXSprite();
+        // Draw on top of the enemy sprite
+        if (spriteRenderer != null)
+        {
+            sr.sortingLayerID = spriteRenderer.sortingLayerID;
+            sr.sortingOrder = spriteRenderer.sortingOrder + 1;
+        }
+        return go;
+    }
+
+    private static Sprite defaultXSprite;
+
+    private static Sprite GetDefaultXSprite()
+    {
+        if (defaultXSprite != null) return defaultXSprite;
+
+        const int size = 64;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        Color red = new Color(0.9f, 0.1f, 0.1f);
+        Color outline = Color.white;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                // Distance to the two diagonals
+                float d = Mathf.Min(Mathf.Abs(x - y), Mathf.Abs(x - (size - 1 - y))) / 1.4142f;
+                bool inside = x > 6 && x < size - 6 && y > 6 && y < size - 6;
+                Color c = Color.clear;
+                if (inside && d <= 5.5f) c = outline;
+                if (inside && d <= 3.5f) c = red;
+                tex.SetPixel(x, y, c);
+            }
+        }
+        tex.Apply();
+        defaultXSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 64f);
+        return defaultXSprite;
+    }
+
+    private void Explode()
+    {
+        battleStarted = true; // no fight, no chasing, no more hits
+        caughtEnemies.Add(GetId()); // stays gone when you come back to this scene
+
+        stunTimer = 0f;
+        if (stars != null) stars.SetActive(false);
+        SetIconVisible(false);
+
+        Debug.Log("EnemyChase: '" + name + "' was overpowered and exploded.");
+
+        Vector3 pos = transform.position;
+
+        if (explosionSound != null)
+            GameSFX.Play(explosionSound, explosionVolume, 1f);
+        else
+            PlayHitSound();
+
+        if (explosionPrefab != null) Instantiate(explosionPrefab, pos, Quaternion.identity);
+
+        DropStars(pos);
+        DropBatteries(pos);
+
+        StartCoroutine(ExplodeRoutine());
+    }
+
+    private void DropStars(Vector3 pos)
+    {
+        if (starsDropped <= 0) return;
+
+        if (starPickupPrefab != null)
+        {
+            for (int i = 0; i < starsDropped; i++)
+            {
+                Vector2 c = Random.insideUnitCircle * 0.8f;
+                Instantiate(starPickupPrefab, pos + new Vector3(c.x, 0.5f, c.y), Quaternion.identity);
+            }
+        }
+        else if (StarManager.Instance != null)
+        {
+            StarManager.Instance.CollectStar(starsDropped);
+        }
+        else
+        {
+            PlayerProgress.AddStars(starsDropped);
+        }
+    }
+
+    private void DropBatteries(Vector3 pos)
+    {
+        if (batteriesDropped <= 0) return;
+
+        BatteryDropper dropper = GetComponent<BatteryDropper>();
+        if (dropper == null) dropper = Object.FindAnyObjectByType<BatteryDropper>(); // reuse your prefab setup
+        if (dropper == null) dropper = gameObject.AddComponent<BatteryDropper>();     // plain yellow dots
+        dropper.DropAt(pos, batteriesDropped);
+    }
+
+    // Quick swell + flash, then gone
+    private IEnumerator ExplodeRoutine()
+    {
+        Vector3 startScale = transform.localScale;
+        const float duration = 0.3f;
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float x = Mathf.Clamp01(t / duration);
+            transform.localScale = startScale * (1f + x * 0.8f);
+            if (spriteRenderer != null)
+            {
+                Color c = Color.Lerp(Color.white, new Color(1f, 0.6f, 0.2f), x);
+                c.a = 1f - x;
+                spriteRenderer.color = c;
+            }
+            yield return null;
+        }
+        Destroy(gameObject);
     }
 
     private void Flash(Color flashColor)
@@ -201,6 +400,8 @@ public class EnemyChase : MonoBehaviour
         // Only ever uses the player assigned in the Inspector
         if (player == null) return;
         if (battleStarted) return;
+
+        UpdatePowerIcon();
 
         // Stunned: can't move, chase or catch the player
         if (stunTimer > 0f)

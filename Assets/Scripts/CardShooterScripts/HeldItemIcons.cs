@@ -1,86 +1,79 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Shows the items you own as little icons above the player's head.
-/// The selected item is big and bright, the others are small and dim. Added automatically by CardShooter.
+/// Shows the CURRENTLY SELECTED item as one small icon above the player's head.
+/// It pops in when you switch items or use one, stays for 'showTime' seconds, then fades out.
+/// Added automatically by CardShooter.
 /// </summary>
 public class HeldItemIcons : MonoBehaviour
 {
-    [Tooltip("Height of the selected icon as a fraction of the character's height.")]
+    [Tooltip("Height of the icon as a fraction of the character's height.")]
     public float iconHeightRatio = 0.28f;
-    [Tooltip("Size of the items that are not selected (1 = same as selected).")]
-    [Range(0.2f, 1f)] public float otherIconScale = 0.6f;
-    [Tooltip("Gap between icons, in icon heights.")]
-    public float spacing = 1.2f;
     [Tooltip("Extra gap above the head, as a fraction of the character's height.")]
     public float heightAbove = 0.15f;
-    [Range(0f, 1f)] public float otherAlpha = 0.55f;
+    [Tooltip("Seconds the icon stays after you switch or use an item.")]
+    public float showTime = 1.5f;
+    public float fadeSpeed = 6f;
     public float popTime = 0.25f;
     public float popStrength = 0.35f;
 
     private SpriteRenderer character;
     private Transform root;
-    private readonly List<SpriteRenderer> icons = new List<SpriteRenderer>();
-    private readonly List<float> scaleMult = new List<float>();
-    private int selected;
+    private SpriteRenderer icon;
+    private float visibleTimer;
     private float popTimer;
+    private float alpha;
 
     public void Init(SpriteRenderer characterRenderer)
     {
         character = characterRenderer;
-        EnsureRoot();
+        EnsureIcon();
     }
 
-    private void EnsureRoot()
+    private void EnsureIcon()
     {
-        // Not parented to the player, so the player's scale/rotation can't distort the icons
-        if (root == null) root = new GameObject("HeldItemIcons").transform;
-    }
+        if (root != null) return;
 
-    public void SetItems(List<Sprite> sprites, int selectedIndex)
-    {
-        EnsureRoot();
-
-        bool same = sprites.Count == icons.Count;
-        for (int i = 0; same && i < icons.Count; i++)
-            if (icons[i] == null || icons[i].sprite != sprites[i]) same = false;
-
-        if (!same)
+        // Not parented to the player, so the player's scale/rotation can't distort the icon
+        root = new GameObject("HeldItemIcon").transform;
+        icon = root.gameObject.AddComponent<SpriteRenderer>();
+        icon.enabled = false;
+        if (character != null)
         {
-            foreach (SpriteRenderer old in icons)
-                if (old != null) Destroy(old.gameObject);
-            icons.Clear();
-            scaleMult.Clear();
-
-            for (int i = 0; i < sprites.Count; i++)
-            {
-                GameObject go = new GameObject("Icon" + i);
-                go.transform.SetParent(root, false);
-                SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = sprites[i];
-                if (character != null)
-                {
-                    sr.sortingLayerID = character.sortingLayerID;
-                    sr.sortingOrder = character.sortingOrder + 10;
-                }
-                else sr.sortingOrder = 10;
-
-                icons.Add(sr);
-                scaleMult.Add(0f); // grows in
-            }
+            icon.sortingLayerID = character.sortingLayerID;
+            icon.sortingOrder = character.sortingOrder + 10;
         }
+        else icon.sortingOrder = 10;
+    }
 
-        if (!same || selectedIndex != selected) popTimer = popTime;
-        selected = selectedIndex;
+    /// <summary>Shows this sprite for 'showTime' seconds. pop = bounce (use when switching items).</summary>
+    public void Show(Sprite sprite, bool pop)
+    {
+        EnsureIcon();
+
+        if (icon.sprite != sprite) pop = true;
+        icon.sprite = sprite;
+        visibleTimer = showTime;
+        if (pop) popTimer = popTime;
     }
 
     private void LateUpdate()
     {
         Camera cam = Camera.main;
-        if (cam == null || root == null || icons.Count == 0) return;
+        if (cam == null || icon == null) return;
 
         float dt = Time.unscaledDeltaTime;
+
+        visibleTimer = Mathf.Max(0f, visibleTimer - dt);
+        popTimer = Mathf.Max(0f, popTimer - dt);
+        alpha = Mathf.MoveTowards(alpha, visibleTimer > 0f ? 1f : 0f, fadeSpeed * dt);
+
+        if (alpha <= 0.01f || icon.sprite == null)
+        {
+            icon.enabled = false;
+            return;
+        }
+        icon.enabled = true;
 
         float charH = 2f;
         Vector3 head = transform.position + Vector3.up * 2f;
@@ -91,34 +84,20 @@ public class HeldItemIcons : MonoBehaviour
             head = new Vector3(transform.position.x, b.max.y, transform.position.z);
         }
 
-        float baseSize = charH * iconHeightRatio;
-        head += Vector3.up * (charH * heightAbove + baseSize * 0.5f);
+        float size = charH * iconHeightRatio;
+        head += Vector3.up * (charH * heightAbove + size * 0.5f);
+
+        float pop = popTime > 0f ? 1f + popStrength * Mathf.Sin((1f - popTimer / popTime) * Mathf.PI) : 1f;
+        float spriteH = Mathf.Max(0.0001f, icon.sprite.bounds.size.y);
+        float appear = Mathf.Lerp(0.6f, 1f, alpha); // grows slightly as it fades in
 
         root.position = head;
         root.rotation = cam.transform.rotation; // always faces the camera
+        root.localScale = Vector3.one * (size / spriteH * pop * appear);
 
-        popTimer = Mathf.Max(0f, popTimer - dt);
-        float pop = popTime > 0f ? 1f + popStrength * Mathf.Sin((1f - popTimer / popTime) * Mathf.PI) : 1f;
-
-        for (int i = 0; i < icons.Count; i++)
-        {
-            SpriteRenderer sr = icons[i];
-            if (sr == null) continue;
-
-            bool isSel = i == selected;
-            float target = isSel ? 1f : otherIconScale;
-            scaleMult[i] = Mathf.Lerp(scaleMult[i], target, 1f - Mathf.Exp(-18f * dt));
-            float m = scaleMult[i] * (isSel ? pop : 1f);
-
-            float spriteH = sr.sprite != null ? Mathf.Max(0.0001f, sr.sprite.bounds.size.y) : 1f;
-            Transform t = sr.transform;
-            t.localScale = Vector3.one * (baseSize / spriteH * m);
-            t.localPosition = new Vector3((i - (icons.Count - 1) * 0.5f) * spacing * baseSize, 0f, 0f);
-
-            Color c = sr.color;
-            c.a = Mathf.Lerp(c.a, isSel ? 1f : otherAlpha, 1f - Mathf.Exp(-14f * dt));
-            sr.color = c;
-        }
+        Color c = icon.color;
+        c.a = alpha;
+        icon.color = c;
     }
 
     private void OnDestroy()

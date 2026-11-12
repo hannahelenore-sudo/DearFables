@@ -28,6 +28,7 @@ public class CardShooter : MonoBehaviour
     public KeyCode cycleKey = KeyCode.E;
     public AudioClip cycleSound;
     [Range(0f, 1f)] public float cycleVolume = 0.6f;
+    [Tooltip("Show the selected item above the head for a moment when you switch or use it.")]
     public bool showItemIcons = true;
     [Tooltip("ON: the Wind Card only appears when you own the Wind Fan trinket. OFF: it is always available.")]
     public bool windRequiresWindFan = false;
@@ -53,7 +54,8 @@ public class CardShooter : MonoBehaviour
     [Tooltip("Cards used by each throw.")]
     public float cardCost = 1f;
     public float tsinelasCost = 1f;
-    public float smallRockCost = 1f;
+    [Tooltip("Stamina used by a Small Rock. 0 = free, because it already uses up the item itself.")]
+    public float smallRockCost = 0f;
     [Tooltip("Played when you try to use something with no stamina left.")]
     public AudioClip emptySound;
     [Range(0f, 1f)] public float emptyVolume = 1f;
@@ -115,7 +117,6 @@ public class CardShooter : MonoBehaviour
     private WindBoost wind;
     private ThrowItem selected = ThrowItem.Card;
     private readonly List<ThrowItem> available = new List<ThrowItem>();
-    private readonly List<Sprite> iconSprites = new List<Sprite>();
 
     private static Sprite glowSprite;
 
@@ -152,18 +153,14 @@ public class CardShooter : MonoBehaviour
 
     private void OnDisable()
     {
-        if (wind != null) wind.SetHeld(false);
+        if (wind != null) wind.Deactivate();
     }
 
     private void Update()
     {
         if (cooldownTimer > 0f) cooldownTimer -= Time.deltaTime;
 
-        if (Time.timeScale <= 0f)
-        {
-            if (wind != null) wind.SetHeld(false);
-            return;
-        }
+        if (Time.timeScale <= 0f) return; // paused: the boost just waits
 
         RefreshItems();
 
@@ -172,16 +169,18 @@ public class CardShooter : MonoBehaviour
         // Don't use items when clicking UI (boon cards, buttons)
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
-        // ---- Wind Card: hold to run ----
+        // ---- Wind Card: click once, runs until the stamina is drained ----
         if (selected == ThrowItem.WindCard)
         {
-            wind.SetHeld(Input.GetMouseButton(shootMouseButton) && !overUI);
-
-            if (Input.GetMouseButtonDown(shootMouseButton) && !overUI && !wind.CanStart)
-                Denied();
+            if (Input.GetMouseButtonDown(shootMouseButton) && !overUI)
+            {
+                if (wind.IsActive) { }                 // already running
+                else if (wind.CanStart) { wind.Activate(); ShowIcon(false); }
+                else Denied();
+            }
             return;
         }
-        wind.SetHeld(false);
+        wind.Deactivate(); // any other item selected: no boost, no drain
 
         // ---- Throwing ----
         if (!Input.GetMouseButtonDown(shootMouseButton)) return;
@@ -189,7 +188,7 @@ public class CardShooter : MonoBehaviour
         if (overUI) return;
 
         float cost = GetCost(selected);
-        if (stamina != null && !stamina.CanThrow(cost))
+        if (cost > 0f && stamina != null && !stamina.CanThrow(cost))
         {
             Denied();
             return;
@@ -197,9 +196,12 @@ public class CardShooter : MonoBehaviour
 
         if (!TryGetAimDirection(out Vector3 direction)) return;
 
-        Shoot(direction, selected);
-        if (stamina != null) stamina.Use(cost);
+        ThrowItem thrown = selected;
+        Shoot(direction, thrown);
+        if (thrown == ThrowItem.SmallRock) ConsumeSmallRock();
+        if (cost > 0f && stamina != null) stamina.Use(cost);
         cooldownTimer = cooldown;
+        ShowIcon(false);
     }
 
     private void Denied()
@@ -219,27 +221,46 @@ public class CardShooter : MonoBehaviour
         if (TrinketEffects.CanRemoveMoods) available.Add(ThrowItem.SmallRock);
         if (!windRequiresWindFan || TrinketEffects.HasDash) available.Add(ThrowItem.WindCard);
 
-        // Lost the selected item (e.g. sold the trinket) -> back to the card
-        if (!available.Contains(selected)) selected = ThrowItem.Card;
-
-        if (icons != null)
+        // Lost the selected item (sold it, or the last Small Rock was thrown) -> back to the card
+        if (!available.Contains(selected))
         {
-            iconSprites.Clear();
-            foreach (ThrowItem item in available) iconSprites.Add(GetIcon(item));
-            icons.SetItems(iconSprites, available.IndexOf(selected));
+            selected = ThrowItem.Card;
+            ShowIcon(true);
+        }
+    }
+
+    private void ShowIcon(bool pop)
+    {
+        if (icons != null) icons.Show(GetIcon(selected), pop);
+    }
+
+    /// <summary>The Small Rock is a consumable: each throw uses up one (the sidebar animates the removal).</summary>
+    private void ConsumeSmallRock()
+    {
+        var owned = TrinketInventory.Owned;
+        for (int i = owned.Count - 1; i >= 0; i--)
+        {
+            if (owned[i] != null && owned[i].type == TrinketType.SmallRock)
+            {
+                TrinketInventory.RemoveAt(i);
+                return;
+            }
         }
     }
 
     private void CycleItem()
     {
-        if (available.Count <= 1) return;
+        if (available.Count > 1)
+        {
+            int index = available.IndexOf(selected);
+            selected = available[(index + 1) % available.Count];
 
-        int index = available.IndexOf(selected);
-        selected = available[(index + 1) % available.Count];
+            if (wind != null) wind.Deactivate();
+            if (cycleSound != null)
+                GameSFX.Play(cycleSound, cycleVolume, 1f);
+        }
 
-        if (wind != null) wind.SetHeld(false);
-        if (cycleSound != null)
-            GameSFX.Play(cycleSound, cycleVolume, 1f);
+        ShowIcon(true); // pressing E always shows what you're holding
     }
 
     private float GetCost(ThrowItem item)

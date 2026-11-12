@@ -13,7 +13,9 @@ public class WindAura : MonoBehaviour
     [Tooltip("Streak length as a fraction of the character's height.")]
     public float lengthRatio = 0.45f;
     [Tooltip("How far the streaks float away from the body.")]
-    public float radiusPadding = 0.25f;
+    public float radiusPadding = 0.05f;
+    [Tooltip("How much of the character's half-width the streaks circle at. 1 = at the body's edge, lower = hugging it.")]
+    [Range(0.3f, 1.5f)] public float bodyHug = 0.7f;
 
     private SpriteRenderer character;
     private Transform root;
@@ -50,7 +52,7 @@ public class WindAura : MonoBehaviour
             angle[i] = Random.value * 360f;
             speed[i] = orbitSpeed * Random.Range(0.7f, 1.3f);
             height[i] = Random.value;
-            radiusMul[i] = Random.Range(0.85f, 1.25f);
+            radiusMul[i] = Random.Range(0.9f, 1.1f);
             lenMul[i] = Random.Range(0.7f, 1.3f);
             phase[i] = Random.value * 6.28f;
         }
@@ -89,7 +91,7 @@ public class WindAura : MonoBehaviour
             halfW = b.size.x * 0.5f;
         }
 
-        float baseRadius = Mathf.Max(0.3f, halfW) + radiusPadding;
+        float baseRadius = Mathf.Max(0.15f, halfW * bodyHug) + radiusPadding;
         Vector3 center = new Vector3(transform.position.x, feet, transform.position.z);
 
         Vector3 camFwd = cam.transform.forward;

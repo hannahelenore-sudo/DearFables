@@ -56,7 +56,7 @@ public class TrinketData : ScriptableObject
             CreateRuntime("Sun Charm", "Played cards with Sun Powered give +3 Mult when scored.", TrinketType.SunCharm, 5),
             CreateRuntime("Sun Plushie", "1 in 2 chance for played Sun Powered cards to give X1.5 Mult when scored.", TrinketType.SunPlushie, 7),
             CreateRuntime("Uncle's Business Card", "Lets you build another Structure.", TrinketType.UnclesBusinessCard, 6),
-            CreateRuntime("Small Rock", "Throw it at an enemy to remove any Moods.", TrinketType.SmallRock, 3)
+            CreateRuntime("Small Rock", "Consumable.\nThrow it at an enemy to remove any Moods.", TrinketType.SmallRock, 3)
         };
     }
 }
