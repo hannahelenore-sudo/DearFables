@@ -45,6 +45,7 @@ public class BattleManager : MonoBehaviour
     public float countAnimationDuration = 0.8f; // Duration per individual stat count
     public float stampAnimationDuration = 0.35f;
     public float delayBeforeStamp = 1.0f;      // Wait time after stars gained before stamp plays
+    public float lossStampDelay = 0.5f;        // On a loss there is no paper: wait this long, then the LOST stamp drops
     public string returnSceneName = "YourOtherSceneName";
 
     [Header("Boon Meter")]
@@ -359,33 +360,43 @@ public class BattleManager : MonoBehaviour
         if (winGameObject != null) winGameObject.SetActive(false);
         if (lostGameObject != null) lostGameObject.SetActive(false);
 
-        PlaySFX(paperSlideSound);
+        // Losing: no paper and no scores, only the LOST stamp drops onto the dimmed screen
+        SetPaperVisible(isWin);
 
-        // Fly PAPERIMG smoothly from below using local anchoredPosition
-        float elapsed = 0f;
-        Vector2 startAnchoredPos = paperImgTransform != null ? paperImgTransform.anchoredPosition : Vector2.zero;
-
-        while (elapsed < paperFlyDuration && paperImgTransform != null)
+        if (isWin)
         {
-            elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / paperFlyDuration);
-            float smoothT = 1f - (1f - t) * (1f - t);
-            paperImgTransform.anchoredPosition = Vector2.Lerp(startAnchoredPos, finalAnchoredPos, smoothT);
-            yield return null;
+            PlaySFX(paperSlideSound);
+
+            // Fly PAPERIMG smoothly from below using local anchoredPosition
+            float elapsed = 0f;
+            Vector2 startAnchoredPos = paperImgTransform != null ? paperImgTransform.anchoredPosition : Vector2.zero;
+
+            while (elapsed < paperFlyDuration && paperImgTransform != null)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / paperFlyDuration);
+                float smoothT = 1f - (1f - t) * (1f - t);
+                paperImgTransform.anchoredPosition = Vector2.Lerp(startAnchoredPos, finalAnchoredPos, smoothT);
+                yield return null;
+            }
+            if (paperImgTransform != null) paperImgTransform.anchoredPosition = finalAnchoredPos;
+
+            // 1. COUNT TARGET SCORE
+            yield return StartCoroutine(CountStatSequence(targetScoreTxt, "Target Score: ", targetScore));
+
+            // 2. COUNT YOUR SCORE
+            yield return StartCoroutine(CountStatSequence(yourScoreTxt, "Your Score: ", yourScore));
+
+            // 3. COUNT STARS GAINED
+            yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
+
+            // Delay after counting is fully done before the stamp animation plays
+            yield return new WaitForSecondsRealtime(delayBeforeStamp);
         }
-        if (paperImgTransform != null) paperImgTransform.anchoredPosition = finalAnchoredPos;
-
-        // 1. COUNT TARGET SCORE
-        yield return StartCoroutine(CountStatSequence(targetScoreTxt, "Target Score: ", targetScore));
-
-        // 2. COUNT YOUR SCORE
-        yield return StartCoroutine(CountStatSequence(yourScoreTxt, "Your Score: ", yourScore));
-
-        // 3. COUNT STARS GAINED
-        yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
-
-        // Delay after counting is fully done before the stamp animation plays
-        yield return new WaitForSecondsRealtime(delayBeforeStamp);
+        else
+        {
+            yield return new WaitForSecondsRealtime(lossStampDelay);
+        }
 
         // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top - Sorting Order 503)
         GameObject targetStampObj = isWin ? winGameObject : lostGameObject;
@@ -410,6 +421,22 @@ public class BattleManager : MonoBehaviour
         }
 
         isWaitingForClickToExit = true;
+    }
+
+    /// <summary>Shows or hides the paper and its three score lines (only the paper's own picture is hidden, so a stamp placed inside it still shows).</summary>
+    private void SetPaperVisible(bool visible)
+    {
+        if (paperImgTransform != null)
+        {
+            Graphic g = paperImgTransform.GetComponent<Graphic>();
+            if (g != null) g.enabled = visible;
+            SpriteRenderer sr = paperImgTransform.GetComponent<SpriteRenderer>();
+            if (sr != null) sr.enabled = visible;
+        }
+
+        if (targetScoreTxt != null) targetScoreTxt.gameObject.SetActive(visible);
+        if (yourScoreTxt != null) yourScoreTxt.gameObject.SetActive(visible);
+        if (starsGainedTxt != null) starsGainedTxt.gameObject.SetActive(visible);
     }
 
     private void ConfigureEndingSortingOrders()

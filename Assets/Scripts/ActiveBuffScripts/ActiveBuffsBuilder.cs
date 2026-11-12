@@ -12,7 +12,7 @@ public static class ActiveBuffsBuilder
 {
     // Compact sizes (reference pixels, before the panel scale)
     private const float PanelWidth = 124f;
-    private const float PanelHeight = 600f;
+    private const float PanelHeight = 700f;
     private const float SectionSize = 92f;
     private const float StatsHeight = 180f;
 
@@ -79,7 +79,7 @@ public static class ActiveBuffsBuilder
         rr.anchorMin = rr.anchorMax = new Vector2(0f, 0.5f);
         rr.pivot = new Vector2(0f, 0.5f);
         rr.sizeDelta = new Vector2(PanelWidth, PanelHeight);
-        rr.anchoredPosition = Vector2.zero;
+        rr.anchoredPosition = new Vector2(0f, -50f * scale); // 5 squares: keep the top where it was
         Image bg = AddImage(root, new Color(0.33f, 0.33f, 0.33f), panelSprite, true);
         bg.raycastTarget = true; // clicks on the bar must not throw cards / start walking
         bar.slideRoot = rr;
@@ -104,6 +104,7 @@ public static class ActiveBuffsBuilder
         bar.boonsSection = MakeSection(content.transform, "Boons", "Boons", panelSprite);
         bar.trinketsSection = MakeSection(content.transform, "Trinkets", "Trinkets", panelSprite);
         bar.advantageSection = MakeSection(content.transform, "AdvantageHit", "Advantage Hit", panelSprite);
+        bar.structureSection = MakeSection(content.transform, "Blueprint", "Blueprint", panelSprite);
 
         // ---- Row template (cloned for every tooltip line) ----
         bar.rowTemplate = MakeRowTemplate(root.transform);
@@ -164,7 +165,7 @@ public static class ActiveBuffsBuilder
         Selection.activeObject = canvasGO;
         Debug.Log("Active Buffs bar created (left side, compact). " +
                   (trinket != null ? "Scale and stat icons were copied from your Trinket bar. " : "No Trinket bar found in this scene, so default scale / no stat icons: set the Sun / Wind / Speed icons yourself. ") +
-                  "Set each section's icon: select Sections > (Mood / Boons / Trinkets / AdvantageHit) > Icon and assign a sprite. " +
+                  "Set each section's icon: select Sections > (Mood / Boons / Trinkets / AdvantageHit / Blueprint) > Icon and assign a sprite. " +
                   "Sun card: " + (bar.sunCard != null ? bar.sunCard.name : "NOT FOUND (drag it into 'Sun Card')") + ", Wind card: " +
                   (bar.windCard != null ? bar.windCard.name : "NOT FOUND (drag it into 'Wind Card')") + ".");
     }

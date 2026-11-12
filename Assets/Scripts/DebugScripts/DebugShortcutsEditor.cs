@@ -40,6 +40,55 @@ public class DebugShortcutsEditor : Editor
         }
 
         EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Card Power (Play mode only)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Wind Power / Sun Power (debug)", CardData.DebugWindPower + " / " + CardData.DebugSunPower);
+
+        using (new EditorGUI.DisabledScope(!Application.isPlaying))
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Wind", GUILayout.Width(40));
+                if (GUILayout.Button("+1")) t.AddWindPower(1);
+                if (GUILayout.Button("+5")) t.AddWindPower(5);
+                if (GUILayout.Button("+100")) t.AddWindPower(100);
+                if (GUILayout.Button("-5")) t.AddWindPower(-5);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Sun", GUILayout.Width(40));
+                if (GUILayout.Button("+1")) t.AddSunPower(1);
+                if (GUILayout.Button("+5")) t.AddSunPower(5);
+                if (GUILayout.Button("+100")) t.AddSunPower(100);
+                if (GUILayout.Button("-5")) t.AddSunPower(-5);
+            }
+
+            if (GUILayout.Button("Reset debug power")) t.ResetCardPower();
+        }
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Low Power Cards (Play mode, card game)", EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledScope(!Application.isPlaying || !t.HasDeck))
+        {
+            float chance = t.LowPowerChance;
+            float newChance = EditorGUILayout.Slider("Chance per drawn card", chance, 0f, 1f);
+            if (!Mathf.Approximately(newChance, chance)) t.LowPowerChance = newChance;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Make Hand Low Power")) t.MakeHandLowPower(false);
+                if (GUILayout.Button("Make Selected Low Power")) t.MakeHandLowPower(true);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Restore Hand")) t.RestoreHand(false);
+                if (GUILayout.Button("Restore Selected")) t.RestoreHand(true);
+            }
+        }
+
+        EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Difficulty (Play mode only)", EditorStyles.boldLabel);
 
         using (new EditorGUI.DisabledScope(!Application.isPlaying))

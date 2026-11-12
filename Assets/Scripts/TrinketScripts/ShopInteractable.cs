@@ -10,7 +10,7 @@ using TMPro;
 public class ShopInteractable : MonoBehaviour
 {
     [Header("Shop")]
-    public TrinketShopUI shopUI;
+    public ShopPanelBase shopUI;
 
     [Header("Interaction")]
     public KeyCode interactKey = KeyCode.E;

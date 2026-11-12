@@ -171,6 +171,12 @@ public class DeckManager : MonoBehaviour
     public AudioClip setBonusSound;
     [Tooltip("Played when a trinket adds to your mult (Candy, Wind Charm, Wind Fan, Sun Charm, Sun Plushie, Sugar Rush).")]
     public AudioClip trinketTriggerSound;
+
+    [Header("Low Power Cards")]
+    [Tooltip("Chance (0-1) that any card you draw is a Low Power copy: dimmed out and worth half. 0.06 = 6%.")]
+    [Range(0f, 1f)] public float lowPowerChance = 0.06f;
+    [Tooltip("Played when a Low Power card is dealt.")]
+    public AudioClip lowPowerDrawSound;
     [Tooltip("Pause (seconds) after each trinket triggers while scoring, so you can watch them go from top to bottom.")]
     public float trinketTriggerDelay = 0.4f;
     [Tooltip("Played when the permanent Wind Power boon adds its flat bonus to your score.")]
@@ -479,6 +485,15 @@ public class DeckManager : MonoBehaviour
 
             CardData drawnCard = drawPile[0];
             drawPile.RemoveAt(0);
+
+            // Small chance that this card comes out weak (half score, dimmed). It stays weak for the rest of the battle.
+            bool becameLowPower = false;
+            if (!drawnCard.isLowPower && Random.value < lowPowerChance * StructureProgress.LowPowerChanceFactorFor(drawnCard))
+            {
+                drawnCard = MakeLowPowerCopy(drawnCard);
+                becameLowPower = true;
+            }
+
             hand.Add(drawnCard);
             cardsRemainingInRound--;
 
@@ -487,6 +502,7 @@ public class DeckManager : MonoBehaviour
             RebuildLayout();
 
             PlaySFX(drawCardSound, Mathf.Min(1f + i * 0.05f, 1.5f) + Random.Range(-0.02f, 0.02f));
+            if (becameLowPower) PlaySFX(lowPowerDrawSound);
             UpdateHandCountDisplay();
             UpdateDeckLeftDisplay();
 
@@ -495,6 +511,70 @@ public class DeckManager : MonoBehaviour
 
         RebuildLayout();
         UpdateSelectedTotal();
+    }
+
+    /// <summary>A runtime copy of the card (same type, so Wind/Solar checks still work) that scores half.</summary>
+    private static CardData MakeLowPowerCopy(CardData original)
+    {
+        CardData copy = Instantiate(original);
+        copy.name = original.name + " (Low Power)";
+        copy.hideFlags = HideFlags.DontSave;
+        copy.isLowPower = true;
+        copy.lowPowerSource = original;
+        return copy;
+    }
+
+    // ------------------------------------------------------------------
+    // Debug (called by DebugShortcuts)
+    // ------------------------------------------------------------------
+
+    /// <summary>Debug: turns cards in your hand into Low Power cards. onlySelected = just the selected ones.</summary>
+    public int DebugMakeHandLowPower(bool onlySelected)
+    {
+        return DebugSwapHand(onlySelected, true);
+    }
+
+    /// <summary>Debug: turns Low Power cards in your hand back to normal.</summary>
+    public int DebugRestoreHand(bool onlySelected)
+    {
+        return DebugSwapHand(onlySelected, false);
+    }
+
+    private int DebugSwapHand(bool onlySelected, bool makeLow)
+    {
+        if (isScoring || isDiscarding) return 0;
+
+        int changed = 0;
+        foreach (CardUI ui in spawnedCardUIList)
+        {
+            if (ui == null || ui.cardData == null) continue;
+            if (onlySelected && !ui.isSelected) continue;
+
+            CardData old = ui.cardData;
+            CardData replacement;
+            if (makeLow)
+            {
+                if (old.isLowPower) continue;
+                replacement = MakeLowPowerCopy(old);
+            }
+            else
+            {
+                if (!old.isLowPower || old.lowPowerSource == null) continue;
+                replacement = old.lowPowerSource;
+            }
+
+            int index = hand.IndexOf(old);
+            if (index >= 0) hand[index] = replacement;
+            ui.LoadCardData(replacement);
+            changed++;
+        }
+
+        if (changed > 0)
+        {
+            PlaySFX(makeLow ? lowPowerDrawSound : null);
+            UpdateSelectedTotal();
+        }
+        return changed;
     }
 
     private CardUI CreateCardUI(CardData data, bool fromDeck = false)
@@ -1167,7 +1247,7 @@ public class DeckManager : MonoBehaviour
             {
                 if (CountCardsOfType<SolarCard>(selectedCards) >= solar.requiredCards)
                 {
-                    setMult = solar.multiplier;
+                    setMult = solar.EffectiveMultiplier;
                     hasSetBonus = true;
                     setBonusClip = solar.bonusSound;
                     setBonusVolume = solar.bonusVolume;
@@ -1177,7 +1257,7 @@ public class DeckManager : MonoBehaviour
             {
                 if (CountCardsOfType<WindCard>(selectedCards) >= wind.requiredCards)
                 {
-                    setMult = wind.multiplier;
+                    setMult = wind.EffectiveMultiplier;
                     hasSetBonus = true;
                     setBonusClip = wind.bonusSound;
                     setBonusVolume = wind.bonusVolume;

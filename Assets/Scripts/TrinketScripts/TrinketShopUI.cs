@@ -10,7 +10,7 @@ using TMPro;
 /// Everything is free for now: clicking a trinket takes it. Open it with Open() (ShopInteractable does this).
 /// Needs an EventSystem in the scene. Tip: build the whole UI with  Tools > Shop > Create Shop UI.
 /// </summary>
-public class TrinketShopUI : MonoBehaviour
+public class TrinketShopUI : ShopPanelBase
 {
     [Serializable]
     public class Slot
@@ -62,8 +62,8 @@ public class TrinketShopUI : MonoBehaviour
     public AudioClip cantAffordSound;
 
     /// <summary>True while any shop is open. Handy to stop player movement: if (TrinketShopUI.IsAnyShopOpen) return;</summary>
-    public static bool IsAnyShopOpen { get; private set; }
-    public bool IsOpen { get; private set; }
+    // IsAnyShopOpen now lives in ShopPanelBase (TrinketShopUI.IsAnyShopOpen still works)
+    // IsOpen now lives in ShopPanelBase
 
     /// <summary>The shop that is open right now (null if none). The sidebar uses it to react when you sell.</summary>
     public static TrinketShopUI OpenShop { get; private set; }
@@ -120,7 +120,7 @@ public class TrinketShopUI : MonoBehaviour
     // Open / close
     // -------------------------------------------------------------------
 
-    public void Open()
+    public override void Open()
     {
         if (IsOpen) return;
 
@@ -147,7 +147,7 @@ public class TrinketShopUI : MonoBehaviour
         if (shopkeeper != null) shopkeeper.SayGreeting();
     }
 
-    public void Close()
+    public override void Close()
     {
         if (!IsOpen) return;
 

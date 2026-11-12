@@ -57,6 +57,8 @@ public class EnemyChase : MonoBehaviour
     public int baseTargetScore = 400;
     [Tooltip("Same as 'Max Score Multiplier' on the BattleManager.")]
     public float maxScoreMultiplier = 3f;
+    [Tooltip("Sun + Wind together are multiplied by this before being compared with the score to beat. Higher = the combo obliterates enemies even at high difficulty. 1 = plain Sun + Wind.")]
+    public float powerMultiplier = 2f;
     [Tooltip("Optional. Sprite for the X above the enemy. If empty, a red X is drawn automatically.")]
     public Sprite xIconSprite;
     public Vector3 xIconOffset = new Vector3(0f, 1.6f, 0f);
@@ -150,6 +152,10 @@ public class EnemyChase : MonoBehaviour
     {
         if (battleStarted) return;
 
+        Debug.Log("EnemyChase '" + name + "': Sun " + DeckPower.Sun + " + Wind " + DeckPower.Wind
+                  + " = " + DeckPower.Total + " (x" + powerMultiplier + " = " + GetCombinedPower() + ") vs score to beat " + GetScoreToBeat()
+                  + (IsOverpowered() ? " -> EXPLODE" : " -> battle"));
+
         // Strong enough: the card makes the enemy explode instead of starting a battle
         if (explodeWhenOverpowered && IsOverpowered())
         {
@@ -203,10 +209,16 @@ public class EnemyChase : MonoBehaviour
         return DifficultyProgress.ScaleScore(baseTargetScore, maxScoreMultiplier);
     }
 
-    /// <summary>True when your combined Wind + Sun power is greater than the score to beat.</summary>
+    /// <summary>Your combined Sun + Wind power times 'Power Multiplier'.</summary>
+    public float GetCombinedPower()
+    {
+        return (DeckPower.Sun + DeckPower.Wind) * powerMultiplier;
+    }
+
+    /// <summary>True when your combined Wind + Sun power (x Power Multiplier) is greater than the score to beat.</summary>
     public bool IsOverpowered()
     {
-        return DeckPower.Total > GetScoreToBeat();
+        return GetCombinedPower() > GetScoreToBeat();
     }
 
     private void UpdatePowerIcon()
@@ -403,6 +415,9 @@ public class EnemyChase : MonoBehaviour
 
         UpdatePowerIcon();
 
+        // Player frozen (e.g. talking to the shopkeeper) -> the enemy freezes too
+        if (IsPlayerFrozen()) return;
+
         // Stunned: can't move, chase or catch the player
         if (stunTimer > 0f)
         {
@@ -462,6 +477,19 @@ public class EnemyChase : MonoBehaviour
             MoveToward(startPosition, 0.05f);
             UpdateFlip(startPosition);
         }
+    }
+
+    private PlayerMovement playerMovement;
+
+    /// <summary>True while the player's input is locked (PlayerMovement.InputLocked).</summary>
+    private bool IsPlayerFrozen()
+    {
+        if (playerMovement == null && player != null)
+        {
+            playerMovement = player.GetComponentInParent<PlayerMovement>();
+            if (playerMovement == null) playerMovement = player.GetComponentInChildren<PlayerMovement>();
+        }
+        return playerMovement != null && playerMovement.InputLocked;
     }
 
     private void StartBattle(bool byCard)

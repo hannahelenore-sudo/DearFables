@@ -129,4 +129,51 @@ public class DebugShortcuts : MonoBehaviour
     {
         BatteryManager.Add(amount);
     }
+
+    // ---------------- Card power ----------------
+
+    /// <summary>Adds (or removes, if negative) Wind Power for the whole session. Shows in the trinket bar and adds to every Wind card.</summary>
+    public void AddWindPower(int amount)
+    {
+        CardData.DebugWindPower += amount;
+    }
+
+    /// <summary>Adds (or removes, if negative) Sun Power for the whole session. Shows in the trinket bar and adds to every Solar card.</summary>
+    public void AddSunPower(int amount)
+    {
+        CardData.DebugSunPower += amount;
+    }
+
+    public void ResetCardPower()
+    {
+        CardData.DebugWindPower = 0;
+        CardData.DebugSunPower = 0;
+    }
+
+    // ---------------- Low Power cards (card game scene) ----------------
+
+    public bool HasDeck { get { return Object.FindAnyObjectByType<DeckManager>() != null; } }
+
+    public float LowPowerChance
+    {
+        get { DeckManager d = Object.FindAnyObjectByType<DeckManager>(); return d != null ? d.lowPowerChance : 0f; }
+        set { DeckManager d = Object.FindAnyObjectByType<DeckManager>(); if (d != null) d.lowPowerChance = Mathf.Clamp01(value); }
+    }
+
+    /// <summary>Makes cards in your hand Low Power (half score, dimmed). onlySelected = just the selected ones.</summary>
+    public void MakeHandLowPower(bool onlySelected)
+    {
+        DeckManager d = Object.FindAnyObjectByType<DeckManager>();
+        if (d == null) { Debug.LogWarning("DebugShortcuts: no DeckManager in this scene (use this in the card game).", this); return; }
+        int n = d.DebugMakeHandLowPower(onlySelected);
+        Debug.Log("DebugShortcuts: " + n + " card(s) are now Low Power.", this);
+    }
+
+    public void RestoreHand(bool onlySelected)
+    {
+        DeckManager d = Object.FindAnyObjectByType<DeckManager>();
+        if (d == null) { Debug.LogWarning("DebugShortcuts: no DeckManager in this scene (use this in the card game).", this); return; }
+        int n = d.DebugRestoreHand(onlySelected);
+        Debug.Log("DebugShortcuts: " + n + " card(s) restored to normal.", this);
+    }
 }

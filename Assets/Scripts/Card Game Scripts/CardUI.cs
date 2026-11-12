@@ -26,6 +26,15 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     [Header("Card Tint Colors")]
     public Color cardDefaultTint = Color.white;
     public Color cardTintOnSelect = new Color(1f, 0.98f, 0.8f, 1f);
+    [Header("Low Power Look")]
+    [Tooltip("Dimmed, washed-out tint for Low Power cards.")]
+    public Color lowPowerTint = new Color(0.5f, 0.5f, 0.55f, 1f);
+    public Color lowPowerSelectTint = new Color(0.62f, 0.62f, 0.6f, 1f);
+    [Tooltip("Murky liquid that fills the bottom of Low Power cards.")]
+    public bool showLowPowerLiquid = true;
+    public Color lowPowerLiquidColor = new Color(0.32f, 0.55f, 0.5f, 0.7f);
+    [Tooltip("How full the card is: 0.5 = half.")]
+    [Range(0f, 1f)] public float lowPowerLiquidFill = 0.5f;
     [Tooltip("How fast the tint fades between normal and selected.")]
     public float tintSpeed = 14f;
 
@@ -77,8 +86,13 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     private static System.Reflection.FieldInfo scoringField;
     private static System.Reflection.FieldInfo discardingField;
 
+    private Color normalDefaultTint;
+    private Color normalSelectTint;
+
     void Awake()
     {
+        normalDefaultTint = cardDefaultTint;
+        normalSelectTint = cardTintOnSelect;
         EnsureRefs();
         layoutElement = GetComponent<LayoutElement>();
         if (layoutElement == null) layoutElement = gameObject.AddComponent<LayoutElement>();
@@ -161,6 +175,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         rotVel += ((targetRot - curRot) * springStiffness - rotVel * springDamping) * dt;
         curRot += rotVel * dt;
         rectTransform.localRotation = Quaternion.Euler(0f, 0f, curRot);
+        if (liquid != null) liquid.SetCardRotation(curRot); // the surface stays level as the card tilts
 
         // tint
         if (cardImage != null)
@@ -232,8 +247,83 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             cardImage.sprite = cardData.cardArt;
         }
 
+        // Low Power cards look dimmed out, like they're genuinely weak
+        if (cardData != null && cardData.isLowPower)
+        {
+            cardDefaultTint = lowPowerTint;
+            cardTintOnSelect = lowPowerSelectTint;
+            if (cardImage != null) cardImage.color = lowPowerTint;
+            SetLowPowerLiquid(true);
+        }
+        else
+        {
+            cardDefaultTint = normalDefaultTint;
+            cardTintOnSelect = normalSelectTint;
+            SetLowPowerLiquid(false);
+        }
+
         UpdateBubbleText();
         StartCoroutine(InitializeSelectionState());
+    }
+
+    // ------------------------------------------------------------------
+    // Low Power liquid: fills the bottom of the card, clipped to the card's shape
+    // ------------------------------------------------------------------
+
+    private LowPowerLiquid liquid;
+
+    private void SetLowPowerLiquid(bool on)
+    {
+        if (on)
+        {
+            if (!showLowPowerLiquid) return;
+            if (liquid == null) liquid = BuildLiquid();
+            if (liquid != null)
+            {
+                liquid.liquidColor = lowPowerLiquidColor;
+                liquid.FillTo(lowPowerLiquidFill);
+            }
+        }
+        else if (liquid != null)
+        {
+            liquid.Drain();
+        }
+    }
+
+    private LowPowerLiquid BuildLiquid()
+    {
+        EnsureRefs();
+        if (rectTransform == null) return null;
+
+        // A container shaped like the card (its sprite is the mask), so the liquid never pokes out of rounded corners
+        GameObject maskGO = new GameObject("LowPowerLiquidMask", typeof(RectTransform), typeof(LayoutElement));
+        RectTransform mr = maskGO.GetComponent<RectTransform>();
+        mr.SetParent(transform, false);
+        mr.anchorMin = Vector2.zero;
+        mr.anchorMax = Vector2.one;
+        mr.offsetMin = Vector2.zero;
+        mr.offsetMax = Vector2.zero;
+        maskGO.GetComponent<LayoutElement>().ignoreLayout = true;
+
+        Image maskImg = maskGO.AddComponent<Image>();
+        if (cardImage != null && cardImage.sprite != null)
+        {
+            maskImg.sprite = cardImage.sprite;
+            maskImg.type = cardImage.type;
+        }
+        maskImg.raycastTarget = false;
+        Mask mask = maskGO.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        GameObject liquidGO = new GameObject("Liquid", typeof(RectTransform));
+        RectTransform lr = liquidGO.GetComponent<RectTransform>();
+        lr.SetParent(mr, false);
+        lr.anchorMin = Vector2.zero;
+        lr.anchorMax = Vector2.one;
+        lr.offsetMin = Vector2.zero;
+        lr.offsetMax = Vector2.zero;
+
+        return liquidGO.AddComponent<LowPowerLiquid>();
     }
 
     private void CreateHoverBubbleUI()
@@ -327,7 +417,11 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     {
         if (bubbleTextComponent != null && cardData != null)
         {
-            if (cardData is SolarCard solar)
+            if (cardData.isLowPower)
+            {
+                bubbleTextComponent.text = $"{cardData.GetEffectiveValue()}\n<size=85%><color=#B0B0B0>Low Power: half score</color></size>";
+            }
+            else if (cardData is SolarCard solar)
             {
                 bubbleTextComponent.text = $"{solar.GetEffectiveValue()}\n<size=85%>(X1.5 if 5 solar cards are selected)</size>";
             }
@@ -372,6 +466,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
         isHovered = true;
         scaleVel += selectPopKick * 0.4f; // tiny bounce on hover
+        if (liquid != null) liquid.Slosh(28f);
 
         // Draw the hovered card on top of its overlapping neighbours
         siblingBeforeHover = transform.GetSiblingIndex();
@@ -379,6 +474,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
         if (activeValueBubble != null)
         {
+            UpdateBubbleText(); // power can change while the card is in your hand (moods, debug power...)
             UpdateBubbleVisuals();
             activeValueBubble.SetActive(true);
         }

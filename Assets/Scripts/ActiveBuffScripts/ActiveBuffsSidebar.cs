@@ -89,6 +89,8 @@ public class ActiveBuffsSidebar : MonoBehaviour
     public Section boonsSection = new Section();
     public Section trinketsSection = new Section();
     public Section advantageSection = new Section();
+    [Tooltip("Blueprint Shop structure (Solar Panel / Windmill) and its upgrades. If left empty, the rows are shown under Boons.")]
+    public Section structureSection = new Section();
 
     [Header("Stats (bottom of the bar)")]
     public StatRow sunPower = new StatRow();
@@ -124,6 +126,10 @@ public class ActiveBuffsSidebar : MonoBehaviour
 
     [Header("Animation")]
     public float slideSpeed = 12f;
+
+    [Header("Position")]
+    [Tooltip("Moves the whole bar down (reference pixels) so it does not overlap the star / money counter. Raise it to go lower.")]
+    public float lowerBy = 60f;
 
     [Header("Sounds")]
     [Range(0f, 1f)] public float sfxVolume = 1f;
@@ -168,7 +174,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
 
     private Section[] AllSections()
     {
-        return new Section[] { moodSection, boonsSection, trinketsSection, advantageSection };
+        return new Section[] { moodSection, boonsSection, trinketsSection, advantageSection, structureSection };
     }
 
     // -------------------------------------------------------------------
@@ -200,6 +206,13 @@ public class ActiveBuffsSidebar : MonoBehaviour
         if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
         if (toggleButton != null) toggleButton.onClick.AddListener(Toggle);
         if (slideRoot != null) slideRoot.localScale = new Vector3(panelScale, panelScale, 1f);
+        EnsureStructureSection();
+        if (slideRoot != null)
+        {
+            Vector2 sp = slideRoot.anchoredPosition;
+            sp.y -= lowerBy;
+            slideRoot.anchoredPosition = sp;
+        }
         if (tooltip != null)
         {
             tooltip.localScale = new Vector3(panelScale, panelScale, 1f);
@@ -209,6 +222,48 @@ public class ActiveBuffsSidebar : MonoBehaviour
         open = startOpen;
         SnapSlide();
         UpdateArrow();
+    }
+
+    // Bars made before the Blueprint square existed get one added here: a copy of the last square, with the bar made taller.
+    private void EnsureStructureSection()
+    {
+        if (structureSection != null && structureSection.box != null) return;
+
+        Section src = (advantageSection != null && advantageSection.box != null) ? advantageSection : boonsSection;
+        if (src == null || src.box == null || slideRoot == null) return;
+
+        RectTransform box = Instantiate(src.box, src.box.parent);
+        box.name = "Blueprint";
+        box.SetSiblingIndex(src.box.GetSiblingIndex() + 1);
+
+        Transform iconTf = box.Find("Icon");
+        Transform letterTf = box.Find("Letter");
+
+        structureSection = new Section();
+        structureSection.title = "Blueprint";
+        structureSection.box = box;
+        structureSection.icon = iconTf != null ? iconTf.GetComponent<Image>() : null;
+        structureSection.fallbackLabel = letterTf != null ? letterTf.GetComponent<TMP_Text>() : null;
+        if (structureSection.icon != null) structureSection.icon.sprite = null; // shows the letter "B" until you assign an icon
+
+        // Make room for the extra square
+        float spacing = 0f;
+        if (layoutRoot != null)
+        {
+            VerticalLayoutGroup vlg = layoutRoot.GetComponent<VerticalLayoutGroup>();
+            if (vlg != null) spacing = vlg.spacing;
+        }
+        LayoutElement le = box.GetComponent<LayoutElement>();
+        float added = (le != null && le.preferredHeight > 0f ? le.preferredHeight : box.rect.height) + spacing;
+
+        Vector2 size = slideRoot.sizeDelta;
+        size.y += added;
+        slideRoot.sizeDelta = size;
+
+        // The bar grows up and down equally: move it down by half so the top stays where it was
+        Vector2 pos = slideRoot.anchoredPosition;
+        pos.y -= added * panelScale * 0.5f;
+        slideRoot.anchoredPosition = pos;
     }
 
     private void OnEnable()
@@ -374,7 +429,9 @@ public class ActiveBuffsSidebar : MonoBehaviour
           .Append(BoonProgress.BonusWindPower).Append('|')
           .Append(BoonProgress.ExtraHands).Append('|')
           .Append(BoonProgress.ExtraHandSize).Append('|')
-          .Append(AdvantageHit.IsActive).Append(AdvantageHit.Reduction).Append('|');
+          .Append(AdvantageHit.IsActive).Append(AdvantageHit.Reduction).Append('|')
+          .Append((int)StructureProgress.Current).Append(StructureProgress.Level(StructureUpgrade.Power))
+          .Append(StructureProgress.Level(StructureUpgrade.Stability)).Append(StructureProgress.Level(StructureUpgrade.Mult)).Append('|');
 
         IReadOnlyList<TrinketData> owned = TrinketInventory.Owned;
         for (int i = 0; i < owned.Count; i++)
@@ -413,6 +470,29 @@ public class ActiveBuffsSidebar : MonoBehaviour
         if (BoonProgress.BonusWindPower > 0) AddRow(boonsSection, windIcon, Signed(BoonProgress.BonusWindPower), buffColor);
         if (BoonProgress.ExtraHands > 0) AddRow(boonsSection, null, Signed(BoonProgress.ExtraHands) + " Hand", buffColor);
         if (BoonProgress.ExtraHandSize > 0) AddRow(boonsSection, null, Signed(BoonProgress.ExtraHandSize) + " Hand Size", buffColor);
+
+        // Blueprint Shop structure (falls back to the Boons icon if there is no Structure section in the bar)
+        if (StructureProgress.IsBuilt)
+        {
+            StructureType st = StructureProgress.Current;
+            Section ss = (structureSection != null && structureSection.box != null) ? structureSection : boonsSection;
+            Sprite cardIcon = st == StructureType.Solar ? sunIcon : windIcon;
+
+            AddRow(ss, null, StructureProgress.DisplayName(st), dimColor);
+
+            int sPower = StructureProgress.PowerBonus(st);
+            if (sPower > 0) AddRow(ss, cardIcon, Signed(sPower), buffColor);
+
+            int stab = StructureProgress.Level(StructureUpgrade.Stability);
+            if (stab > 0)
+            {
+                int pct = Mathf.RoundToInt((1f - StructureProgress.LowPowerChanceFactor(st)) * 100f);
+                AddRow(ss, null, "-" + pct + "% Low Power chance", buffColor);
+            }
+
+            float sMult = StructureProgress.MultBonus(st);
+            if (sMult > 0f) AddRow(ss, null, "+" + sMult.ToString("0.##") + " " + StructureProgress.CardName(st) + " Set Mult", buffColor);
+        }
 
         // Trinkets: only the stat values they give. A trinket without stats adds nothing.
         IReadOnlyList<TrinketData> owned = TrinketInventory.Owned;

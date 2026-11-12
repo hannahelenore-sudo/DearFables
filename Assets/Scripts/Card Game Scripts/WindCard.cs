@@ -15,9 +15,16 @@ public class WindCard : CardData
     public AudioClip bonusSound;
     [Range(0f, 1f)] public float bonusVolume = 1f;
 
+    /// <summary>The set bonus Mult including the Windmill's Mult upgrades.</summary>
+    public float EffectiveMultiplier
+    {
+        get { return multiplier + StructureProgress.MultBonus(StructureType.Wind); }
+    }
+
     public override int GetEffectiveValue()
     {
-        return base.GetEffectiveValue() + BoonProgress.BonusWindPower;
+        // Low Power halves the whole thing, Wind Power boon included
+        return ApplyLowPower(primaryValue + MoodManager.PowerBonus + BoonProgress.BonusWindPower + DebugWindPower + StructureProgress.PowerBonus(StructureType.Wind));
     }
 
     public override int EvaluateScore(int currentTotal, List<CardUI> selectedCards)
@@ -35,7 +42,7 @@ public class WindCard : CardData
 
             if (windCount >= requiredCards)
             {
-                return Mathf.RoundToInt(currentTotal * multiplier);
+                return Mathf.RoundToInt(currentTotal * EffectiveMultiplier);
             }
         }
         return currentTotal;
