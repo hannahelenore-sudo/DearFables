@@ -6445,7 +6445,7 @@ MonoBehaviour:
   tsinelasPopInDuration: 0.25
   tsinelasResultHoldDuration: 0.8
   tsinelasFadeOutDuration: 0.25
-  tsinelasPopupPosition: {x: 0, y: -260}
+  tsinelasPopupPosition: {x: 637, y: -374}
   tsinelasPopupSize: 220
 --- !u!212 &1283867253
 SpriteRenderer:

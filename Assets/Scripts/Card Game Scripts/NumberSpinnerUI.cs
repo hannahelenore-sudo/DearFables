@@ -51,9 +51,11 @@ public class NumberSpinnerUI : MonoBehaviour
     [Tooltip("How long the popup takes to fade away when the timer runs out.")]
     public float tsinelasFadeOutDuration = 0.25f;
 
-    [Tooltip("Where the auto-built popup sits, measured in from the LOWER RIGHT corner (x negative = left, y positive = up). Only used when you don't assign your own popup.")]
-    public Vector2 tsinelasPopupPosition = new Vector2(-60f, 110f);
+    [Tooltip("Where the auto-built popup sits, Pos X / Pos Y measured from the CENTER of this object (x positive = right, y negative = down). Only used when you don't assign your own popup.")]
+    public Vector2 tsinelasPopupPosition = new Vector2(637f, -374f);
     public float tsinelasPopupSize = 220f;
+    [Tooltip("How many times Tsinelas can reroll the spinner number per roll.")]
+    public int maxTsinelasRerolls = 1;
 
     private System.Func<int> tsinelasOffer;
     private bool tsinelasClicked;
@@ -79,7 +81,7 @@ public class NumberSpinnerUI : MonoBehaviour
     }
 
     /// <param name="keepCurrentAlpha">True when the caller is fading this screen in itself (cross-fade): the spin starts without forcing the alpha to 1.</param>
-    /// <param name="onTsinelasUsed">Pass this only when the player owns Tsinelas. The spinner pauses after the roll and shows the popup; if tapped, this is called (it should reroll the enemy defence and return the new value).</param>
+    /// <param name="onTsinelasUsed">Pass this only when the player owns Tsinelas. The spinner pauses after the roll and shows the popup; if tapped, the spinner number is rolled again. The callback is only used to tell the spinner that Tsinelas is owned.</param>
     public void StartSequence(System.Action<int> onComplete, bool keepCurrentAlpha = false, System.Func<int> onTsinelasUsed = null)
     {
         if (sequenceRoutine != null) StopCoroutine(sequenceRoutine);
@@ -115,30 +117,44 @@ public class NumberSpinnerUI : MonoBehaviour
 
     private IEnumerator RunSpinnerSequence(System.Action<int> onComplete)
     {
-        float elapsed = 0f;
-        float nextSpinTime = 0f;
         int finalNumber = minNumber;
+        int rerollsUsed = 0;
 
-        while (elapsed < spinDuration)
+        while (true)
         {
-            elapsed += Time.unscaledDeltaTime;
-            if (elapsed >= nextSpinTime)
+            float elapsed = 0f;
+            float nextSpinTime = 0f;
+
+            while (elapsed < spinDuration)
             {
-                nextSpinTime = elapsed + spinInterval;
-                finalNumber = Random.Range(minNumber, maxNumber + 1);
-                if (spinnerNumberText != null) spinnerNumberText.text = finalNumber.ToString();
+                elapsed += Time.unscaledDeltaTime;
+                if (elapsed >= nextSpinTime)
+                {
+                    nextSpinTime = elapsed + spinInterval;
+                    finalNumber = Random.Range(minNumber, maxNumber + 1);
+                    if (spinnerNumberText != null) spinnerNumberText.text = finalNumber.ToString();
+                }
+                yield return null;
             }
-            yield return null;
+
+            if (spinnerNumberText != null) spinnerNumberText.text = finalNumber.ToString();
+
+            yield return StartCoroutine(PopAndWiggleRoutine());
+            yield return new WaitForSecondsRealtime(postSpinPauseDuration);
+
+            // Tsinelas: pause here (before the minimizing). If the player taps it, spin the number again.
+            if (tsinelasOffer != null && tsinelasPopup != null && rerollsUsed < maxTsinelasRerolls)
+            {
+                yield return StartCoroutine(TsinelasOfferRoutine());
+                if (tsinelasClicked)
+                {
+                    rerollsUsed++;
+                    continue; // roll the number again
+                }
+            }
+            break;
         }
-
-        if (spinnerNumberText != null) spinnerNumberText.text = finalNumber.ToString();
-
-        yield return StartCoroutine(PopAndWiggleRoutine());
-        yield return new WaitForSecondsRealtime(postSpinPauseDuration);
-
-        // Tsinelas: pause here (before the minimizing) and let the player reroll the enemy defence
-        if (tsinelasOffer != null && tsinelasPopup != null)
-            yield return StartCoroutine(TsinelasOfferRoutine());
+        tsinelasOffer = null;
 
         if (container != null)
         {
@@ -250,43 +266,32 @@ public class NumberSpinnerUI : MonoBehaviour
 
         if (tsinelasClicked)
         {
+            // Tapped: don't wait for anything. The popup shrinks away in the background so the spin starts right now.
             if (tsinelasHintLabel != null) tsinelasHintLabel.gameObject.SetActive(false);
-            int newDefence = tsinelasOffer != null ? tsinelasOffer() : 0;
-
-            if (tsinelasResultText != null)
-            {
-                tsinelasResultText.text = "Enemy defence: " + newDefence;
-                tsinelasResultText.gameObject.SetActive(true);
-            }
-
-            // Quick wiggle on the popup, then let the result be read
-            float wElapsed = 0f;
-            float wDuration = Mathf.Max(0.01f, tsinelasResultHoldDuration);
-            while (wElapsed < wDuration)
-            {
-                wElapsed += Time.unscaledDeltaTime;
-                float p = Mathf.Clamp01(wElapsed / 0.3f);
-                popT.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(p * Mathf.PI * 6f) * wiggleAngle * (1f - p));
-                yield return null;
-            }
-            popT.localRotation = Quaternion.identity;
+            StartCoroutine(TsinelasDismissRoutine(popT, popGroup, baseScale, true));
+            yield break;
         }
 
-        // Tapped: shrink away. Timed out: just fade away. Then continue with the normal minimizing.
-        elapsed = 0f;
+        // Timed out: fade away, then continue with the normal minimizing.
+        yield return StartCoroutine(TsinelasDismissRoutine(popT, popGroup, baseScale, false));
+    }
+
+    private IEnumerator TsinelasDismissRoutine(Transform popT, CanvasGroup popGroup, Vector3 baseScale, bool shrink)
+    {
+        float elapsed = 0f;
         float outDuration = Mathf.Max(0.01f, tsinelasFadeOutDuration);
         while (elapsed < outDuration)
         {
             elapsed += Time.unscaledDeltaTime;
             float p = Mathf.Clamp01(elapsed / outDuration);
-            if (tsinelasClicked) popT.localScale = Vector3.Lerp(baseScale, Vector3.zero, p);
+            p = p * p * (3f - 2f * p);
+            if (shrink) popT.localScale = Vector3.Lerp(baseScale, Vector3.zero, p);
             else popGroup.alpha = 1f - p;
             yield return null;
         }
         tsinelasPopup.SetActive(false);
         popT.localScale = baseScale;
         popGroup.alpha = 1f;
-        tsinelasOffer = null;
     }
 
     private void OnTsinelasClicked()
@@ -309,8 +314,8 @@ public class NumberSpinnerUI : MonoBehaviour
         GameObject root = new GameObject("TsinelasPopup", typeof(RectTransform));
         root.transform.SetParent(transform, false);
         RectTransform rootRt = (RectTransform)root.transform;
-        rootRt.anchorMin = rootRt.anchorMax = new Vector2(1f, 0f); // lower right
-        rootRt.pivot = new Vector2(1f, 0f);
+        rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f); // center
+        rootRt.pivot = new Vector2(0.5f, 0.5f);
         rootRt.anchoredPosition = tsinelasPopupPosition;
         rootRt.sizeDelta = new Vector2(size, size);
         root.transform.SetAsLastSibling();

@@ -80,6 +80,7 @@ public class PlayerRollUI : MonoBehaviour
     private Coroutine shieldSpinRoutine;
     private List<GameObject> activeConfettiList = new List<GameObject>();
     private float currentShieldZRotation = 0f;
+    private Vector3 initialNotificationScale = Vector3.one;
 
     private void Awake()
     {
@@ -119,6 +120,7 @@ public class PlayerRollUI : MonoBehaviour
 
         if (notificationText != null)
         {
+            initialNotificationScale = notificationText.rectTransform.localScale;
             notificationText.gameObject.SetActive(false);
         }
     }
@@ -150,6 +152,7 @@ public class PlayerRollUI : MonoBehaviour
         if (notificationText != null)
         {
             notificationText.text = "";
+            notificationText.rectTransform.localScale = initialNotificationScale;
             notificationText.gameObject.SetActive(false);
         }
 
@@ -270,23 +273,35 @@ public class PlayerRollUI : MonoBehaviour
             playerNumberText.color = new Color(playerNumberText.color.r, playerNumberText.color.g, playerNumberText.color.b, 1f);
         }
 
+        int lastDisplay = -1;
+        float nextTickTime = 0f;
+
+        // Frame-based timing (no fixed waits) so the spin stays smooth at any frame rate,
+        // and the flips slow down a little toward the end so the number settles instead of snapping.
         while (elapsedTime < spinDuration)
         {
-            int randomDisplay = Random.Range(minRoll, maxRoll + 1);
-
-            if (playerNumberText != null)
+            if (elapsedTime >= nextTickTime)
             {
-                playerNumberText.text = randomDisplay.ToString();
-                playerNumberText.gameObject.SetActive(true);
+                int randomDisplay = PickDifferentRoll(lastDisplay);
+                lastDisplay = randomDisplay;
+
+                if (playerNumberText != null)
+                {
+                    playerNumberText.text = randomDisplay.ToString();
+                    playerNumberText.gameObject.SetActive(true);
+                }
+
+                PlaySFX(spinTickSound, Random.Range(0.95f, 1.1f));
+
+                float progress = Mathf.Clamp01(elapsedTime / spinDuration);
+                nextTickTime = elapsedTime + spinSpeed * Mathf.Lerp(1f, 3f, progress * progress);
             }
 
-            PlaySFX(spinTickSound, Random.Range(0.95f, 1.1f));
-
-            yield return new WaitForSecondsRealtime(spinSpeed);
-            elapsedTime += spinSpeed;
+            elapsedTime += Time.unscaledDeltaTime;
+            yield return null;
         }
 
-        int finalRolledValue = Random.Range(minRoll, maxRoll + 1);
+        int finalRolledValue = PickDifferentRoll(lastDisplay);
 
         if (playerNumberText != null)
         {
@@ -303,18 +318,40 @@ public class PlayerRollUI : MonoBehaviour
 
         hasRolledThisRound = true;
 
-        CleanupConfetti();
-        if (shieldSpinRoutine != null)
+        // Stop making new confetti, but let what's already falling (and the spinning shield) fade out with the screen
+        if (confettiRoutine != null)
         {
-            StopCoroutine(shieldSpinRoutine);
-            shieldSpinRoutine = null;
-            currentShieldZRotation = 0f;
-            if (playerShieldImage != null) playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
+            StopCoroutine(confettiRoutine);
+            confettiRoutine = null;
         }
 
         yield return StartCoroutine(FadeCanvasGroupRoutine(1f, 0f, fadeOutDuration));
 
+        if (shieldSpinRoutine != null)
+        {
+            StopCoroutine(shieldSpinRoutine);
+            shieldSpinRoutine = null;
+        }
+        currentShieldZRotation = 0f;
+        if (playerShieldImage != null) playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, 0);
+
         CompleteRollSequence(finalRolledValue);
+    }
+
+    private int PickDifferentRoll(int last)
+    {
+        if (maxRoll <= minRoll || last < minRoll || last > maxRoll)
+            return Random.Range(minRoll, maxRoll + 1);
+
+        int v = Random.Range(minRoll, maxRoll); // never the same number twice in a row
+        if (v >= last) v++;
+        return v;
+    }
+
+    private static float Smooth(float t)
+    {
+        t = Mathf.Clamp01(t);
+        return t * t * (3f - 2f * t);
     }
 
     private void EvaluateShieldState(int playerRoll)
@@ -362,6 +399,7 @@ public class PlayerRollUI : MonoBehaviour
         {
             notificationText.text = "-10%";
             notificationText.gameObject.SetActive(true);
+            StartCoroutine(NotificationPopInRoutine());
         }
     }
 
@@ -373,6 +411,7 @@ public class PlayerRollUI : MonoBehaviour
         {
             notificationText.text = "X1.5 on this round";
             notificationText.gameObject.SetActive(true);
+            StartCoroutine(NotificationPopInRoutine());
         }
 
         if (playerRollCanvas != null && starConfettiSprite != null)
@@ -386,6 +425,27 @@ public class PlayerRollUI : MonoBehaviour
             if (shieldSpinRoutine != null) StopCoroutine(shieldSpinRoutine);
             shieldSpinRoutine = StartCoroutine(SpinShieldRoutine());
         }
+    }
+
+    private IEnumerator NotificationPopInRoutine()
+    {
+        if (notificationText == null) yield break;
+
+        RectTransform rt = notificationText.rectTransform;
+        float duration = 0.3f;
+        float elapsed = 0f;
+        rt.localScale = Vector3.zero;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f); // easeOutBack
+            rt.localScale = initialNotificationScale * overshoot;
+            yield return null;
+        }
+
+        rt.localScale = initialNotificationScale;
     }
 
     private IEnumerator InfiniteConfettiLoop()
@@ -431,16 +491,26 @@ public class PlayerRollUI : MonoBehaviour
         float swayAmount = Random.Range(20f, 60f);
         float startX = rect != null ? rect.anchoredPosition.x : 0f;
 
+        Image img = rect != null ? rect.GetComponent<Image>() : null;
+
         while (elapsed < duration && rect != null)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = elapsed / duration;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float fall = Mathf.Lerp(t, t * t, 0.5f); // starts gently, picks up speed like it's falling
 
-            float currentY = Mathf.Lerp(startY, endY, t);
+            float currentY = Mathf.Lerp(startY, endY, fall);
             float currentX = startX + Mathf.Sin(t * Mathf.PI * swaySpeed) * swayAmount;
 
             rect.anchoredPosition = new Vector2(currentX, currentY);
             rect.Rotate(0, 0, rotationSpeed * Time.unscaledDeltaTime);
+
+            if (img != null)
+            {
+                Color c = img.color;
+                c.a = 1f - Smooth((t - 0.85f) / 0.15f);
+                img.color = c;
+            }
 
             yield return null;
         }
@@ -454,9 +524,12 @@ public class PlayerRollUI : MonoBehaviour
 
     private IEnumerator SpinShieldRoutine()
     {
+        float spinTime = 0f;
         while (playerShieldImage != null)
         {
-            currentShieldZRotation -= 120f * Time.unscaledDeltaTime;
+            spinTime += Time.unscaledDeltaTime;
+            float ramp = Smooth(spinTime / 0.6f); // speeds up smoothly instead of starting at full speed
+            currentShieldZRotation -= 120f * ramp * Time.unscaledDeltaTime;
             playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, currentShieldZRotation);
 
             if (playerNumberText != null)
@@ -495,7 +568,9 @@ public class PlayerRollUI : MonoBehaviour
         while (elapsed < 0.1f)
         {
             elapsed += Time.unscaledDeltaTime;
-            playerRollContainer.localScale = Vector3.Lerp(baseScale, maxPop, elapsed / 0.1f);
+            float tp = Mathf.Clamp01(elapsed / 0.1f);
+            float easeOut = 1f - (1f - tp) * (1f - tp) * (1f - tp);
+            playerRollContainer.localScale = Vector3.Lerp(baseScale, maxPop, easeOut);
             yield return null;
         }
 
@@ -507,7 +582,7 @@ public class PlayerRollUI : MonoBehaviour
             float currentWiggle = Mathf.Sin(progress * Mathf.PI * 8f) * wiggleAngle * (1f - progress);
 
             playerRollContainer.localRotation = Quaternion.Euler(0, 0, currentWiggle);
-            playerRollContainer.localScale = Vector3.Lerp(maxPop, baseScale, progress);
+            playerRollContainer.localScale = Vector3.Lerp(maxPop, baseScale, Smooth(progress));
             yield return null;
         }
 
@@ -521,11 +596,12 @@ public class PlayerRollUI : MonoBehaviour
 
         rollCanvasGroup.alpha = startAlpha;
         float elapsed = 0f;
+        duration = Mathf.Max(0.01f, duration);
 
         while (elapsed < duration)
         {
             elapsed += Time.unscaledDeltaTime;
-            rollCanvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, elapsed / duration);
+            rollCanvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, Smooth(elapsed / duration));
             yield return null;
         }
 
