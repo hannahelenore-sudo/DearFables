@@ -36,6 +36,7 @@ public class BattleManager : MonoBehaviour
     public TextMeshProUGUI targetScoreTxt;      // TARGETSCORETXT
     public TextMeshProUGUI yourScoreTxt;        // YOURSCORETXT
     public TextMeshProUGUI starsGainedTxt;      // STARSGAINEDTEXT
+    public TextMeshProUGUI batteriesGainedTxt;  // BATTERIESGAINEDTEXT (on the paper, under the stars line)
     public GameObject winGameObject;            // WIN parent object
     public GameObject lostGameObject;           // LOST parent object
 
@@ -111,6 +112,7 @@ public class BattleManager : MonoBehaviour
     private bool isWaitingForClickToExit = false;
     private int scoreBeforeAdvantage;
     private bool advantageApplied;
+    private float difficultyAtStart;
 
     private void Awake()
     {
@@ -121,14 +123,11 @@ public class BattleManager : MonoBehaviour
         maxRounds = Mathf.Max(1, maxRounds + MoodManager.HandsModifier);
 
         // Difficulty meter: the more stars / fights, the higher the score to beat
+        difficultyAtStart = DifficultyProgress.Meter; // remembered for the battery reward
         battleTargetScore = DifficultyProgress.ScaleScore(battleTargetScore, maxScoreMultiplier);
         Debug.Log("BattleManager: difficulty " + Mathf.RoundToInt(DifficultyProgress.Meter * 100f) + "% -> target score " + battleTargetScore);
 
-        // Tsinelas trinket: rerolls the enemy's defence (the score to beat)
-        int beforeReroll = battleTargetScore;
-        battleTargetScore = TrinketEffects.RerollEnemyDefence(battleTargetScore);
-        if (battleTargetScore != beforeReroll)
-            Debug.Log("BattleManager: Tsinelas rerolled the target score " + beforeReroll + " -> " + battleTargetScore);
+        // Tsinelas is no longer automatic: during the number spinner the player gets a popup and chooses (see OnTsinelasUsed)
 
         // Advantage Hit: you hit the enemy with a card before the fight -> smaller score to beat
         scoreBeforeAdvantage = battleTargetScore;
@@ -285,9 +284,9 @@ public class BattleManager : MonoBehaviour
         // Batteries: Balatro style - a base reward plus a bonus for every hand you had left.
         // They drop in the world (BatteryDropper) when you are back in the game scene.
         int handsLeft = Mathf.Max(0, maxRounds - currentRoundNumber);
-        int batteryReward = BatteryManager.CalculateFightReward(handsLeft);
+        int batteryReward = BatteryManager.CalculateFightReward(handsLeft, difficultyAtStart);
         BatteryManager.QueueDrop(batteryReward);
-        Debug.Log("BattleManager: won with " + handsLeft + " hand(s) left -> " + batteryReward + " batteries");
+        Debug.Log("BattleManager: won with " + handsLeft + " hand(s) left at " + Mathf.RoundToInt(difficultyAtStart * 100f) + "% difficulty -> " + batteryReward + " batteries");
 
         MoodManager.OnFightEnded(); // timed moods count down
         BoonProgress.AddMeter(boonMeterFillOnWin); // fills the boon meter in the overworld
@@ -300,7 +299,7 @@ public class BattleManager : MonoBehaviour
         }
 
         int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
-        StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsGainedOnWin));
+        StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsGainedOnWin, batteryReward));
     }
 
     public void TriggerLossCondition()
@@ -319,7 +318,7 @@ public class BattleManager : MonoBehaviour
         StartCoroutine(RunEndingSequence(false, battleTargetScore, finalYourScore, 0));
     }
 
-    private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained)
+    private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained, int batteriesGained = 0)
     {
         if (cardSystemCanvas != null) cardSystemCanvas.gameObject.SetActive(false);
 
@@ -356,6 +355,7 @@ public class BattleManager : MonoBehaviour
         if (targetScoreTxt != null) targetScoreTxt.text = "Target Score: 0";
         if (yourScoreTxt != null) yourScoreTxt.text = "Your Score: 0";
         if (starsGainedTxt != null) starsGainedTxt.text = "Stars Gained: 0";
+        if (batteriesGainedTxt != null) batteriesGainedTxt.text = "Batteries Gained: 0";
 
         if (winGameObject != null) winGameObject.SetActive(false);
         if (lostGameObject != null) lostGameObject.SetActive(false);
@@ -389,6 +389,9 @@ public class BattleManager : MonoBehaviour
 
             // 3. COUNT STARS GAINED
             yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
+
+            // 4. COUNT BATTERIES GAINED
+            yield return StartCoroutine(CountStatSequence(batteriesGainedTxt, "Batteries Gained: ", batteriesGained));
 
             // Delay after counting is fully done before the stamp animation plays
             yield return new WaitForSecondsRealtime(delayBeforeStamp);
@@ -437,6 +440,7 @@ public class BattleManager : MonoBehaviour
         if (targetScoreTxt != null) targetScoreTxt.gameObject.SetActive(visible);
         if (yourScoreTxt != null) yourScoreTxt.gameObject.SetActive(visible);
         if (starsGainedTxt != null) starsGainedTxt.gameObject.SetActive(visible);
+        if (batteriesGainedTxt != null) batteriesGainedTxt.gameObject.SetActive(visible);
     }
 
     private void ConfigureEndingSortingOrders()
@@ -465,6 +469,7 @@ public class BattleManager : MonoBehaviour
         SetCanvasOrder(targetScoreTxt, 502);
         SetCanvasOrder(yourScoreTxt, 502);
         SetCanvasOrder(starsGainedTxt, 502);
+        SetCanvasOrder(batteriesGainedTxt, 502);
 
         // 3. Win / Lose GameObjects (Sorting Order 503 - Absolute front of everything)
         if (winGameObject != null)
@@ -652,12 +657,15 @@ public class BattleManager : MonoBehaviour
             Coroutine spinnerFadeIn = StartCoroutine(FadeCanvasGroup(numberSpinnerUI.gameObject, 0f, 1f, crossFadeDuration));
 
             bool isSpinnerComplete = false;
+            // Tsinelas: the spinner pauses after the roll and offers a reroll of the enemy defence
+            System.Func<int> tsinelasOffer = TrinketInventory.Has(TrinketType.Tsinelas) ? (System.Func<int>)OnTsinelasUsed : null;
+
             numberSpinnerUI.StartSequence((resultNumber) =>
             {
                 rolledNumber = resultNumber;
                 PlaySFX(spinnerResultSound);
                 isSpinnerComplete = true;
-            }, true); // the fade-in above controls the alpha
+            }, true, tsinelasOffer); // the fade-in above controls the alpha
             while (!isSpinnerComplete) yield return null;
             yield return spinnerFadeIn;
         }
@@ -689,6 +697,22 @@ public class BattleManager : MonoBehaviour
         SetCameraState(battleViewActive: true);
         SetPersistentUITextsActive(true);
         SetBattleUIInteractable(true);
+    }
+
+    /// <summary>Called by the spinner when the player taps the Tsinelas popup. Rerolls the score to beat and returns the new value.</summary>
+    private int OnTsinelasUsed()
+    {
+        int before = battleTargetScore;
+        battleTargetScore = TrinketEffects.RerollEnemyDefence(battleTargetScore);
+        Debug.Log("BattleManager: Tsinelas rerolled the target score " + before + " -> " + battleTargetScore);
+
+        if (deckManager != null)
+        {
+            deckManager.targetScore = battleTargetScore;
+            deckManager.currentRemainingScore = battleTargetScore;
+        }
+        UpdateBattleTargetScoreDisplay(battleTargetScore);
+        return battleTargetScore;
     }
 
     public IEnumerator PlayRoundIntroSequence(int roundNum)

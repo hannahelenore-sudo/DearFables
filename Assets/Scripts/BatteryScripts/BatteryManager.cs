@@ -15,6 +15,7 @@ public static class BatteryManager
     public const int RerollBaseCost = 5;       // Balatro: the first reroll costs $5
     public const int RerollCostIncrease = 1;   // ...and each reroll in the same shop costs $1 more
     public const float SellRate = 0.5f;        // Balatro: items sell for half of their price
+    public const int MaxDifficultyBonus = 4;   // extra batteries a win pays at 100% difficulty (scales linearly from 0)
 
     private static int count = StartingBatteries;
     private static int pendingDrop;
@@ -62,6 +63,13 @@ public static class BatteryManager
     public static int CalculateFightReward(int handsLeft)
     {
         return FightBaseReward + RewardPerHandLeft * Mathf.Max(0, handsLeft);
+    }
+
+    /// <summary>Same, plus a bonus that grows with the difficulty meter (0..1): harder fights pay more.</summary>
+    public static int CalculateFightReward(int handsLeft, float difficulty)
+    {
+        int bonus = Mathf.RoundToInt(Mathf.Clamp01(difficulty) * MaxDifficultyBonus);
+        return CalculateFightReward(handsLeft) + bonus;
     }
 
     /// <summary>Batteries won in a fight that haven't dropped in the world yet (BatteryDropper spawns them).</summary>
