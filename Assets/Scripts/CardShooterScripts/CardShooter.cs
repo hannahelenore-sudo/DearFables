@@ -1,10 +1,15 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 /// <summary>
-/// Left click throws a card toward the mouse (costs 1 card from the stamina wheel).
-/// The card flies up to 'range' meters, then falls with real physics and lands on the ground.
-/// If it hits an EnemyChase while flying, the battle transition starts.
+/// Press E to cycle through the items you own. The icons float above your head.
+/// Left click uses the selected item (toward the mouse):
+///   Card      - flies up to 'range' meters, then falls with real physics. Hitting an EnemyChase starts the battle.
+///   Tsinelas  - (needs the Tsinelas trinket) hitting an enemy stuns it: it spins and sees stars.
+///   Small Rock- (needs the Small Rock trinket) hitting an enemy clears your current Mood.
+///   Wind Card - HOLD left click to run faster. Drains the same stamina bar. See WindBoost.cs.
+/// Every throw costs stamina from the bar.
 /// </summary>
 public class CardShooter : MonoBehaviour
 {
@@ -19,10 +24,37 @@ public class CardShooter : MonoBehaviour
     [Tooltip("Height above the player's feet where the card spawns.")]
     public float spawnHeight = 0.5f;
 
+    [Header("Items (press E to cycle)")]
+    public KeyCode cycleKey = KeyCode.E;
+    public AudioClip cycleSound;
+    [Range(0f, 1f)] public float cycleVolume = 0.6f;
+    public bool showItemIcons = true;
+    [Tooltip("ON: the Wind Card only appears when you own the Wind Fan trinket. OFF: it is always available.")]
+    public bool windRequiresWindFan = false;
+    [Tooltip("Optional. If empty, the icon from the Trinket asset is used, then a generated one.")]
+    public Sprite tsinelasSprite;
+    public Sprite smallRockSprite;
+    public Sprite windCardSprite;
+
+    [Header("Throwables (Tsinelas / Small Rock)")]
+    public float itemRange = 4f;
+    public float itemSpeed = 14f;
+    [Tooltip("Spin in the air (degrees/second).")]
+    public float itemSpinSpeed = 720f;
+    [Tooltip("Size as a fraction of the character's height.")]
+    public float itemHeightRatio = 0.22f;
+    [Tooltip("How long the Tsinelas stuns an enemy (seconds).")]
+    public float stunDuration = 2.5f;
+    public AudioClip itemThrowSound;
+
     [Header("Stamina")]
     [Tooltip("Leave empty: a CardStamina is added to this object automatically.")]
     public CardStamina stamina;
-    [Tooltip("Played when you try to throw with no cards left.")]
+    [Tooltip("Cards used by each throw.")]
+    public float cardCost = 1f;
+    public float tsinelasCost = 1f;
+    public float smallRockCost = 1f;
+    [Tooltip("Played when you try to use something with no stamina left.")]
     public AudioClip emptySound;
     [Range(0f, 1f)] public float emptyVolume = 1f;
 
@@ -34,7 +66,7 @@ public class CardShooter : MonoBehaviour
     [Tooltip("Extra multiplier on top of the automatic size (1 = no change). Keep this positive!")]
     public float cardScale = 1f;
 
-    [Header("Visual - Glow")]
+    [Header("Visual - Glow (cards only)")]
     public bool glow = true;
     [Tooltip("Colour and strength (alpha) of the glow. If you use Bloom in your Global Volume, a bright colour here will bloom too.")]
     public Color glowColor = new Color(1f, 0.85f, 0.3f, 0.8f);
@@ -57,17 +89,17 @@ public class CardShooter : MonoBehaviour
     public float spinSpeed = 360f;
 
     [Header("Falling (physics)")]
-    [Tooltip("How much of the throw speed the card keeps when it starts to fall. 0 = drops straight down, 1 = keeps flying forward.")]
+    [Tooltip("How much of the throw speed it keeps when it starts to fall. 0 = drops straight down, 1 = keeps flying forward.")]
     [Range(0f, 1f)] public float forwardSpeedWhenFalling = 0.2f;
-    [Tooltip("How hard the card tumbles when it starts to fall (degrees/second).")]
+    [Tooltip("How hard it tumbles when it starts to fall (degrees/second).")]
     public float tumbleSpeed = 300f;
-    [Tooltip("Thickness of the card's collider in meters.")]
+    [Tooltip("Thickness of the collider in meters.")]
     public float cardThickness = 0.02f;
     [Range(0f, 1f)] public float cardBounciness = 0.1f;
     [Range(0f, 1f)] public float cardFriction = 0.6f;
-    [Tooltip("Card is considered landed after this many seconds even if it is still wobbling.")]
+    [Tooltip("Considered landed after this many seconds even if it is still wobbling.")]
     public float maxSettleTime = 3f;
-    [Tooltip("How long the card stays on the ground before fading out.")]
+    [Tooltip("How long it stays on the ground before fading out.")]
     public float groundStayTime = 1f;
     public float fadeTime = 0.4f;
 
@@ -79,11 +111,17 @@ public class CardShooter : MonoBehaviour
     private SpriteRenderer characterRenderer;
     private Collider[] ownColliders;
 
+    private HeldItemIcons icons;
+    private WindBoost wind;
+    private ThrowItem selected = ThrowItem.Card;
+    private readonly List<ThrowItem> available = new List<ThrowItem>();
+    private readonly List<Sprite> iconSprites = new List<Sprite>();
+
     private static Sprite glowSprite;
 
     private void Start()
     {
-        // Use the tallest sprite under the player as the "character" (for card size and sorting)
+        // Use the tallest sprite under the player as the "character" (for sizes and sorting)
         float best = 0f;
         foreach (SpriteRenderer sr in GetComponentsInChildren<SpriteRenderer>())
         {
@@ -94,39 +132,157 @@ public class CardShooter : MonoBehaviour
             }
         }
 
-        // The card must never collide with the player who throws it
+        // Thrown things must never collide with the player who throws them
         ownColliders = GetComponentsInChildren<Collider>();
 
         if (stamina == null) stamina = GetComponent<CardStamina>();
         if (stamina == null) stamina = gameObject.AddComponent<CardStamina>();
+
+        wind = GetComponent<WindBoost>();
+        if (wind == null) wind = gameObject.AddComponent<WindBoost>();
+        wind.Init(stamina, characterRenderer);
+
+        if (showItemIcons)
+        {
+            icons = GetComponent<HeldItemIcons>();
+            if (icons == null) icons = gameObject.AddComponent<HeldItemIcons>();
+            icons.Init(characterRenderer);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (wind != null) wind.SetHeld(false);
     }
 
     private void Update()
     {
         if (cooldownTimer > 0f) cooldownTimer -= Time.deltaTime;
 
-        if (Time.timeScale <= 0f) return;
+        if (Time.timeScale <= 0f)
+        {
+            if (wind != null) wind.SetHeld(false);
+            return;
+        }
+
+        RefreshItems();
+
+        if (Input.GetKeyDown(cycleKey)) CycleItem();
+
+        // Don't use items when clicking UI (boon cards, buttons)
+        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+
+        // ---- Wind Card: hold to run ----
+        if (selected == ThrowItem.WindCard)
+        {
+            wind.SetHeld(Input.GetMouseButton(shootMouseButton) && !overUI);
+
+            if (Input.GetMouseButtonDown(shootMouseButton) && !overUI && !wind.CanStart)
+                Denied();
+            return;
+        }
+        wind.SetHeld(false);
+
+        // ---- Throwing ----
         if (!Input.GetMouseButtonDown(shootMouseButton)) return;
         if (cooldownTimer > 0f) return;
+        if (overUI) return;
 
-        // Don't throw when clicking UI (boon cards, buttons)
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-
-        // Out of cards (or still recovering from running dry)
-        if (stamina != null && !stamina.CanThrow())
+        float cost = GetCost(selected);
+        if (stamina != null && !stamina.CanThrow(cost))
         {
-            stamina.NotifyDenied();
-            if (emptySound != null)
-                GameSFX.Play(emptySound, emptyVolume, 1f);
+            Denied();
             return;
         }
 
         if (!TryGetAimDirection(out Vector3 direction)) return;
 
-        Shoot(direction);
-        if (stamina != null) stamina.Use();
+        Shoot(direction, selected);
+        if (stamina != null) stamina.Use(cost);
         cooldownTimer = cooldown;
     }
+
+    private void Denied()
+    {
+        if (stamina != null) stamina.NotifyDenied();
+        if (emptySound != null)
+            GameSFX.Play(emptySound, emptyVolume, 1f);
+    }
+
+    // ---------------- Items ----------------
+
+    private void RefreshItems()
+    {
+        available.Clear();
+        available.Add(ThrowItem.Card);
+        if (TrinketEffects.CanStunEnemies) available.Add(ThrowItem.Tsinelas);
+        if (TrinketEffects.CanRemoveMoods) available.Add(ThrowItem.SmallRock);
+        if (!windRequiresWindFan || TrinketEffects.HasDash) available.Add(ThrowItem.WindCard);
+
+        // Lost the selected item (e.g. sold the trinket) -> back to the card
+        if (!available.Contains(selected)) selected = ThrowItem.Card;
+
+        if (icons != null)
+        {
+            iconSprites.Clear();
+            foreach (ThrowItem item in available) iconSprites.Add(GetIcon(item));
+            icons.SetItems(iconSprites, available.IndexOf(selected));
+        }
+    }
+
+    private void CycleItem()
+    {
+        if (available.Count <= 1) return;
+
+        int index = available.IndexOf(selected);
+        selected = available[(index + 1) % available.Count];
+
+        if (wind != null) wind.SetHeld(false);
+        if (cycleSound != null)
+            GameSFX.Play(cycleSound, cycleVolume, 1f);
+    }
+
+    private float GetCost(ThrowItem item)
+    {
+        switch (item)
+        {
+            case ThrowItem.Tsinelas: return tsinelasCost;
+            case ThrowItem.SmallRock: return smallRockCost;
+            default: return cardCost;
+        }
+    }
+
+    private Sprite GetIcon(ThrowItem item)
+    {
+        switch (item)
+        {
+            case ThrowItem.Tsinelas:
+                if (tsinelasSprite != null) return tsinelasSprite;
+                Sprite t = FindTrinketIcon(TrinketType.Tsinelas);
+                return t != null ? t : ItemSprites.Tsinelas;
+
+            case ThrowItem.SmallRock:
+                if (smallRockSprite != null) return smallRockSprite;
+                Sprite r = FindTrinketIcon(TrinketType.SmallRock);
+                return r != null ? r : ItemSprites.Rock;
+
+            case ThrowItem.WindCard:
+                return windCardSprite != null ? windCardSprite : ItemSprites.Wind;
+
+            default:
+                return cardSprite != null ? cardSprite : ItemSprites.Card;
+        }
+    }
+
+    private Sprite FindTrinketIcon(TrinketType type)
+    {
+        var owned = TrinketInventory.Owned;
+        for (int i = 0; i < owned.Count; i++)
+            if (owned[i] != null && owned[i].type == type) return owned[i].icon;
+        return null;
+    }
+
+    // ---------------- Aiming ----------------
 
     private bool TryGetAimDirection(out Vector3 direction)
     {
@@ -150,19 +306,17 @@ public class CardShooter : MonoBehaviour
         return true;
     }
 
-    /// <summary>Scale that makes the card a fixed fraction of the character's height.</summary>
-    private float GetCardScale()
+    /// <summary>Scale that makes a sprite a fixed fraction of the character's height.</summary>
+    private float GetScaleFor(Sprite sprite, float heightRatio)
     {
-        if (cardSprite == null) return Mathf.Abs(cardScale);
-
         float characterHeight = characterRenderer != null
             ? characterRenderer.bounds.size.y
             : transform.lossyScale.y;
 
-        float spriteHeight = cardSprite.bounds.size.y;
-        if (spriteHeight < 0.0001f) return Mathf.Abs(cardScale);
+        float spriteHeight = sprite != null ? sprite.bounds.size.y : 0f;
+        if (spriteHeight < 0.0001f) return 1f;
 
-        return (characterHeight * cardHeightRatio / spriteHeight) * Mathf.Abs(cardScale);
+        return characterHeight * heightRatio / spriteHeight;
     }
 
     private void ApplySorting(SpriteRenderer target, int extraOffset)
@@ -180,26 +334,30 @@ public class CardShooter : MonoBehaviour
         }
     }
 
-    private void Shoot(Vector3 direction)
+    private void Shoot(Vector3 direction, ThrowItem item)
     {
-        if (cardSprite == null)
-            Debug.LogWarning("CardShooter: no Card Sprite assigned, the card will be invisible.", this);
+        bool isCard = item == ThrowItem.Card;
+        Sprite sprite = GetIcon(item);
 
-        GameObject go = new GameObject("CardProjectile");
+        GameObject go = new GameObject(isCard ? "CardProjectile" : item + "Projectile");
         go.transform.position = transform.position + Vector3.up * spawnHeight;
-        go.transform.localScale = Vector3.one * GetCardScale();
+
+        float scale = isCard
+            ? GetScaleFor(sprite, cardHeightRatio) * Mathf.Abs(cardScale)
+            : GetScaleFor(sprite, itemHeightRatio);
+        go.transform.localScale = Vector3.one * scale;
 
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = cardSprite;
+        sr.sprite = sprite;
         ApplySorting(sr, 0);
 
         // Soft glow behind the card (a child, so it moves/spins/falls with it)
-        if (glow && cardSprite != null)
+        if (isCard && glow && sprite != null)
         {
             GameObject g = new GameObject("Glow");
             g.transform.SetParent(go.transform, false);
-            Vector3 size = cardSprite.bounds.size;
-            g.transform.localPosition = cardSprite.bounds.center;
+            Vector3 size = sprite.bounds.size;
+            g.transform.localPosition = sprite.bounds.center;
             g.transform.localScale = new Vector3(size.x * glowSize, size.y * glowSize, 1f);
 
             SpriteRenderer gsr = g.AddComponent<SpriteRenderer>();
@@ -211,13 +369,21 @@ public class CardShooter : MonoBehaviour
         EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
 
         CardProjectile projectile = go.AddComponent<CardProjectile>();
-        projectile.Launch(direction, cardSpeed, range, hitRadius, spinSpeed, enemies, ownColliders,
+        projectile.kind = item;
+        projectile.stunDuration = stunDuration;
+        projectile.Launch(direction,
+                          isCard ? cardSpeed : itemSpeed,
+                          isCard ? range : itemRange,
+                          hitRadius,
+                          isCard ? spinSpeed : itemSpinSpeed,
+                          enemies, ownColliders,
                           forwardSpeedWhenFalling, tumbleSpeed, cardThickness,
                           cardBounciness, cardFriction, maxSettleTime, groundStayTime, fadeTime);
         projectile.SetGlowPulse(glowPulseSpeed, glowPulseAmount);
 
-        if (throwSound != null)
-            GameSFX.Play(throwSound, throwVolume, Random.Range(0.95f, 1.08f));
+        AudioClip clip = (!isCard && itemThrowSound != null) ? itemThrowSound : throwSound;
+        if (clip != null)
+            GameSFX.Play(clip, throwVolume, Random.Range(0.95f, 1.08f));
     }
 
     // Generates a soft round gradient so no glow image is needed

@@ -15,6 +15,8 @@ public class DebugShortcuts : MonoBehaviour
     [Tooltip("Overworld scene. In the card game scene, BattleManager.returnSceneName is used instead if it is set.")]
     public string overworldSceneName = "YourOtherSceneName";
     public bool fadeWhenStartingCardGame = true;
+    [Tooltip("Start Card Game as if you had hit the enemy with a card first (smaller score to beat + the Advantage Hit animation).")]
+    public bool startWithAdvantageHit = false;
 
     [Header("Boons")]
     [Tooltip("Assign in the overworld scene. If empty, the first BoonSelectionUI in the scene is used.")]
@@ -61,6 +63,9 @@ public class DebugShortcuts : MonoBehaviour
     public void StartCardGame()
     {
         if (string.IsNullOrEmpty(cardGameSceneName)) return;
+
+        if (startWithAdvantageHit) AdvantageHit.Arm();
+        else AdvantageHit.Disarm();
         Time.timeScale = 1f;
 
         if (fadeWhenStartingCardGame)

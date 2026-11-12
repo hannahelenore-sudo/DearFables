@@ -3,11 +3,12 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Zelda/Genshin-style stamina wheel for thrown cards. Put it on the Player, or let CardShooter add it automatically.
-/// - Each throw uses 1 card. Max 4 by default.
+/// Vertical stamina bar for thrown items and the Wind Card. Put it on the Player, or let CardShooter add it automatically.
+/// - Each throw uses cards from the bar (1 each by default). Max 4 by default.
 /// - Not fully used: cards come back after a short delay.
-/// - Fully used up: locked until the wheel is completely full again.
-/// The wheel is built in code, so no prefab or sprite is needed.
+/// - Fully used up: locked until the bar is completely full again.
+/// - The Wind Card drains the bar smoothly while you run.
+/// The bar is built in code, so no prefab or sprite is needed.
 /// </summary>
 public class CardStamina : MonoBehaviour
 {
@@ -21,35 +22,34 @@ public class CardStamina : MonoBehaviour
     public float exhaustedSecondsPerCard = 1.5f;
     public float exhaustedRegenDelay = 0.5f;
 
-    [Header("Wheel - Shape")]
-    public bool showWheel = true;
-    [Tooltip("ON = half circle, OFF = full circle. (Right-click the component > Rebuild Wheel after changing.)")]
-    public bool halfCircle = true;
-    [Tooltip("Width of the wheel in pixels (at 1920x1080). A half circle is this wide and half as tall.")]
-    public float wheelSize = 60f;
-    [Tooltip("Turns the wheel around its centre point, in degrees. 0 = arc opens downward (a rainbow shape), 90 = arc faces right, 180 = bowl shape, -90 = arc faces left.")]
-    [Range(-180f, 180f)] public float rotation = 0f;
-    [Tooltip("Fade the wheel out while it's full, like Zelda.")]
+    [Header("Bar - Shape")]
+    public bool showBar = true;
+    [Tooltip("Width of the bar in pixels (at 1920x1080).")]
+    public float barWidth = 16f;
+    [Tooltip("Height of the bar in pixels (at 1920x1080).")]
+    public float barHeight = 90f;
+    [Tooltip("Thickness of the dark outline in pixels.")]
+    public float borderSize = 2f;
+    [Tooltip("Fade the bar out while it's full, like Zelda.")]
     public bool hideWhenFull = true;
     public float fadeSpeed = 5f;
 
-    [Header("Wheel - Position")]
-    [Tooltip("OPTIONAL: drag any object here (e.g. an empty child of the Character) and the wheel sits exactly on it. Move that object in the Scene view to place the wheel anywhere. When empty, the sliders below are used.")]
-    public Transform wheelAnchor;
+    [Header("Bar - Position")]
+    [Tooltip("OPTIONAL: drag any object here (e.g. an empty child of the Character) and the bar sits exactly on it. When empty, the sliders below are used.")]
+    public Transform barAnchor;
     [Tooltip("Height on the character. 0 = feet, 0.5 = chest, 1 = top of head. Can go beyond.")]
-    [Range(-0.5f, 1.5f)] public float wheelHeight = 0.5f;
+    [Range(-0.5f, 1.5f)] public float barHeightOnBody = 0.5f;
     [Tooltip("Left/right on the character. -1 = left edge, 0 = middle, 1 = right edge. Can go beyond to float next to the character.")]
-    [Range(-2f, 2f)] public float wheelSide = 1.2f;
+    [Range(-2f, 2f)] public float barSide = 1.2f;
     [Tooltip("Extra pixel offset on top of the position above (X = right, Y = up).")]
     public Vector2 screenOffset = Vector2.zero;
 
-    [Header("Wheel - Colors (change live while playing)")]
+    [Header("Bar - Colors (change live while playing)")]
     public Color normalColor = new Color(0.4f, 0.95f, 0.35f, 1f);
     public Color exhaustedColor = new Color(1f, 0.3f, 0.25f, 1f);
     public Color backgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.65f);
     public Color dividerColor = new Color(0f, 0f, 0f, 0.85f);
-
-    private const float InnerRatio = 0.62f;
+    public Color borderColor = new Color(0f, 0f, 0f, 0.85f);
 
     private float value;
     private float displayValue;
@@ -66,13 +66,13 @@ public class CardStamina : MonoBehaviour
     private GameObject canvasGO;
     private Canvas canvas;
     private CanvasGroup group;
-    private RectTransform wheelRoot;
+    private RectTransform barRoot;
+    private Image borderImage;
     private Image bgImage;
     private Image fillImage;
     private readonly List<Image> dividers = new List<Image>();
 
-    private static Sprite ringSprite;
-    private static Sprite halfRingSprite;
+    private static Sprite whiteSprite;
 
     public bool IsExhausted => exhausted;
     public float CardsLeft => value;
@@ -85,7 +85,7 @@ public class CardStamina : MonoBehaviour
 
     private void Start()
     {
-        // Measure the character so the wheel can be placed on the body
+        // Measure the character so the bar can be placed on the body
         Bounds b = new Bounds(transform.position, Vector3.zero);
         bool any = false;
         foreach (SpriteRenderer sr in GetComponentsInChildren<SpriteRenderer>())
@@ -102,26 +102,46 @@ public class CardStamina : MonoBehaviour
             bodyCenterOffset.y = 0f;
         }
 
-        if (showWheel) BuildUI();
+        if (showBar) BuildUI();
     }
 
-    // ---------------- Used by CardShooter ----------------
+    // ---------------- Used by CardShooter / WindBoost ----------------
 
-    public bool CanThrow()
+    public bool CanThrow(float cost = 1f)
     {
-        return !exhausted && value >= 1f - 0.0001f;
+        return !exhausted && value >= cost - 0.0001f;
     }
 
-    public void Use()
+    public void Use(float cost = 1f)
     {
-        value = Mathf.Max(0f, value - 1f);
+        value = Mathf.Max(0f, value - cost);
         sinceUse = 0f;
 
         // Can't throw another one -> dried up, must refill completely
         if (value < 1f - 0.0001f) exhausted = true;
     }
 
-    /// <summary>Call when the player tries to throw but can't (wheel shakes).</summary>
+    /// <summary>
+    /// Smoothly takes stamina (Wind Card). Returns false once the bar is empty,
+    /// which also locks the bar until it's full again, just like running out of cards.
+    /// </summary>
+    public bool Drain(float amount)
+    {
+        if (exhausted || value <= 0f) return false;
+
+        value = Mathf.Max(0f, value - amount);
+        sinceUse = 0f;
+
+        if (value <= 0.0001f)
+        {
+            value = 0f;
+            exhausted = true;
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>Call when the player tries to throw but can't (bar shakes).</summary>
     public void NotifyDenied()
     {
         flashTimer = 0.25f;
@@ -154,7 +174,7 @@ public class CardStamina : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (!showWheel || wheelRoot == null) return;
+        if (!showBar || barRoot == null) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
@@ -163,9 +183,10 @@ public class CardStamina : MonoBehaviour
         bool inFront = sp.z > 0f;
 
         float scale = canvas.scaleFactor;
-        wheelRoot.position = new Vector2(sp.x, sp.y) + screenOffset * scale;
+        barRoot.position = new Vector2(sp.x, sp.y) + screenOffset * scale;
 
         // Colours (live, so you can tweak them while playing)
+        borderImage.color = borderColor;
         bgImage.color = backgroundColor;
         foreach (Image d in dividers) d.color = dividerColor;
 
@@ -180,10 +201,9 @@ public class CardStamina : MonoBehaviour
             fillImage.color = normalColor;
         }
 
-        // Rotation + little punch when you try to throw with no cards
-        wheelRoot.localRotation = Quaternion.Euler(0f, 0f, -rotation);
+        // Little punch when you try to throw with no cards
         float punch = flashTimer > 0f ? 1f + 0.25f * (flashTimer / 0.25f) : 1f;
-        wheelRoot.localScale = Vector3.one * punch;
+        barRoot.localScale = Vector3.one * punch;
 
         // Fade out while full
         bool full = value >= maxCards - 0.0001f && displayValue >= maxCards - 0.01f;
@@ -193,7 +213,7 @@ public class CardStamina : MonoBehaviour
 
     private Vector3 GetAnchorWorld(Camera cam)
     {
-        if (wheelAnchor != null) return wheelAnchor.position;
+        if (barAnchor != null) return barAnchor.position;
 
         // Left/right follows the screen, so "right" always looks right
         Vector3 right = cam.transform.right;
@@ -202,17 +222,17 @@ public class CardStamina : MonoBehaviour
 
         return transform.position
                + bodyCenterOffset
-               + Vector3.up * (bodyBottom + bodyHeight * wheelHeight)
-               + right * (bodyHalfWidth * wheelSide);
+               + Vector3.up * (bodyBottom + bodyHeight * barHeightOnBody)
+               + right * (bodyHalfWidth * barSide);
     }
 
-    /// <summary>Right-click the component header > Rebuild Wheel after changing Half Circle, Wheel Size or Max Cards.</summary>
-    [ContextMenu("Rebuild Wheel")]
-    public void RebuildWheel()
+    /// <summary>Right-click the component header > Rebuild Bar after changing Bar Width/Height or Max Cards.</summary>
+    [ContextMenu("Rebuild Bar")]
+    public void RebuildBar()
     {
         if (canvasGO != null) Destroy(canvasGO);
         dividers.Clear();
-        if (showWheel && Application.isPlaying) BuildUI();
+        if (showBar && Application.isPlaying) BuildUI();
     }
 
     private void BuildUI()
@@ -232,72 +252,47 @@ public class CardStamina : MonoBehaviour
         group.blocksRaycasts = false;
         group.alpha = 0f;
 
-        // For a half circle the pivot is the bottom-centre = the centre of the arc,
-        // so positioning and rotation both happen around the arc's centre.
-        GameObject rootGO = new GameObject("Wheel", typeof(RectTransform));
+        GameObject rootGO = new GameObject("Bar", typeof(RectTransform));
         rootGO.transform.SetParent(canvasGO.transform, false);
-        wheelRoot = rootGO.GetComponent<RectTransform>();
-        wheelRoot.sizeDelta = halfCircle ? new Vector2(wheelSize, wheelSize * 0.5f) : new Vector2(wheelSize, wheelSize);
-        wheelRoot.pivot = halfCircle ? new Vector2(0.5f, 0f) : new Vector2(0.5f, 0.5f);
+        barRoot = rootGO.GetComponent<RectTransform>();
+        barRoot.sizeDelta = new Vector2(barWidth, barHeight);
+        barRoot.pivot = new Vector2(0.5f, 0.5f);
 
-        Sprite sprite = halfCircle ? GetHalfRingSprite() : GetRingSprite();
+        Sprite white = GetWhiteSprite();
 
-        // Dark ring behind
-        bgImage = CreateImage("Background", wheelRoot, sprite);
+        // Dark outline (a bit bigger than the bar)
+        borderImage = CreateImage("Border", barRoot, white);
+        borderImage.color = borderColor;
+        Stretch(borderImage.rectTransform);
+        borderImage.rectTransform.offsetMin = new Vector2(-borderSize, -borderSize);
+        borderImage.rectTransform.offsetMax = new Vector2(borderSize, borderSize);
+
+        // Dark background
+        bgImage = CreateImage("Background", barRoot, white);
         bgImage.color = backgroundColor;
         Stretch(bgImage.rectTransform);
 
-        // The coloured fill
-        fillImage = CreateImage("Fill", wheelRoot, sprite);
+        // The coloured fill, grows from the bottom up
+        fillImage = CreateImage("Fill", barRoot, white);
         fillImage.type = Image.Type.Filled;
-        if (halfCircle)
-        {
-            fillImage.fillMethod = Image.FillMethod.Radial180;
-            fillImage.fillOrigin = (int)Image.Origin180.Bottom;
-        }
-        else
-        {
-            fillImage.fillMethod = Image.FillMethod.Radial360;
-            fillImage.fillOrigin = (int)Image.Origin360.Top;
-        }
-        fillImage.fillClockwise = true;
+        fillImage.fillMethod = Image.FillMethod.Vertical;
+        fillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
         fillImage.fillAmount = 1f;
         fillImage.color = normalColor;
         Stretch(fillImage.rectTransform);
 
         // Small dividers so you can see the separate cards
-        if (maxCards > 1)
+        for (int i = 1; i < maxCards; i++)
         {
-            float outerR = wheelSize * 0.5f;
-            float innerR = outerR * InnerRatio;
-            float midR = (outerR + innerR) * 0.5f;
-            float length = (outerR - innerR) + 2f;
-
-            for (int i = 0; i < maxCards; i++)
-            {
-                float angle; // degrees clockwise from straight up
-                if (halfCircle)
-                {
-                    if (i == 0) continue; // the flat ends don't need a divider
-                    angle = -90f + 180f / maxCards * i;
-                }
-                else
-                {
-                    angle = 360f / maxCards * i;
-                }
-                float rad = angle * Mathf.Deg2Rad;
-
-                Image div = CreateImage("Divider" + i, wheelRoot, null);
-                div.color = dividerColor;
-                RectTransform rt = div.rectTransform;
-                Vector2 anchor = halfCircle ? new Vector2(0.5f, 0f) : new Vector2(0.5f, 0.5f);
-                rt.anchorMin = rt.anchorMax = anchor;
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.sizeDelta = new Vector2(2f, length);
-                rt.anchoredPosition = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad)) * midR;
-                rt.localRotation = Quaternion.Euler(0f, 0f, -angle);
-                dividers.Add(div);
-            }
+            Image div = CreateImage("Divider" + i, barRoot, white);
+            div.color = dividerColor;
+            RectTransform rt = div.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(0f, 2f);
+            rt.anchoredPosition = new Vector2(0f, barHeight * i / maxCards);
+            dividers.Add(div);
         }
     }
 
@@ -319,63 +314,18 @@ public class CardStamina : MonoBehaviour
         rt.offsetMax = Vector2.zero;
     }
 
-    // Generates smooth ring textures so no image asset is needed
-    private static Sprite GetRingSprite()
+    private static Sprite GetWhiteSprite()
     {
-        if (ringSprite != null) return ringSprite;
+        if (whiteSprite != null) return whiteSprite;
 
-        const int size = 256;
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        tex.wrapMode = TextureWrapMode.Clamp;
-        tex.filterMode = FilterMode.Bilinear;
-
-        float c = (size - 1) * 0.5f;
-        float outerR = size * 0.5f - 1f;
-        float innerR = outerR * InnerRatio;
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float d = Vector2.Distance(new Vector2(x, y), new Vector2(c, c));
-                float a = Mathf.Clamp01(outerR - d + 0.5f) * Mathf.Clamp01(d - innerR + 0.5f);
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-            }
-        }
+        Texture2D tex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+        Color[] px = new Color[16];
+        for (int i = 0; i < px.Length; i++) px[i] = Color.white;
+        tex.SetPixels(px);
         tex.Apply();
 
-        ringSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
-        return ringSprite;
-    }
-
-    // Upper half of a ring: the arc's centre is the bottom-middle of the texture
-    private static Sprite GetHalfRingSprite()
-    {
-        if (halfRingSprite != null) return halfRingSprite;
-
-        const int w = 256;
-        const int h = 128;
-        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        tex.wrapMode = TextureWrapMode.Clamp;
-        tex.filterMode = FilterMode.Bilinear;
-
-        Vector2 center = new Vector2((w - 1) * 0.5f, 0f);
-        float outerR = w * 0.5f - 1f;
-        float innerR = outerR * InnerRatio;
-
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                float d = Vector2.Distance(new Vector2(x, y), center);
-                float a = Mathf.Clamp01(outerR - d + 0.5f) * Mathf.Clamp01(d - innerR + 0.5f);
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-            }
-        }
-        tex.Apply();
-
-        halfRingSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
-        return halfRingSprite;
+        whiteSprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 100f);
+        return whiteSprite;
     }
 
     private void OnDestroy()

@@ -55,6 +55,12 @@ public class TrinketSidebar : MonoBehaviour
     public Color statUpColor = new Color(0.4f, 1f, 0.4f);
     public Color statDownColor = new Color(1f, 0.4f, 0.4f);
 
+    [Header("Stats moved to the Active Buffs bar")]
+    [Tooltip("Hides the Sun / Wind / Speed stats here (they live in the Active Buffs bar now) and makes this bar shorter.")]
+    public bool statsLiveInBuffBar = true;
+    [Tooltip("0 = work out the height of the removed stat area automatically. Otherwise this many pixels are cut off the bottom of the bar.")]
+    public float removedStatsHeight = 0f;
+
     [Header("Info Card (hover / selected trinket)")]
     public RectTransform infoCard;
     public TMP_Text infoName;
@@ -108,7 +114,7 @@ public class TrinketSidebar : MonoBehaviour
     /// <summary>True while the mouse is over the bar (or dragging a trinket). Use it to stop clicks leaking into the world.</summary>
     public static bool IsPointerOver
     {
-        get { return Instance != null && Instance.PointerInside(); }
+        get { return (Instance != null && Instance.PointerInside()) || ActiveBuffsSidebar.IsPointerOver; }
     }
 
     public static bool ReorderLocked { get; private set; }
@@ -157,6 +163,7 @@ public class TrinketSidebar : MonoBehaviour
     private TrinketItemView draggingView;
     private TrinketItemView infoShown;
 
+    private bool statsRemoved;
     private PlayerMovement player;
     private float lastSpeed;
     private float nextFindTime;
@@ -201,6 +208,7 @@ public class TrinketSidebar : MonoBehaviour
         if (sellButton != null) sellButton.onClick.AddListener(SellSelected);
 
         if (slideRoot != null) slideRoot.localScale = new Vector3(panelScale, panelScale, 1f);
+        if (statsLiveInBuffBar) RemoveStatsArea();
 
         open = startOpen;
         SnapSlide();
@@ -257,9 +265,12 @@ public class TrinketSidebar : MonoBehaviour
 
         UpdateSlide();
         UpdateItems();
-        UpdateStat(sunPower, TrinketStats.SunPower);
-        UpdateStat(windPower, TrinketStats.WindPower);
-        UpdateStat(moveSpeed, GetSpeed());
+        if (!statsRemoved)
+        {
+            UpdateStat(sunPower, TrinketStats.SunPower);
+            UpdateStat(windPower, TrinketStats.WindPower);
+            UpdateStat(moveSpeed, GetSpeed());
+        }
         UpdateInfoCard();
         HandleOutsideClick();
     }
@@ -680,6 +691,110 @@ public class TrinketSidebar : MonoBehaviour
     // -------------------------------------------------------------------
     // Stats
     // -------------------------------------------------------------------
+
+    // Hides the stat rows and cuts the empty space they leave from the bottom of the bar.
+    // (The numbers are shown in the Active Buffs bar now.)
+    private void RemoveStatsArea()
+    {
+        statsRemoved = true;
+        if (slideRoot == null) return;
+
+        float oldHeight = slideRoot.rect.height;
+
+        // 1) Hide the stats: the whole holder if they sit in their own object, otherwise each icon and number
+        List<Transform> parts = new List<Transform>();
+        AddStatParts(parts, sunPower);
+        AddStatParts(parts, windPower);
+        AddStatParts(parts, moveSpeed);
+
+        Transform holder = CommonAncestor(parts);
+        if (holder != null && IsSafeToHide(holder)) holder.gameObject.SetActive(false);
+        else for (int i = 0; i < parts.Count; i++) parts[i].gameObject.SetActive(false);
+
+        // 2) Make the bar shorter
+        float cut = removedStatsHeight > 0f ? removedStatsHeight : EstimateStatsHeight();
+        if (cut <= 1f) return;
+
+        slideRoot.sizeDelta = new Vector2(slideRoot.sizeDelta.x, slideRoot.sizeDelta.y - cut);
+
+        // Things anchored to the middle would end up too low / too high: move them so they keep their distance from the top.
+        // The slots (frames) are moved the same way, since the trinkets sit on them.
+        for (int i = 0; i < slideRoot.childCount; i++)
+        {
+            RectTransform c = slideRoot.GetChild(i) as RectTransform;
+            if (c == null || !c.gameObject.activeSelf) continue;
+            if (toggleButton != null && toggleButton.transform.IsChildOf(c)) continue; // the tab stays level with the middle
+            if (infoCard != null && infoCard.IsChildOf(c)) continue;                   // the info card follows the trinket
+            if (!Mathf.Approximately(c.anchorMin.y, c.anchorMax.y)) continue;         // stretched things resize by themselves
+
+            if (Mathf.Approximately(c.anchorMin.y, 0.5f) && c.rect.height >= oldHeight * 0.9f)
+            {
+                // a background plate as tall as the bar: shrink it too
+                c.sizeDelta = new Vector2(c.sizeDelta.x, c.sizeDelta.y - cut);
+            }
+            else
+            {
+                Vector2 p = c.anchoredPosition;
+                p.y += (c.anchorMin.y - 1f) * cut;
+                c.anchoredPosition = p;
+            }
+        }
+    }
+
+    private static void AddStatParts(List<Transform> list, StatRow row)
+    {
+        if (row == null) return;
+        if (row.icon != null) list.Add(row.icon.transform);
+        if (row.valueText != null) list.Add(row.valueText.transform);
+    }
+
+    private static Transform CommonAncestor(List<Transform> list)
+    {
+        if (list.Count == 0) return null;
+        for (Transform t = list[0].parent; t != null; t = t.parent)
+        {
+            bool all = true;
+            for (int i = 0; i < list.Count; i++)
+                if (!list[i].IsChildOf(t)) { all = false; break; }
+            if (all) return t;
+        }
+        return null;
+    }
+
+    // Only hide a holder that has nothing else in it (not the panel, the slots, the tab...)
+    private bool IsSafeToHide(Transform holder)
+    {
+        if (holder == slideRoot || slideRoot.IsChildOf(holder)) return false;
+        if (toggleButton != null && toggleButton.transform.IsChildOf(holder)) return false;
+        if (itemTemplate != null && itemTemplate.transform.IsChildOf(holder)) return false;
+        if (infoCard != null && infoCard.IsChildOf(holder)) return false;
+        if (frames != null)
+            for (int i = 0; i < frames.Length; i++)
+                if (frames[i] != null && frames[i].IsChildOf(holder)) return false;
+        return true;
+    }
+
+    // Free room under the last slot, minus a margin as big as the one above the first slot
+    private float EstimateStatsHeight()
+    {
+        if (frames == null || frames.Length == 0) return 0f;
+
+        float half = slideRoot.rect.height * 0.5f;
+        float top = float.MinValue;
+        float bottom = float.MaxValue;
+        for (int i = 0; i < frames.Length; i++)
+        {
+            RectTransform f = frames[i];
+            if (f == null) continue;
+            top = Mathf.Max(top, f.anchoredPosition.y + f.rect.height * (1f - f.pivot.y));
+            bottom = Mathf.Min(bottom, f.anchoredPosition.y - f.rect.height * f.pivot.y);
+        }
+        if (top == float.MinValue) return 0f;
+
+        float topMargin = Mathf.Max(0f, half - top);
+        float freeBelow = bottom + half;
+        return Mathf.Max(0f, freeBelow - topMargin);
+    }
 
     private void CaptureStat(StatRow row)
     {

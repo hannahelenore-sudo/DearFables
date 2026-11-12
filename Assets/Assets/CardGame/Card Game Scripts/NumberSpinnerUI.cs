@@ -50,12 +50,13 @@ public class NumberSpinnerUI : MonoBehaviour
         maxNumber = Mathf.Max(min, max);
     }
 
-    public void StartSequence(System.Action<int> onComplete)
+    /// <param name="keepCurrentAlpha">True when the caller is fading this screen in itself (cross-fade): the spin starts without forcing the alpha to 1.</param>
+    public void StartSequence(System.Action<int> onComplete, bool keepCurrentAlpha = false)
     {
         if (sequenceRoutine != null) StopCoroutine(sequenceRoutine);
         gameObject.SetActive(true);
 
-        if (canvasGroup != null) canvasGroup.alpha = 1f;
+        if (canvasGroup != null && !keepCurrentAlpha) canvasGroup.alpha = 1f;
         if (container != null)
         {
             container.localScale = initialScale;

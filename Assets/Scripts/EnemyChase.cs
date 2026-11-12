@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -8,6 +10,8 @@ using UnityEngine.SceneManagement;
 /// - Player leaves the range for loseSightTime seconds -> enemy stops chasing.
 /// - If the player comes back into range before the timer runs out, the timer resets.
 /// - A card thrown by CardShooter hits the enemy (CardProjectile calls HitByCard) -> battle starts.
+/// - A thrown Tsinelas stuns the enemy (Stun): it spins, sees stars and can't move or catch you for a while.
+/// - A thrown Small Rock clears the player's current Mood (MoodManager.Clear).
 /// - Optionally, the enemy touching the player also starts the battle (Touch Starts Battle).
 /// - Battle start = hit sound, Pokemon-style transition, then the card game.
 /// </summary>
@@ -29,13 +33,32 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("A card thrown by CardShooter starts the battle when it hits this enemy.")]
     public bool startBattleOnCardHit = true;
     [Tooltip("Also start the battle when the enemy touches the player. Turn off if only cards should start fights.")]
-    public bool touchStartsBattle = false;
+    public bool touchStartsBattle = true;
     [Tooltip("Player this close counts as touching. Keep it a bit larger than Stop Distance.")]
     public float touchDistance = 0.8f;
     [Tooltip("Touching is ignored for this many seconds after the scene loads, so the player isn't instantly sent back into battle.")]
     public float touchGraceTime = 2f;
     [Tooltip("Play the Pokemon-style transition before the card game. Needs BattleTransition.cs in the project.")]
     public bool useBattleTransition = true;
+
+    [Header("Card Hit Advantage")]
+    [Tooltip("Hitting the enemy with a thrown card gives you an advantage: the score to beat is smaller for that fight.")]
+    public bool cardHitGivesAdvantage = true;
+    [Range(0f, 0.9f)]
+    [Tooltip("How much of the score to beat is removed. 0.1 = 10% less.")]
+    public float scoreReduction = 0.1f;
+
+    [Header("Stun (Tsinelas)")]
+    [Tooltip("How long the fast spin at the start of the stun lasts.")]
+    public float stunSpinTime = 0.7f;
+    [Tooltip("Full turns during the fast spin.")]
+    public float stunSpinTurns = 3f;
+    [Tooltip("How far the dazed enemy sways left/right afterwards (degrees).")]
+    public float stunSwayAngle = 8f;
+
+    [Header("Moods (Small Rock)")]
+    [Tooltip("Optional extra: runs when a Small Rock hits this enemy (e.g. play a particle).")]
+    public UnityEvent onMoodsRemoved;
 
     [Header("Sound Effects")]
     [Tooltip("Played the moment the battle starts (card hit or touch).")]
@@ -66,6 +89,16 @@ public class EnemyChase : MonoBehaviour
     private float outOfRangeTimer;
     private Vector3 startPosition;
     private SpriteRenderer spriteRenderer;
+    private Color baseColor = Color.white;
+
+    // Stun
+    private float stunTimer;
+    private float stunDuration;
+    private DizzyStars stars;
+    private Coroutine flashRoutine;
+
+    /// <summary>True while a Tsinelas has this enemy stunned.</summary>
+    public bool IsStunned => stunTimer > 0f;
 
     // Remembers which enemies already caught the player. Static = survives scene loads.
     private static readonly HashSet<string> caughtEnemies = new HashSet<string>();
@@ -86,7 +119,62 @@ public class EnemyChase : MonoBehaviour
     public void HitByCard()
     {
         if (!startBattleOnCardHit) return;
-        StartBattle();
+        StartBattle(true);
+    }
+
+    /// <summary>Called by CardProjectile when a thrown Tsinelas reaches this enemy.</summary>
+    public void Stun(float duration)
+    {
+        if (battleStarted || duration <= 0f) return;
+
+        stunDuration = duration;
+        stunTimer = duration; // hitting it again restarts the spin
+
+        if (stars == null && spriteRenderer != null)
+        {
+            stars = GetComponent<DizzyStars>();
+            if (stars == null) stars = gameObject.AddComponent<DizzyStars>();
+            stars.Init(spriteRenderer);
+        }
+        if (stars != null) stars.SetActive(true);
+
+        Flash(new Color(1f, 0.9f, 0.5f)); // "bonk"
+    }
+
+    /// <summary>Called by CardProjectile when a thrown Small Rock reaches this enemy.</summary>
+    public void RemoveMoods()
+    {
+        if (battleStarted) return;
+
+        // Moods are the player's (Sugar Rush, Angry...): the rock knocks the current one off
+        bool hadMood = !MoodManager.IsNeutral;
+        MoodManager.Clear();
+
+        if (onMoodsRemoved != null) onMoodsRemoved.Invoke();
+
+        // Cyan flash if a mood was actually removed, a dull grey one if there was nothing to remove
+        Flash(hadMood ? new Color(0.6f, 0.95f, 1f) : new Color(0.7f, 0.7f, 0.7f));
+    }
+
+    private void Flash(Color flashColor)
+    {
+        if (spriteRenderer == null) return;
+        if (flashRoutine != null) StopCoroutine(flashRoutine);
+        flashRoutine = StartCoroutine(FlashRoutine(flashColor));
+    }
+
+    private IEnumerator FlashRoutine(Color flashColor)
+    {
+        const float duration = 0.4f;
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            spriteRenderer.color = Color.Lerp(flashColor, baseColor, t / duration);
+            yield return null;
+        }
+        spriteRenderer.color = baseColor;
+        flashRoutine = null;
     }
 
     private void Start()
@@ -102,6 +190,7 @@ public class EnemyChase : MonoBehaviour
 
         startPosition = transform.position;
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer != null) baseColor = spriteRenderer.color;
 
         if (player == null)
             Debug.LogError("EnemyChase on '" + name + "': no Player assigned! Drag your player into the 'Player' slot in the Inspector.", this);
@@ -113,12 +202,24 @@ public class EnemyChase : MonoBehaviour
         if (player == null) return;
         if (battleStarted) return;
 
+        // Stunned: can't move, chase or catch the player
+        if (stunTimer > 0f)
+        {
+            stunTimer -= Time.deltaTime;
+            if (stunTimer <= 0f)
+            {
+                stunTimer = 0f;
+                if (stars != null) stars.SetActive(false);
+            }
+            return;
+        }
+
         float distance = GetDistance(transform.position, player.position);
 
         // Touched the player (optional) -> start the battle
         if (touchStartsBattle && distance <= touchDistance && Time.timeSinceLevelLoad >= touchGraceTime)
         {
-            StartBattle();
+            StartBattle(false);
             return;
         }
 
@@ -162,8 +263,15 @@ public class EnemyChase : MonoBehaviour
         }
     }
 
-    private void StartBattle()
+    private void StartBattle(bool byCard)
     {
+        // A card that lands while the battle is already starting (the enemy touched you a moment before) still counts
+        if (byCard && battleStarted)
+        {
+            if (cardHitGivesAdvantage) AdvantageHit.Arm(scoreReduction);
+            return;
+        }
+
         // Already fighting, or another enemy already started a battle this frame
         if (battleStarted || battleStarting) return;
         if (player == null) return;
@@ -179,6 +287,14 @@ public class EnemyChase : MonoBehaviour
         battleStarted = true;
         battleStarting = true;
         caughtEnemies.Add(GetId()); // gone when the player comes back
+
+        // Stun is over, the fight begins
+        stunTimer = 0f;
+        if (stars != null) stars.SetActive(false);
+
+        // Hit it with a card first = advantage (smaller score to beat). Touching it = no advantage.
+        if (byCard && cardHitGivesAdvantage) AdvantageHit.Arm(scoreReduction);
+        else AdvantageHit.Disarm();
 
         Debug.Log("EnemyChase: '" + name + "' started a battle.");
 
@@ -208,7 +324,35 @@ public class EnemyChase : MonoBehaviour
         if (!faceCamera || Camera.main == null) return;
 
         // Turn only around the Y axis so the sprite stays upright
-        transform.rotation = Quaternion.Euler(0f, Camera.main.transform.eulerAngles.y, 0f);
+        float yaw = Camera.main.transform.eulerAngles.y;
+        Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
+
+        if (stunTimer > 0f)
+        {
+            float elapsed = stunDuration - stunTimer;
+            float spinTime = Mathf.Max(0.05f, Mathf.Min(stunSpinTime, stunDuration * 0.6f));
+
+            float spinYaw = 0f;
+            float roll = 0f;
+
+            if (elapsed < spinTime)
+            {
+                // Fast cartoon spin that slows down (ends on a full turn, so it lands facing the camera)
+                float t = elapsed / spinTime;
+                float eased = 1f - (1f - t) * (1f - t);
+                spinYaw = eased * 360f * stunSpinTurns;
+            }
+            else
+            {
+                // Dazed sway, easing out at the end of the stun
+                float fadeOut = Mathf.Clamp01(stunTimer / 0.3f);
+                roll = Mathf.Sin(elapsed * 9f) * stunSwayAngle * fadeOut;
+            }
+
+            rot = Quaternion.Euler(0f, yaw + spinYaw, 0f) * Quaternion.Euler(0f, 0f, roll);
+        }
+
+        transform.rotation = rot;
     }
 
     private void MoveToward(Vector3 target, float minDistance)

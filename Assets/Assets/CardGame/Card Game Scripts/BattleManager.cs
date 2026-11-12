@@ -76,6 +76,8 @@ public class BattleManager : MonoBehaviour
     [Header("Sequence Settings")]
     public float delayBetweenSequences = 0.2f;
     public float fadeDuration = 0.25f;
+    [Tooltip("Score To Beat fades out while the number spinner fades in over this time (they overlap).")]
+    public float crossFadeDuration = 0.5f;
 
     [Header("Deck Manager Link")]
     public DeckManager deckManager;
@@ -106,6 +108,8 @@ public class BattleManager : MonoBehaviour
     private bool hasMatchStartedOnce = false;
     private bool isMatchOver = false;
     private bool isWaitingForClickToExit = false;
+    private int scoreBeforeAdvantage;
+    private bool advantageApplied;
 
     private void Awake()
     {
@@ -124,6 +128,15 @@ public class BattleManager : MonoBehaviour
         battleTargetScore = TrinketEffects.RerollEnemyDefence(battleTargetScore);
         if (battleTargetScore != beforeReroll)
             Debug.Log("BattleManager: Tsinelas rerolled the target score " + beforeReroll + " -> " + battleTargetScore);
+
+        // Advantage Hit: you hit the enemy with a card before the fight -> smaller score to beat
+        scoreBeforeAdvantage = battleTargetScore;
+        advantageApplied = AdvantageHit.BeginBattle();
+        if (advantageApplied)
+        {
+            battleTargetScore = AdvantageHit.Apply(battleTargetScore);
+            Debug.Log("BattleManager: Advantage Hit! target score " + scoreBeforeAdvantage + " -> " + battleTargetScore);
+        }
 
         isOpeningSequenceActive = true;
         isMatchOver = false;
@@ -172,6 +185,11 @@ public class BattleManager : MonoBehaviour
         }
 
         StartCoroutine(RunBattleOpeningSequence());
+    }
+
+    private void OnDestroy()
+    {
+        AdvantageHit.EndBattle(); // the advantage only lasts for this fight
     }
 
     public void OnCardSystemButtonClicked()
@@ -588,21 +606,23 @@ public class BattleManager : MonoBehaviour
 
             PlaySFX(scoreToBeatSound);
             bool isScoreComplete = false;
-            scoreToBeatUI.StartSequence(battleTargetScore, () => isScoreComplete = true);
+            scoreToBeatUI.StartSequence(battleTargetScore, () => isScoreComplete = true, advantageApplied ? scoreBeforeAdvantage : 0);
             while (!isScoreComplete) yield return null;
         }
 
         yield return new WaitForSecondsRealtime(delayBetweenSequences);
 
+        // Cross-fade: Score To Beat fades out while the number spinner fades in (and starts spinning) at the same time
+        Coroutine scoreFadeOut = null;
         if (scoreToBeatUI != null)
         {
-            yield return StartCoroutine(FadeCanvasGroup(scoreToBeatUI.gameObject, 1f, 0f, fadeDuration));
+            scoreFadeOut = StartCoroutine(FadeCanvasGroup(scoreToBeatUI.gameObject, 1f, 0f, crossFadeDuration));
         }
 
         if (numberSpinnerUI != null)
         {
             numberSpinnerUI.SetNumberLimits(1, 10);
-            yield return StartCoroutine(FadeCanvasGroup(numberSpinnerUI.gameObject, 0f, 1f, fadeDuration));
+            Coroutine spinnerFadeIn = StartCoroutine(FadeCanvasGroup(numberSpinnerUI.gameObject, 0f, 1f, crossFadeDuration));
 
             bool isSpinnerComplete = false;
             numberSpinnerUI.StartSequence((resultNumber) =>
@@ -610,9 +630,12 @@ public class BattleManager : MonoBehaviour
                 rolledNumber = resultNumber;
                 PlaySFX(spinnerResultSound);
                 isSpinnerComplete = true;
-            });
+            }, true); // the fade-in above controls the alpha
             while (!isSpinnerComplete) yield return null;
+            yield return spinnerFadeIn;
         }
+
+        if (scoreFadeOut != null) yield return scoreFadeOut;
 
         if (deckManager != null)
         {
@@ -729,7 +752,7 @@ public class BattleManager : MonoBehaviour
         while (elapsedTime < duration)
         {
             elapsedTime += Time.unscaledDeltaTime;
-            canvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, elapsedTime / duration);
+            canvasGroup.alpha = Mathf.SmoothStep(startAlpha, endAlpha, Mathf.Clamp01(elapsedTime / duration)); // eased, so it starts and ends softly
             yield return null;
         }
 

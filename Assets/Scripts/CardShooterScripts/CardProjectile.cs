@@ -2,6 +2,10 @@ using UnityEngine;
 
 /// <summary>
 /// Flies in a straight line with a little spin and hits the first enemy it passes.
+/// What happens on a hit depends on 'kind':
+///   Card      -> starts the battle (with advantage)
+///   Tsinelas  -> stuns the enemy
+///   SmallRock -> clears the player's current Mood
 /// At the end of its range it turns into a physics object (Rigidbody + BoxCollider),
 /// falls onto the ground, settles, fades out (card + glow) and disappears.
 /// </summary>
@@ -10,6 +14,10 @@ public class CardProjectile : MonoBehaviour
     private enum State { Flying, Falling, Landed }
 
     private State state = State.Flying;
+
+    // Set by CardShooter before Launch()
+    [HideInInspector] public ThrowItem kind = ThrowItem.Card;
+    [HideInInspector] public float stunDuration = 2f;
 
     private Vector3 direction;
     private float speed;
@@ -115,14 +123,14 @@ public class CardProjectile : MonoBehaviour
         Vector3 start = transform.position;
         Vector3 end = start + direction * step;
 
-        // Check the whole path travelled this frame so fast cards can't skip over an enemy
+        // Check the whole path travelled this frame so fast projectiles can't skip over an enemy
         foreach (EnemyChase enemy in enemies)
         {
             if (enemy == null || !enemy.isActiveAndEnabled) continue;
 
             if (FlatSegmentDistance(start, end, enemy.transform.position) <= hitRadius)
             {
-                enemy.HitByCard();
+                OnHitEnemy(enemy);
                 Destroy(gameObject);
                 return;
             }
@@ -141,13 +149,29 @@ public class CardProjectile : MonoBehaviour
             BeginFall();
     }
 
+    private void OnHitEnemy(EnemyChase enemy)
+    {
+        switch (kind)
+        {
+            case ThrowItem.Tsinelas:
+                enemy.Stun(stunDuration);
+                break;
+            case ThrowItem.SmallRock:
+                enemy.RemoveMoods();
+                break;
+            default:
+                enemy.HitByCard();
+                break;
+        }
+    }
+
     // ---------------- Falling (physics) ----------------
 
     private void BeginFall()
     {
         state = State.Falling;
 
-        // Thin box that matches the card sprite (sizes are in local space, the scale is applied by Unity)
+        // Thin box that matches the sprite (sizes are in local space, the scale is applied by Unity)
         BoxCollider box = gameObject.AddComponent<BoxCollider>();
         if (sr != null && sr.sprite != null)
         {

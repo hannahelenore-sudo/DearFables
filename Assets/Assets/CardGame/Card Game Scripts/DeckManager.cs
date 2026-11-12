@@ -67,8 +67,20 @@ public class DeckManager : MonoBehaviour
     [Header("Hand Layout (Balatro style)")]
     [Tooltip("Preferred distance between cards. It shrinks automatically so a big hand still fits.")]
     public float handCardSpacing = 200f;
-    [Tooltip("Widest the hand may spread. 0 = use the width of the hand container.")]
+    [Tooltip("Widest the hand may spread (outer edge of the first card to outer edge of the last). 0 = use 'Hand Area Width' below.")]
     public float handMaxWidth = 0f;
+    [Tooltip("The area the hand lives in: between the back button and the deck pile. When you hold more cards (Hand Size boon) they squeeze together to stay inside it. Never wider than the hand container.")]
+    public float handAreaWidth = 1370f;
+    [Tooltip("Closest the cards may get to each other when the hand is squeezed.")]
+    public float minCardSpacing = 30f;
+
+    [Header("Drag & Drop (Balatro style)")]
+    [Tooltip("Hold a card and drag it to another spot in the hand. The other cards slide aside. The order you set is the order cards are scored in.")]
+    public bool allowCardDragging = true;
+    public AudioClip cardPickupSound;
+    [Tooltip("Played each time the dragged card passes another card.")]
+    public AudioClip cardSwapSound;
+    public AudioClip cardDropSound;
     [Tooltip("Tilt (degrees) of the outermost cards. The hand fans out like held cards.")]
     public float fanMaxAngle = 6f;
     [Tooltip("How much lower the outermost cards sit, creating the arc.")]
@@ -122,6 +134,23 @@ public class DeckManager : MonoBehaviour
     [Tooltip("How big the score text pops when chips or mult change.")]
     public float scorePulseScale = 1.3f;
 
+    [Header("Card Score Popups (Balatro style)")]
+    [Tooltip("While scoring, each card shows its value above it (+10). If the card is boosted (Wind Power boon, mood), the extra shows right after as a second number.")]
+    public bool showCardValuePopups = true;
+    [Tooltip("Colour of the card's own value. Uses the Chips colour when left on the default.")]
+    public Color cardValuePopupColor = new Color(0.30f, 0.65f, 1f);
+    [Tooltip("Colour of the extra value from boosts (Wind Power boon, mood...).")]
+    public Color modifiedValuePopupColor = new Color(1f, 0.85f, 0.25f);
+    public float popupFontSize = 64f;
+    [Tooltip("Gap between the top of the card and the first number.")]
+    public float popupOffsetY = 45f;
+    [Tooltip("Distance between stacked numbers (card value, then the boost above it).")]
+    public float popupStackSpacing = 70f;
+    [Tooltip("How far a number floats upward.")]
+    public float popupRise = 30f;
+    public float popupHoldTime = 0.55f;
+    public float popupFadeTime = 0.25f;
+
     [Header("Sound Effects")]
     [Range(0f, 1f)] public float sfxVolume = 1f;
     public AudioClip openCardViewSound;
@@ -163,6 +192,9 @@ public class DeckManager : MonoBehaviour
 
     private Transform originalTotalValueParent;
 
+    private CardUI draggingCard;
+    private float currentSpacing = 200f;
+
     private int lastSelectedCount = 0;
     private bool suppressSelectSounds = false;
     private Vector3 balatroBaseScale = Vector3.one;
@@ -178,7 +210,9 @@ public class DeckManager : MonoBehaviour
         if (balatroScoreText != null)
         {
             balatroBaseScale = balatroScoreText.transform.localScale;
+            MakeTextFit(balatroScoreText, 18f);
         }
+        MakeTextFit(totalValueText, 18f);
 
         currentRemainingScore = targetScore;
         if (battleManager == null)
@@ -487,6 +521,12 @@ public class DeckManager : MonoBehaviour
             cardRect.pivot = new Vector2(0.5f, 0.5f);
         }
 
+        // Lets the player drag the card to another spot in the hand
+        CardDragHandler drag = newCardObj.GetComponent<CardDragHandler>();
+        if (drag == null) drag = newCardObj.AddComponent<CardDragHandler>();
+        drag.manager = this;
+        drag.card = cardUI;
+
         cardUI.followSlot = true;
         if (fromDeck)
         {
@@ -522,13 +562,16 @@ public class DeckManager : MonoBehaviour
         RectTransform firstRect = spawnedCardUIList[0].GetComponent<RectTransform>();
         if (firstRect != null) cardWidth = firstRect.rect.width;
 
-        float available = handMaxWidth;
-        if (available <= 0f && handParentContainer is RectTransform handRect) available = handRect.rect.width;
-        if (available < 100f) available = float.MaxValue; // container has no usable width: don't squeeze
+        // The hand stays inside its area: more cards = they squeeze together
+        float available = handMaxWidth > 0f ? handMaxWidth : handAreaWidth;
+        if (handParentContainer is RectTransform handRect && handRect.rect.width >= 100f)
+            available = available > 0f ? Mathf.Min(available, handRect.rect.width) : handRect.rect.width;
+        if (available < 100f) available = float.MaxValue; // no usable width: don't squeeze
 
         float spacing = handCardSpacing;
         if (n > 1 && available < float.MaxValue)
-            spacing = Mathf.Min(handCardSpacing, Mathf.Max(30f, (available - cardWidth) / (n - 1)));
+            spacing = Mathf.Min(handCardSpacing, Mathf.Max(minCardSpacing, (available - cardWidth) / (n - 1)));
+        currentSpacing = Mathf.Max(1f, spacing);
 
         float half = (n - 1) / 2f;
 
@@ -539,7 +582,7 @@ public class DeckManager : MonoBehaviour
 
             float norm = n > 1 ? (i - half) / half : 0f; // -1 (left) .. +1 (right)
 
-            card.followSlot = true;
+            card.followSlot = card != draggingCard; // the card in your hand (mouse) is not pulled back to its slot
             card.slotPosition = new Vector2((i - half) * spacing, -(norm * norm) * fanArcHeight);
             card.slotRotation = -norm * fanMaxAngle;
 
@@ -547,8 +590,103 @@ public class DeckManager : MonoBehaviour
             LayoutElement le = card.GetComponent<LayoutElement>();
             if (le != null) le.ignoreLayout = true;
 
-            if (instant) card.SnapToSlot();
+            if (instant && card != draggingCard) card.SnapToSlot();
         }
+
+        // Cards on the right sit on top of the ones to their left (and the dragged card on top of everything)
+        for (int i = 0; i < n; i++)
+        {
+            CardUI card = spawnedCardUIList[i];
+            if (card != null && card != draggingCard) card.transform.SetAsLastSibling();
+        }
+        if (draggingCard != null) draggingCard.transform.SetAsLastSibling();
+    }
+
+    // ------------------------------------------------------------------
+    // Dragging cards to another spot (used by CardDragHandler)
+    // ------------------------------------------------------------------
+
+    public bool CanDragCards
+    {
+        get
+        {
+            return allowCardDragging && !isScoring && !isDiscarding &&
+                   (battleManager == null || !battleManager.isOpeningSequenceActive);
+        }
+    }
+
+    public void BeginCardDrag(CardUI card)
+    {
+        if (card == null) return;
+        draggingCard = card;
+        card.followSlot = false;
+        card.transform.SetAsLastSibling();
+        PlaySFX(cardPickupSound);
+    }
+
+    private readonly Vector3[] clampCorners = new Vector3[4];
+
+    /// <summary>Keeps a dragged card on the screen (the hand container itself can be a thin strip, so the screen is the limit).</summary>
+    public Vector2 ClampToHandArea(Vector2 pos, RectTransform cardRect)
+    {
+        RectTransform parent = handParentContainer as RectTransform;
+        if (parent == null || cardRect == null) return pos;
+
+        Canvas canvas = parent.GetComponentInParent<Canvas>();
+        if (canvas == null) return pos;
+        RectTransform canvasRect = canvas.rootCanvas.transform as RectTransform;
+        if (canvasRect == null) return pos;
+
+        // the screen's edges, in the same space as the card's anchored position
+        canvasRect.GetWorldCorners(clampCorners);
+        Vector2 center = parent.rect.center;
+        Vector3 lo = parent.InverseTransformPoint(clampCorners[0]);
+        Vector3 hi = parent.InverseTransformPoint(clampCorners[2]);
+
+        float halfW = cardRect.rect.width * 0.5f * Mathf.Abs(cardRect.localScale.x);
+        float halfH = cardRect.rect.height * 0.5f * Mathf.Abs(cardRect.localScale.y);
+
+        float minX = lo.x - center.x + halfW;
+        float maxX = hi.x - center.x - halfW;
+        float minY = lo.y - center.y + halfH;
+        float maxY = hi.y - center.y - halfH;
+
+        if (minX < maxX) pos.x = Mathf.Clamp(pos.x, minX, maxX);
+        if (minY < maxY) pos.y = Mathf.Clamp(pos.y, minY, maxY);
+        return pos;
+    }
+
+    /// <summary>Called while a card is dragged: when it passes the middle of another card's spot they swap and the others slide aside.</summary>
+    public void OnCardDragged(CardUI card)
+    {
+        if (card == null || card != draggingCard) return;
+
+        int n = spawnedCardUIList.Count;
+        int current = spawnedCardUIList.IndexOf(card);
+        if (n < 2 || current < 0) return;
+
+        RectTransform rect = card.GetComponent<RectTransform>();
+        if (rect == null) return;
+
+        float half = (n - 1) / 2f;
+        int target = Mathf.Clamp(Mathf.RoundToInt(rect.anchoredPosition.x / currentSpacing + half), 0, n - 1);
+        if (target == current) return;
+
+        spawnedCardUIList.RemoveAt(current);
+        spawnedCardUIList.Insert(target, card);
+
+        PlaySFX(cardSwapSound, 1f + Random.Range(-0.04f, 0.04f));
+        RebuildLayout();
+    }
+
+    public void EndCardDrag(CardUI card)
+    {
+        if (card == null || card != draggingCard) { if (card == null) draggingCard = null; return; }
+
+        draggingCard = null;
+        card.SyncSpringState(); // the spring picks up from where the card was dropped
+        RebuildLayout(); // the dropped card glides into its new slot
+        PlaySFX(cardDropSound);
     }
 
     // ------------------------------------------------------------------
@@ -1069,19 +1207,36 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale * 1.25f;
 
                 int cardValue = card.cardData.GetEffectiveValue(); // includes the Wind Power boon on Wind cards
-                if (card.cardData is WindCard && BoonProgress.BonusWindPower > 0 && !windBoonSoundPlayed)
-                {
-                    PlaySFX(windPowerBoonSound);
-                    windBoonSoundPlayed = true;
-                }
-                baseScore += cardValue;
 
+                // The card's own value first, then whatever the boosts add on top (shown as a second number)
+                int ownValue = Mathf.Min(cardValue, GetBaseCardValue(card.cardData, cardValue));
+                int boost = cardValue - ownValue;
+
+                baseScore += ownValue;
                 SetBalatroText(baseScore, currentMult);
                 StartCoroutine(PulseBalatroText());
+                ShowCardPopup(card, "+" + ownValue, cardValuePopupColor, 0);
 
                 // Pitch climbs with every scored card
                 PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f, 2f));
                 scoredIndex++;
+
+                if (boost > 0)
+                {
+                    yield return new WaitForSeconds(0.25f);
+
+                    if (card.cardData is WindCard && BoonProgress.BonusWindPower > 0 && !windBoonSoundPlayed)
+                    {
+                        PlaySFX(windPowerBoonSound);
+                        windBoonSoundPlayed = true;
+                    }
+
+                    baseScore += boost;
+                    SetBalatroText(baseScore, currentMult);
+                    StartCoroutine(PulseBalatroText());
+                    ShowCardPopup(card, "+" + boost, modifiedValuePopupColor, 1);
+                    PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f + 0.2f, 2f));
+                }
 
                 yield return new WaitForSeconds(0.15f);
                 card.transform.localScale = origScale;
@@ -1405,6 +1560,101 @@ public class DeckManager : MonoBehaviour
         GameSFX.Play(clip, sfxVolume * volumeScale, pitch);
     }
 
+    // The card's value before any boost (Wind Power boon, mood). Falls back to 'fallback' if it can't be found.
+    private static int GetBaseCardValue(CardData data, int fallback)
+    {
+        if (data == null) return fallback;
+
+        System.Type type = data.GetType();
+        System.Reflection.FieldInfo field = type.GetField("primaryValue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        if (field != null && field.FieldType == typeof(int)) return (int)field.GetValue(data);
+
+        System.Reflection.PropertyInfo prop = type.GetProperty("primaryValue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        if (prop != null && prop.PropertyType == typeof(int) && prop.CanRead) return (int)prop.GetValue(data, null);
+
+        return fallback;
+    }
+
+    /// <summary>A number that pops up above a scoring card, floats up a little and fades out. stackIndex 1 sits above stackIndex 0.</summary>
+    private void ShowCardPopup(CardUI card, string text, Color color, int stackIndex)
+    {
+        if (!showCardValuePopups || card == null || handParentContainer == null) return;
+        StartCoroutine(CardPopupRoutine(card, text, color, stackIndex));
+    }
+
+    private IEnumerator CardPopupRoutine(CardUI card, string text, Color color, int stackIndex)
+    {
+        RectTransform cardRect = card.GetComponent<RectTransform>();
+        if (cardRect == null) yield break;
+
+        GameObject go = new GameObject("CardScorePopup", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        go.GetComponent<LayoutElement>().ignoreLayout = true;
+
+        RectTransform r = go.GetComponent<RectTransform>();
+        r.SetParent(handParentContainer, false);
+        r.anchorMin = r.anchorMax = r.pivot = new Vector2(0.5f, 0.5f);
+        r.sizeDelta = new Vector2(400f, popupFontSize * 1.4f);
+        r.SetAsLastSibling(); // above every card
+
+        TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
+        if (balatroScoreText != null) t.font = balatroScoreText.font; // same font as the score
+        t.text = text;
+        t.color = color;
+        t.fontSize = popupFontSize;
+        t.fontStyle = FontStyles.Bold;
+        t.alignment = TextAlignmentOptions.Center;
+        t.raycastTarget = false;
+        t.outlineWidth = 0.25f;
+        t.outlineColor = new Color32(0, 0, 0, 255);
+
+        float cardHalfHeight = cardRect.rect.height * 0.5f * Mathf.Abs(cardRect.localScale.y);
+        Vector2 start = cardRect.anchoredPosition + new Vector2(0f, cardHalfHeight + popupOffsetY + stackIndex * popupStackSpacing);
+        r.anchoredPosition = start;
+        r.localScale = Vector3.zero;
+
+        // pop in with a little overshoot, drifting up
+        float popTime = 0.2f;
+        float e = 0f;
+        while (e < popTime)
+        {
+            e += Time.unscaledDeltaTime;
+            float p = Mathf.Clamp01(e / popTime);
+            float x = p - 1f;
+            const float c1 = 1.70158f;
+            float back = 1f + (c1 + 1f) * x * x * x + c1 * x * x;
+            r.localScale = Vector3.one * back;
+            r.anchoredPosition = start + new Vector2(0f, popupRise * 0.5f * p);
+            yield return null;
+        }
+        r.localScale = Vector3.one;
+
+        // hold (still floating up slowly)
+        float hold = 0f;
+        while (hold < popupHoldTime)
+        {
+            hold += Time.unscaledDeltaTime;
+            float p = Mathf.Clamp01(hold / Mathf.Max(0.01f, popupHoldTime));
+            r.anchoredPosition = start + new Vector2(0f, popupRise * (0.5f + 0.3f * p));
+            yield return null;
+        }
+
+        // fade out
+        float f = 0f;
+        Vector2 fadeStart = r.anchoredPosition;
+        while (f < popupFadeTime)
+        {
+            f += Time.unscaledDeltaTime;
+            float p = Mathf.Clamp01(f / Mathf.Max(0.01f, popupFadeTime));
+            Color c = color;
+            c.a = 1f - p;
+            t.color = c;
+            r.anchoredPosition = fadeStart + new Vector2(0f, popupRise * 0.2f * p);
+            yield return null;
+        }
+
+        Destroy(go);
+    }
+
     private int CountCardsOfType<T>(List<CardUI> cards) where T : CardData
     {
         int count = 0;
@@ -1419,7 +1669,30 @@ public class DeckManager : MonoBehaviour
     {
         string chipsHex = ColorUtility.ToHtmlStringRGB(chipsColor);
         string multHex = ColorUtility.ToHtmlStringRGB(multColor);
-        return "<color=#" + chipsHex + ">" + chips + "</color> x <color=#" + multHex + ">" + mult.ToString("0.##") + "</color>";
+        return "<color=#" + chipsHex + ">" + Compact(chips, "0") + "</color> x <color=#" + multHex + ">" + Compact(mult, "0.##") + "</color>";
+    }
+
+    // Huge numbers get short (1.5M) so the score line never runs out of room
+    private static string Compact(float value, string format)
+    {
+        float a = Mathf.Abs(value);
+        if (a >= 1e12f) return (value / 1e12f).ToString("0.##") + "T";
+        if (a >= 1e9f) return (value / 1e9f).ToString("0.##") + "B";
+        if (a >= 1e6f) return (value / 1e6f).ToString("0.##") + "M";
+        return value.ToString(format);
+    }
+
+    // One line only; the text shrinks to fit its box instead of wrapping onto a second line
+    private static void MakeTextFit(TMP_Text text, float minSize)
+    {
+        if (text == null) return;
+        text.enableAutoSizing = true;
+        text.fontSizeMax = text.fontSize;
+        text.fontSizeMin = Mathf.Min(minSize, text.fontSize);
+#pragma warning disable 618
+        text.enableWordWrapping = false;
+#pragma warning restore 618
+        text.overflowMode = TextOverflowModes.Overflow;
     }
 
     private void SetBalatroText(int chips, float mult)

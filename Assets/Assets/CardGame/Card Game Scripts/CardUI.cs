@@ -204,6 +204,20 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         SnapTo(slotPosition, 1f, slotRotation);
     }
 
+    /// <summary>
+    /// Call after something else (dragging) moved the card, right before followSlot is turned back on.
+    /// The spring continues from where the card really is, so it glides into its slot instead of jumping.
+    /// </summary>
+    public void SyncSpringState()
+    {
+        EnsureRefs();
+        posVel = Vector2.zero;
+        scaleVel = 0f;
+        rotVel = 0f;
+        curScale = transform.localScale.x;
+        curRot = Mathf.DeltaAngle(0f, rectTransform.localEulerAngles.z);
+    }
+
     public void DeselectCard()
     {
         ToggleSelection(false);
