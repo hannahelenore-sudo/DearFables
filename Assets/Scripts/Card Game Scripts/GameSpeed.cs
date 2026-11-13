@@ -9,16 +9,20 @@ public static class GameSpeed
 {
     public static float Multiplier = 1f;
 
+    /// <summary>True while the game menu is open: every animation and delay that uses GameSpeed freezes.</summary>
+    public static bool Paused;
+
     public static bool IsFast { get { return Multiplier > 1.01f; } }
 
     /// <summary>Use instead of Time.unscaledDeltaTime / Time.deltaTime inside animations and timers.</summary>
-    public static float DeltaTime { get { return Time.unscaledDeltaTime * Multiplier; } }
+    public static float DeltaTime { get { return Paused ? 0f : Time.unscaledDeltaTime * Multiplier; } }
 
     // Keeps things safe when "Enter Play Mode Options > Reload Domain" is turned off
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
         Multiplier = 1f;
+        Paused = false;
     }
 }
 
