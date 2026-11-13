@@ -506,7 +506,7 @@ public class DeckManager : MonoBehaviour
             UpdateHandCountDisplay();
             UpdateDeckLeftDisplay();
 
-            yield return new WaitForSeconds(drawInterval);
+            yield return new GameSpeedWait(drawInterval);
         }
 
         RebuildLayout();
@@ -864,7 +864,7 @@ public class DeckManager : MonoBehaviour
 
     private IEnumerator DissolveCard(CardUI card, float startDelay, float pitch)
     {
-        if (startDelay > 0f) yield return new WaitForSeconds(startDelay);
+        if (startDelay > 0f) yield return new GameSpeedWait(startDelay);
         if (card == null) yield break;
 
         RectTransform cardRect = card.GetComponent<RectTransform>();
@@ -880,7 +880,7 @@ public class DeckManager : MonoBehaviour
         while (t < dissolveShakeTime)
         {
             if (card == null) yield break;
-            t += Time.deltaTime;
+            t += GameSpeed.DeltaTime;
             float strength = Mathf.Lerp(2f, 9f, t / Mathf.Max(0.0001f, dissolveShakeTime));
             cardRect.anchoredPosition = basePos + Random.insideUnitCircle * strength;
             cardRect.localRotation = baseRot * Quaternion.Euler(0f, 0f, Random.Range(-2.5f, 2.5f));
@@ -898,7 +898,7 @@ public class DeckManager : MonoBehaviour
             float f = 0f;
             while (f < dissolveDuration && card != null)
             {
-                f += Time.deltaTime;
+                f += GameSpeed.DeltaTime;
                 fade.alpha = 1f - Mathf.Clamp01(f / dissolveDuration);
                 yield return null;
             }
@@ -981,7 +981,7 @@ public class DeckManager : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < dissolveDuration)
         {
-            elapsed += Time.deltaTime;
+            elapsed += GameSpeed.DeltaTime;
 
             for (int i = 0; i < count; i++)
             {
@@ -1007,7 +1007,7 @@ public class DeckManager : MonoBehaviour
 
     private IEnumerator FlyCardAway(CardUI card, float delay = 0f)
     {
-        if (delay > 0f) yield return new WaitForSeconds(delay);
+        if (delay > 0f) yield return new GameSpeedWait(delay);
         if (card == null) yield break;
 
         if (discardFlyToDeck)
@@ -1111,7 +1111,7 @@ public class DeckManager : MonoBehaviour
         for (int fi = 0; fi < selectedCards.Count; fi++)
             StartCoroutine(FlyCardAway(selectedCards[fi], fi * discardStagger));
 
-        yield return new WaitForSeconds(discardFlyDuration + 0.05f + selectedCards.Count * discardStagger);
+        yield return new GameSpeedWait(discardFlyDuration + 0.05f + selectedCards.Count * discardStagger);
 
         int recycledCount = selectedCards.Count;
         foreach (CardUI card in selectedCards)
@@ -1142,7 +1142,7 @@ public class DeckManager : MonoBehaviour
         RebuildLayout();
         UpdateHandCountDisplay();
 
-        yield return new WaitForSeconds(0.25f); // let the hand close up before dealing
+        yield return new GameSpeedWait(0.25f); // let the hand close up before dealing
         int cardsToDraw = Mathf.Min(recycledCount, cardsRemainingInRound);
         if (cardsToDraw > 0)
         {
@@ -1231,7 +1231,7 @@ public class DeckManager : MonoBehaviour
 
         PlaySFX(cardSlideSound);
         Canvas.ForceUpdateCanvases();
-        yield return new WaitForSeconds(0.4f);
+        yield return new GameSpeedWait(0.4f);
 
         // --- STEP 1: ADD UP CHIPS CARD BY CARD (mult stays at 1 until the effects trigger, like Balatro) ---
         float setMult = 1f;
@@ -1303,7 +1303,7 @@ public class DeckManager : MonoBehaviour
 
                 if (boost > 0)
                 {
-                    yield return new WaitForSeconds(0.25f);
+                    yield return new GameSpeedWait(0.25f);
 
                     if (card.cardData is WindCard && BoonProgress.BonusWindPower > 0 && !windBoonSoundPlayed)
                     {
@@ -1318,9 +1318,9 @@ public class DeckManager : MonoBehaviour
                     PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f + 0.2f, 2f));
                 }
 
-                yield return new WaitForSeconds(0.15f);
+                yield return new GameSpeedWait(0.15f);
                 card.transform.localScale = origScale;
-                yield return new WaitForSeconds(0.2f);
+                yield return new GameSpeedWait(0.2f);
 
                 // Trinkets that trigger when this card scores, TOP TO BOTTOM (Wind Charm, Sun Charm, Sun Plushie)
                 for (int ti = 0; ti < trinketOrder.Count; ti++)
@@ -1336,12 +1336,12 @@ public class DeckManager : MonoBehaviour
                         StartCoroutine(PulseBalatroText());
                         PlaySFX(trinketTriggerSound, Mathf.Min(1f + ti * 0.08f, 1.5f));
                     }
-                    yield return new WaitForSeconds(trinketTriggerDelay);
+                    yield return new GameSpeedWait(trinketTriggerDelay);
                 }
             }
         }
 
-        yield return new WaitForSeconds(0.3f);
+        yield return new GameSpeedWait(0.3f);
 
         // --- STEP 2: MULT EFFECTS TRIGGER ONE AFTER ANOTHER ---
 
@@ -1356,7 +1356,7 @@ public class DeckManager : MonoBehaviour
                 SetBalatroText(baseScore, currentMult);
                 StartCoroutine(PulseBalatroText());
                 PlaySFX(trinketTriggerSound, Mathf.Min(1f + ti * 0.08f, 1.5f));
-                yield return new WaitForSeconds(trinketTriggerDelay + 0.2f);
+                yield return new GameSpeedWait(trinketTriggerDelay + 0.2f);
             }
         }
 
@@ -1366,7 +1366,7 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(baseScore, currentMult);
             StartCoroutine(PulseBalatroText());
             PlaySFX(setBonusClip != null ? setBonusClip : setBonusSound, 1f, setBonusVolume);
-            yield return new WaitForSeconds(0.6f);
+            yield return new GameSpeedWait(0.6f);
         }
 
         // Mood (Sugar Rush): multiplies the mult of the whole hand
@@ -1378,7 +1378,7 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(baseScore, currentMult);
             StartCoroutine(PulseBalatroText());
             PlaySFX(trinketTriggerSound, 1.25f);
-            yield return new WaitForSeconds(0.6f);
+            yield return new GameSpeedWait(0.6f);
         }
 
         if (PlayerRollUI.isHighRollActive)
@@ -1395,7 +1395,7 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(baseScore, currentMult);
             StartCoroutine(PulseBalatroText());
             PlaySFX(highRollBonusSound);
-            yield return new WaitForSeconds(0.6f);
+            yield return new GameSpeedWait(0.6f);
         }
 
         TrinketSidebar.EndScoring(); // unlocks the order again
@@ -1416,7 +1416,7 @@ public class DeckManager : MonoBehaviour
             }
             StartCoroutine(PulseBalatroText());
             PlaySFX(lowRollPenaltySound);
-            yield return new WaitForSeconds(0.6f);
+            yield return new GameSpeedWait(0.6f);
         }
         else
         {
@@ -1427,7 +1427,7 @@ public class DeckManager : MonoBehaviour
         }
         StartCoroutine(PulseBalatroText());
         PlaySFX(finalScoreSound);
-        yield return new WaitForSeconds(0.9f);
+        yield return new GameSpeedWait(0.9f);
 
         if (balatroScoreText != null)
         {
@@ -1454,7 +1454,7 @@ public class DeckManager : MonoBehaviour
 
             while (popElapsed < popDuration)
             {
-                popElapsed += Time.unscaledDeltaTime;
+                popElapsed += GameSpeed.DeltaTime;
                 float t = popElapsed / popDuration;
                 textTransform.localScale = Vector3.Lerp(originalScale, originalScale * 1.4f, Mathf.Sin(t * Mathf.PI));
                 yield return null;
@@ -1465,7 +1465,7 @@ public class DeckManager : MonoBehaviour
             float shakeDuration = 0.2f;
             while (shakeElapsed < shakeDuration)
             {
-                shakeElapsed += Time.unscaledDeltaTime;
+                shakeElapsed += GameSpeed.DeltaTime;
                 Vector3 randomOffset = Random.insideUnitSphere * 8f;
                 textTransform.localPosition = originalPos + new Vector3(randomOffset.x, randomOffset.y, 0f);
                 yield return null;
@@ -1473,7 +1473,7 @@ public class DeckManager : MonoBehaviour
             textTransform.localPosition = originalPos;
         }
 
-        yield return new WaitForSeconds(cameraSwitchDelay);
+        yield return new GameSpeedWait(cameraSwitchDelay);
 
         // --- STEP 5: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
         PlaySFX(cameraSwitchSound);
@@ -1512,10 +1512,10 @@ public class DeckManager : MonoBehaviour
 
         while (elapsed < scoreCountdownDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / scoreCountdownDuration);
 
-            tickTimer += Time.unscaledDeltaTime;
+            tickTimer += GameSpeed.DeltaTime;
             if (tickTimer >= countdownTickInterval)
             {
                 tickTimer = 0f;
@@ -1553,7 +1553,7 @@ public class DeckManager : MonoBehaviour
         UpdateTargetScoreDisplay();
         PlaySFX(countdownEndSound);
 
-        yield return new WaitForSeconds(0.3f);
+        yield return new GameSpeedWait(0.3f);
 
         if (totalValueText != null)
         {
@@ -1582,14 +1582,14 @@ public class DeckManager : MonoBehaviour
                 StartCoroutine(FlyCardAway(selectedCards[fi], fi * discardStagger));
         }
 
-        yield return new WaitForSeconds(delayBetweenDiscards);
+        yield return new GameSpeedWait(delayBetweenDiscards);
 
         // The cards you didn't play go back into the deck
         if (dissolveScoredCards && remainingCards.Count > 0) PlaySFX(discardSound);
         foreach (CardUI card in remainingCards)
             StartCoroutine(FlyCardAway(card));
 
-        yield return new WaitForSeconds(endWait);
+        yield return new GameSpeedWait(endWait);
 
         List<CardUI> allCards = new List<CardUI>(spawnedCardUIList);
         foreach (CardUI card in allCards)
@@ -1697,7 +1697,7 @@ public class DeckManager : MonoBehaviour
         float e = 0f;
         while (e < popTime)
         {
-            e += Time.unscaledDeltaTime;
+            e += GameSpeed.DeltaTime;
             float p = Mathf.Clamp01(e / popTime);
             float x = p - 1f;
             const float c1 = 1.70158f;
@@ -1712,7 +1712,7 @@ public class DeckManager : MonoBehaviour
         float hold = 0f;
         while (hold < popupHoldTime)
         {
-            hold += Time.unscaledDeltaTime;
+            hold += GameSpeed.DeltaTime;
             float p = Mathf.Clamp01(hold / Mathf.Max(0.01f, popupHoldTime));
             r.anchoredPosition = start + new Vector2(0f, popupRise * (0.5f + 0.3f * p));
             yield return null;
@@ -1723,7 +1723,7 @@ public class DeckManager : MonoBehaviour
         Vector2 fadeStart = r.anchoredPosition;
         while (f < popupFadeTime)
         {
-            f += Time.unscaledDeltaTime;
+            f += GameSpeed.DeltaTime;
             float p = Mathf.Clamp01(f / Mathf.Max(0.01f, popupFadeTime));
             Color c = color;
             c.a = 1f - p;
@@ -1793,7 +1793,7 @@ public class DeckManager : MonoBehaviour
 
         while (elapsed < duration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float p = Mathf.Clamp01(elapsed / duration);
             target.localScale = balatroBaseScale * Mathf.Lerp(1f, scorePulseScale, Mathf.Sin(p * Mathf.PI));
             yield return null;

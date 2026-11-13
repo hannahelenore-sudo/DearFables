@@ -373,7 +373,7 @@ public class BattleManager : MonoBehaviour
 
             while (elapsed < paperFlyDuration && paperImgTransform != null)
             {
-                elapsed += Time.unscaledDeltaTime;
+                elapsed += GameSpeed.DeltaTime;
                 float t = Mathf.Clamp01(elapsed / paperFlyDuration);
                 float smoothT = 1f - (1f - t) * (1f - t);
                 paperImgTransform.anchoredPosition = Vector2.Lerp(startAnchoredPos, finalAnchoredPos, smoothT);
@@ -394,11 +394,11 @@ public class BattleManager : MonoBehaviour
             yield return StartCoroutine(CountStatSequence(batteriesGainedTxt, "Batteries Gained: ", batteriesGained));
 
             // Delay after counting is fully done before the stamp animation plays
-            yield return new WaitForSecondsRealtime(delayBeforeStamp);
+            yield return new GameSpeedWait(delayBeforeStamp);
         }
         else
         {
-            yield return new WaitForSecondsRealtime(lossStampDelay);
+            yield return new GameSpeedWait(lossStampDelay);
         }
 
         // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top - Sorting Order 503)
@@ -522,11 +522,11 @@ public class BattleManager : MonoBehaviour
         float tickTimer = 0f;
         while (elapsed < countAnimationDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / countAnimationDuration);
             int currentDisplay = Mathf.RoundToInt(Mathf.Lerp(0, targetValue, t));
 
-            tickTimer += Time.unscaledDeltaTime;
+            tickTimer += GameSpeed.DeltaTime;
             if (targetValue > 0 && tickTimer >= countTickInterval)
             {
                 tickTimer = 0f;
@@ -557,7 +557,7 @@ public class BattleManager : MonoBehaviour
 
         while (elapsed < duration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = elapsed / duration;
             targetTransform.localScale = originalScale * Mathf.Lerp(1f, 1.25f, Mathf.Sin(t * Mathf.PI));
             yield return null;
@@ -575,7 +575,7 @@ public class BattleManager : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < stampAnimationDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / stampAnimationDuration);
             stampTransform.localScale = Vector3.Lerp(originalScale * 2.5f, originalScale, t * t);
             yield return null;
@@ -585,7 +585,7 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator FinalizeAndExitGame()
     {
-        yield return new WaitForSecondsRealtime(0.1f);
+        yield return new GameSpeedWait(0.1f);
         Time.timeScale = 1f;
 
         if (BattleTransition.IsPlaying)
@@ -642,7 +642,7 @@ public class BattleManager : MonoBehaviour
             while (!isScoreComplete) yield return null;
         }
 
-        yield return new WaitForSecondsRealtime(delayBetweenSequences);
+        yield return new GameSpeedWait(delayBetweenSequences);
 
         // Cross-fade: Score To Beat fades out while the number spinner fades in (and starts spinning) at the same time
         Coroutine scoreFadeOut = null;
@@ -679,7 +679,7 @@ public class BattleManager : MonoBehaviour
             UpdateBattleTargetScoreDisplay(battleTargetScore);
         }
 
-        yield return new WaitForSecondsRealtime(0.4f);
+        yield return new GameSpeedWait(0.4f);
 
         currentRoundNumber = 1;
         UpdateCurrentRoundDisplays();
@@ -752,7 +752,7 @@ public class BattleManager : MonoBehaviour
         while (elapsed < roundFadeInDuration)
         {
             if (isMatchOver) yield break;
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = elapsed / roundFadeInDuration;
 
             dimColor.a = Mathf.Lerp(0f, dimOverlayAlpha, t);
@@ -763,13 +763,13 @@ public class BattleManager : MonoBehaviour
             yield return null;
         }
 
-        yield return new WaitForSecondsRealtime(roundDisplayDuration);
+        yield return new GameSpeedWait(roundDisplayDuration);
 
         elapsed = 0f;
         while (elapsed < roundFadeOutDuration)
         {
             if (isMatchOver) yield break;
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = elapsed / roundFadeOutDuration;
 
             dimColor.a = Mathf.Lerp(dimOverlayAlpha, 0f, t);
@@ -802,7 +802,7 @@ public class BattleManager : MonoBehaviour
         float elapsedTime = 0f;
         while (elapsedTime < duration)
         {
-            elapsedTime += Time.unscaledDeltaTime;
+            elapsedTime += GameSpeed.DeltaTime;
             canvasGroup.alpha = Mathf.SmoothStep(startAlpha, endAlpha, Mathf.Clamp01(elapsedTime / duration)); // eased, so it starts and ends softly
             yield return null;
         }

@@ -6447,6 +6447,7 @@ MonoBehaviour:
   tsinelasFadeOutDuration: 0.25
   tsinelasPopupPosition: {x: 637, y: -374}
   tsinelasPopupSize: 220
+  maxTsinelasRerolls: 1
 --- !u!212 &1283867253
 SpriteRenderer:
   serializedVersion: 2
@@ -6949,6 +6950,62 @@ Transform:
   - {fileID: 2124731806}
   - {fileID: 2064940598}
   m_Father: {fileID: 426697762}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1527473519
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1527473521}
+  - component: {fileID: 1527473520}
+  m_Layer: 0
+  m_Name: FastForward
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1527473520
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1527473519}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8d4ec2cd8b1d4f4daf32c6e115516f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FastForwardOverlay
+  size: {x: 110, y: 60}
+  margin: {x: 30, y: 30}
+  sortingOrder: 999
+  backgroundColor: {r: 0.1, g: 0.1, b: 0.1, a: 0.75}
+  activeTint: {r: 1, g: 0.85, b: 0.3, a: 1}
+  fontSize: 32
+  speeds:
+  - 1
+  - 2
+  - 4
+  clickSound: {fileID: 0}
+  clickVolume: 1
+--- !u!4 &1527473521
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1527473519}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 740.972, y: 0, z: 1690.8235}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1534126437
 GameObject:
@@ -9945,5 +10002,6 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 581348593}
   - {fileID: 67436095}
+  - {fileID: 1527473521}
   - {fileID: 426697762}
   - {fileID: 990887748}

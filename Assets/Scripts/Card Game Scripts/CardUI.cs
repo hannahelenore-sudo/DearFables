@@ -566,7 +566,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
         while (elapsed < duration)
         {
-            elapsed += Time.deltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             t = t * t * (3f - 2f * t);
 
@@ -598,7 +598,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         float elapsed = 0f;
         while (elapsed < duration)
         {
-            elapsed += Time.deltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = elapsed / duration;
             t = t * t * (3f - 2f * t);
 

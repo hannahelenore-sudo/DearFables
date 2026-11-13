@@ -127,7 +127,7 @@ public class NumberSpinnerUI : MonoBehaviour
 
             while (elapsed < spinDuration)
             {
-                elapsed += Time.unscaledDeltaTime;
+                elapsed += GameSpeed.DeltaTime;
                 if (elapsed >= nextSpinTime)
                 {
                     nextSpinTime = elapsed + spinInterval;
@@ -140,7 +140,7 @@ public class NumberSpinnerUI : MonoBehaviour
             if (spinnerNumberText != null) spinnerNumberText.text = finalNumber.ToString();
 
             yield return StartCoroutine(PopAndWiggleRoutine());
-            yield return new WaitForSecondsRealtime(postSpinPauseDuration);
+            yield return new GameSpeedWait(postSpinPauseDuration);
 
             // Tsinelas: pause here (before the minimizing). If the player taps it, spin the number again.
             if (tsinelasOffer != null && tsinelasPopup != null && rerollsUsed < maxTsinelasRerolls)
@@ -165,7 +165,7 @@ public class NumberSpinnerUI : MonoBehaviour
 
             while (moveElapsed < moveToCornerDuration)
             {
-                moveElapsed += Time.unscaledDeltaTime;
+                moveElapsed += GameSpeed.DeltaTime;
                 float t = Mathf.Clamp01(moveElapsed / moveToCornerDuration);
                 float smoothT = t * t * (3f - 2f * t);
 
@@ -244,7 +244,7 @@ public class NumberSpinnerUI : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < tsinelasPopInDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / tsinelasPopInDuration);
             float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f); // easeOutBack
             popT.localScale = baseScale * overshoot;
@@ -256,7 +256,7 @@ public class NumberSpinnerUI : MonoBehaviour
         float timeLeft = tsinelasPopupDuration;
         while (timeLeft > 0f && !tsinelasClicked)
         {
-            timeLeft -= Time.unscaledDeltaTime;
+            timeLeft -= GameSpeed.DeltaTime;
             if (tsinelasTimerCircle != null)
                 tsinelasTimerCircle.fillAmount = Mathf.Clamp01(timeLeft / tsinelasPopupDuration);
             yield return null;
@@ -282,7 +282,7 @@ public class NumberSpinnerUI : MonoBehaviour
         float outDuration = Mathf.Max(0.01f, tsinelasFadeOutDuration);
         while (elapsed < outDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float p = Mathf.Clamp01(elapsed / outDuration);
             p = p * p * (3f - 2f * p);
             if (shrink) popT.localScale = Vector3.Lerp(baseScale, Vector3.zero, p);
@@ -437,7 +437,7 @@ public class NumberSpinnerUI : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < 0.1f)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             container.localScale = Vector3.Lerp(baseScale, maxPop, elapsed / 0.1f);
             yield return null;
         }
@@ -445,7 +445,7 @@ public class NumberSpinnerUI : MonoBehaviour
         elapsed = 0f;
         while (elapsed < wiggleDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float progress = Mathf.Clamp01(elapsed / wiggleDuration);
             float currentWiggle = Mathf.Sin(progress * Mathf.PI * 8f) * wiggleAngle * (1f - progress);
 

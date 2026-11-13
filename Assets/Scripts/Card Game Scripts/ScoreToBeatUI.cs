@@ -105,7 +105,7 @@ public class ScoreToBeatUI : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < reelDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float progress = Mathf.Clamp01(elapsed / reelDuration);
 
             if (scoreText != null)
@@ -123,7 +123,7 @@ public class ScoreToBeatUI : MonoBehaviour
         if (advantage)
             yield return StartCoroutine(AdvantageRoutine(originalScore, targetScore));
 
-        yield return new WaitForSecondsRealtime(postAnimationPause);
+        yield return new GameSpeedWait(postAnimationPause);
 
         if (hideWhenDone)
         {
@@ -138,7 +138,7 @@ public class ScoreToBeatUI : MonoBehaviour
     // then the dim and the text fade away while the score drops from the full number to the reduced one.
     private IEnumerator AdvantageRoutine(int from, int to)
     {
-        yield return new WaitForSecondsRealtime(advantageDelay);
+        yield return new GameSpeedWait(advantageDelay);
 
         Image dim = GetDimOverlay();
         TextMeshProUGUI label = GetAdvantageText();
@@ -160,7 +160,7 @@ public class ScoreToBeatUI : MonoBehaviour
             float dur = Mathf.Max(0.01f, dimFadeInDuration);
             while (e < dur)
             {
-                e += Time.unscaledDeltaTime;
+                e += GameSpeed.DeltaTime;
                 float s = Smooth(e / dur);
                 SetDimAlpha(dim, dimAmount * s);
                 SetScoreAreaAlpha(headerBase, scoreBase, Mathf.Lerp(1f, scoreDimmedAlpha, s)); // the Score To Beat text dims with the screen
@@ -179,7 +179,7 @@ public class ScoreToBeatUI : MonoBehaviour
             yield return StartCoroutine(PopIn(label.rectTransform, 0.28f));
         }
 
-        yield return new WaitForSecondsRealtime(0.1f);
+        yield return new GameSpeedWait(0.1f);
 
         if (percentLabel != null)
         {
@@ -189,7 +189,7 @@ public class ScoreToBeatUI : MonoBehaviour
             yield return StartCoroutine(PopIn(percentLabel.rectTransform, 0.35f));
         }
 
-        yield return new WaitForSecondsRealtime(advantageHoldDuration);
+        yield return new GameSpeedWait(advantageHoldDuration);
 
         // 3. Fade everything away and drop the score at the same time
         RectTransform scoreRect = scoreText != null ? scoreText.rectTransform : null;
@@ -201,7 +201,7 @@ public class ScoreToBeatUI : MonoBehaviour
 
         while (t < total)
         {
-            t += Time.unscaledDeltaTime;
+            t += GameSpeed.DeltaTime;
 
             float f = Smooth(t / fadeDur);
             float fade = 1f - f;
@@ -238,7 +238,7 @@ public class ScoreToBeatUI : MonoBehaviour
             float c = 0f;
             while (c < 0.25f)
             {
-                c += Time.unscaledDeltaTime;
+                c += GameSpeed.DeltaTime;
                 scoreText.color = Color.Lerp(reductionColor, scoreBase, Smooth(c / 0.25f));
                 yield return null;
             }
@@ -292,7 +292,7 @@ public class ScoreToBeatUI : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < duration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float x = Mathf.Clamp01(elapsed / duration) - 1f;
             const float c1 = 1.70158f;
             r.localScale = Vector3.one * (1f + (c1 + 1f) * x * x * x + c1 * x * x);
@@ -402,7 +402,7 @@ public class ScoreToBeatUI : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < 0.1f)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             textRect.localScale = Vector3.Lerp(baseScale, maxPop, elapsed / 0.1f);
             yield return null;
         }
@@ -410,7 +410,7 @@ public class ScoreToBeatUI : MonoBehaviour
         elapsed = 0f;
         while (elapsed < wiggleDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float progress = Mathf.Clamp01(elapsed / wiggleDuration);
             float currentWiggle = Mathf.Sin(progress * Mathf.PI * 8f) * wiggleAngle * (1f - progress);
 

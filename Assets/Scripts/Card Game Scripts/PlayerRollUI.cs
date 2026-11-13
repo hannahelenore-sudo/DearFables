@@ -297,7 +297,7 @@ public class PlayerRollUI : MonoBehaviour
                 nextTickTime = elapsedTime + spinSpeed * Mathf.Lerp(1f, 3f, progress * progress);
             }
 
-            elapsedTime += Time.unscaledDeltaTime;
+            elapsedTime += GameSpeed.DeltaTime;
             yield return null;
         }
 
@@ -314,7 +314,7 @@ public class PlayerRollUI : MonoBehaviour
 
         yield return StartCoroutine(PopAndWiggleRoutine());
 
-        yield return new WaitForSecondsRealtime(lingerDuration);
+        yield return new GameSpeedWait(lingerDuration);
 
         hasRolledThisRound = true;
 
@@ -438,7 +438,7 @@ public class PlayerRollUI : MonoBehaviour
 
         while (elapsed < duration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f); // easeOutBack
             rt.localScale = initialNotificationScale * overshoot;
@@ -453,7 +453,7 @@ public class PlayerRollUI : MonoBehaviour
         while (true)
         {
             SpawnSingleConfetti();
-            yield return new WaitForSecondsRealtime(confettiSpawnInterval);
+            yield return new GameSpeedWait(confettiSpawnInterval);
         }
     }
 
@@ -495,7 +495,7 @@ public class PlayerRollUI : MonoBehaviour
 
         while (elapsed < duration && rect != null)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             float fall = Mathf.Lerp(t, t * t, 0.5f); // starts gently, picks up speed like it's falling
 
@@ -503,7 +503,7 @@ public class PlayerRollUI : MonoBehaviour
             float currentX = startX + Mathf.Sin(t * Mathf.PI * swaySpeed) * swayAmount;
 
             rect.anchoredPosition = new Vector2(currentX, currentY);
-            rect.Rotate(0, 0, rotationSpeed * Time.unscaledDeltaTime);
+            rect.Rotate(0, 0, rotationSpeed * GameSpeed.DeltaTime);
 
             if (img != null)
             {
@@ -527,9 +527,9 @@ public class PlayerRollUI : MonoBehaviour
         float spinTime = 0f;
         while (playerShieldImage != null)
         {
-            spinTime += Time.unscaledDeltaTime;
+            spinTime += GameSpeed.DeltaTime;
             float ramp = Smooth(spinTime / 0.6f); // speeds up smoothly instead of starting at full speed
-            currentShieldZRotation -= 120f * ramp * Time.unscaledDeltaTime;
+            currentShieldZRotation -= 120f * ramp * GameSpeed.DeltaTime;
             playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, currentShieldZRotation);
 
             if (playerNumberText != null)
@@ -567,7 +567,7 @@ public class PlayerRollUI : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < 0.1f)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float tp = Mathf.Clamp01(elapsed / 0.1f);
             float easeOut = 1f - (1f - tp) * (1f - tp) * (1f - tp);
             playerRollContainer.localScale = Vector3.Lerp(baseScale, maxPop, easeOut);
@@ -577,7 +577,7 @@ public class PlayerRollUI : MonoBehaviour
         elapsed = 0f;
         while (elapsed < wiggleDuration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             float progress = Mathf.Clamp01(elapsed / wiggleDuration);
             float currentWiggle = Mathf.Sin(progress * Mathf.PI * 8f) * wiggleAngle * (1f - progress);
 
@@ -600,7 +600,7 @@ public class PlayerRollUI : MonoBehaviour
 
         while (elapsed < duration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += GameSpeed.DeltaTime;
             rollCanvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, Smooth(elapsed / duration));
             yield return null;
         }
