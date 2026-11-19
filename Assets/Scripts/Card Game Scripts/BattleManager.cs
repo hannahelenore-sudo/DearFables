@@ -84,6 +84,12 @@ public class BattleManager : MonoBehaviour
     [Header("Deck Manager Link")]
     public DeckManager deckManager;
 
+    [Header("Enemy Sprite (taken from the enemy that started the fight)")]
+    [Tooltip("Optional. A SpriteRenderer in the battle scene that should show the enemy. It gets the sprite of the EnemyChase that started this battle.")]
+    public SpriteRenderer enemySpriteRenderer;
+    [Tooltip("Optional. Same thing for a UI Image.")]
+    public Image enemyImage;
+
     [Header("Sound Effects")]
     [Range(0f, 1f)] public float sfxVolume = 1f;
     public AudioClip buttonClickSound;
@@ -157,7 +163,51 @@ public class BattleManager : MonoBehaviour
         if (currentRoundText1 != null) currentRoundText1.gameObject.SetActive(false);
         if (currentRoundText2 != null) currentRoundText2.gameObject.SetActive(false);
 
+        ApplyEnemySprite();
+
         SetBattleUIInteractable(false);
+    }
+
+    // The enemy that started the fight (EnemyChase) passes its picture on through BattleEnemy.
+    // Only an enemy with "Custom Battle Picture" on also flips / enlarges / moves it; others show as placed.
+    private void ApplyEnemySprite()
+    {
+        bool hasEnemy = BattleEnemy.HasEnemy;
+        bool styled = hasEnemy && BattleEnemy.HasStyle;
+
+        if (enemySpriteRenderer != null)
+        {
+            if (hasEnemy) enemySpriteRenderer.sprite = BattleEnemy.Sprite;
+
+            if (styled)
+            {
+                if (BattleEnemy.Flip) enemySpriteRenderer.flipX = !enemySpriteRenderer.flipX;
+
+                Transform t = enemySpriteRenderer.transform;
+                t.localScale = t.localScale * BattleEnemy.Scale;
+                t.position += BattleEnemy.Offset;
+            }
+        }
+
+        if (enemyImage != null)
+        {
+            if (hasEnemy)
+            {
+                enemyImage.sprite = BattleEnemy.Sprite;
+                enemyImage.preserveAspect = true;
+            }
+
+            if (styled)
+            {
+                RectTransform rt = enemyImage.rectTransform;
+                Vector3 scale = rt.localScale * BattleEnemy.Scale;
+                if (BattleEnemy.Flip) scale.x = -scale.x;
+                rt.localScale = scale;
+                rt.anchoredPosition += BattleEnemy.ImageOffset;
+            }
+        }
+
+        BattleEnemy.Clear(); // a later fight that has no enemy (e.g. from a zone) won't reuse it
     }
 
     private void Update()

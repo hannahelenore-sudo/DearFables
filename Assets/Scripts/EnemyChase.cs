@@ -31,6 +31,22 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("Enemy stops this close to the player.")]
     public float stopDistance = 0.5f;
 
+    [Header("Card Game Unlock")]
+    [Tooltip("ON: this enemy stays passive (no chasing, no touch battles) until the player has collected the card (CardPickup). Use it so the card game only starts after the card tutorial.")]
+    public bool waitForCardUnlock = false;
+
+    [Header("Battle Picture (optional)")]
+    [Tooltip("ON: in the battle scene this enemy's picture is flipped / enlarged / moved as set below. OFF: the battle scene shows it as placed (other enemies stay as they are).")]
+    public bool customBattlePicture = false;
+    [Tooltip("Turn the picture around (mirror left/right).")]
+    public bool battleFlip = true;
+    [Tooltip("How much bigger the picture is drawn. 1 = unchanged, 2 = twice as big.")]
+    public float battleScale = 2f;
+    [Tooltip("Moves a SpriteRenderer picture (world units). Negative Y = lower.")]
+    public Vector3 battleOffset = new Vector3(0f, -1f, 0f);
+    [Tooltip("Moves a UI Image picture (pixels). Negative Y = lower.")]
+    public Vector2 battleImageOffset = new Vector2(0f, -150f);
+
     [Header("Battle Start")]
     [Tooltip("A card thrown by CardShooter starts the battle when it hits this enemy.")]
     public bool startBattleOnCardHit = true;
@@ -147,9 +163,13 @@ public class EnemyChase : MonoBehaviour
         return SceneManager.GetActiveScene().name + "/" + id;
     }
 
+    /// <summary>True if this enemy already caught the player (or exploded) earlier, so it stays gone.</summary>
+    public bool WasCaught { get { return caughtEnemies.Contains(GetId()); } }
+
     /// <summary>Called by CardProjectile when the thrown card reaches this enemy.</summary>
     public void HitByCard()
     {
+        if (!enabled) return; // switched off (e.g. a StarQuestNPC that has not become an enemy yet)
         if (battleStarted) return;
 
         Debug.Log("EnemyChase '" + name + "': Sun " + DeckPower.Sun + " + Wind " + DeckPower.Wind
@@ -170,7 +190,7 @@ public class EnemyChase : MonoBehaviour
     /// <summary>Called by CardProjectile when a thrown Tsinelas reaches this enemy.</summary>
     public void Stun(float duration)
     {
-        if (battleStarted || duration <= 0f) return;
+        if (!enabled || battleStarted || duration <= 0f) return;
 
         stunDuration = duration;
         stunTimer = duration; // hitting it again restarts the spin
@@ -413,6 +433,9 @@ public class EnemyChase : MonoBehaviour
         if (player == null) return;
         if (battleStarted) return;
 
+        // Card game not unlocked yet (the card is still lying there): stay passive
+        if (waitForCardUnlock && CardPickup.Locked) return;
+
         UpdatePowerIcon();
 
         // Player frozen (e.g. talking to the shopkeeper) -> the enemy freezes too
@@ -516,6 +539,11 @@ public class EnemyChase : MonoBehaviour
         battleStarted = true;
         battleStarting = true;
         caughtEnemies.Add(GetId()); // gone when the player comes back
+
+        // The battle scene shows this enemy's picture (BattleManager reads it)
+        BattleEnemy.Set(spriteRenderer != null ? spriteRenderer.sprite : null);
+        if (customBattlePicture)
+            BattleEnemy.SetStyle(battleFlip, battleScale, battleOffset, battleImageOffset);
 
         // Stun is over, the fight begins
         stunTimer = 0f;

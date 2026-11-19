@@ -2710,6 +2710,8 @@ MonoBehaviour:
   fadeDuration: 0.25
   crossFadeDuration: 0.5
   deckManager: {fileID: 882515594}
+  enemySpriteRenderer: {fileID: 1126097988}
+  enemyImage: {fileID: 0}
   sfxVolume: 1
   buttonClickSound: {fileID: 8300000, guid: b42ae12879968b8489f1daaa94b8e675, type: 3}
   scoreToBeatSound: {fileID: 8300000, guid: d30a041c5ac894f4bb07a2c3589a5970, type: 3}
