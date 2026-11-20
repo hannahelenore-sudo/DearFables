@@ -294,8 +294,8 @@ public class CardGameTutorial : MonoBehaviour
 #endif
     }
 
-    void OnDisable() { Resume(); }
-    void OnDestroy() { Resume(); }
+    void OnDisable() { Resume(); InputLock.Pop(this); }
+    void OnDestroy() { Resume(); InputLock.Pop(this); }
 
     // ───────────────────────────────────────────── flow
 
@@ -374,6 +374,7 @@ public class CardGameTutorial : MonoBehaviour
     {
         overlayRoot.SetActive(true);
         Pause();
+        InputLock.Push(this); // every game button is locked while a tutorial step is on screen
 
         for (int i = 0; i < s.steps.Length && !skipRequested; i++)
         {
@@ -413,6 +414,7 @@ public class CardGameTutorial : MonoBehaviour
 
         overlayRoot.SetActive(false);
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        InputLock.Pop(this);
         Resume();
     }
 

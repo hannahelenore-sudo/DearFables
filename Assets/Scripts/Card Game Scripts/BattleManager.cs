@@ -124,6 +124,8 @@ public class BattleManager : MonoBehaviour
     private bool advantageApplied;
     private float difficultyAtStart;
     private bool isTutorialFight;
+    private const string RoundIntroLockKey = "BattleManager.RoundIntro";
+    private const string EndingLockKey = "BattleManager.Ending";
     private bool starDroppedThisFight = true; // false when the enemy that started the fight is not a star enemy
 
     private void Awake()
@@ -265,6 +267,8 @@ public class BattleManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        InputLock.Pop(RoundIntroLockKey);
+        InputLock.Pop(EndingLockKey);
         AdvantageHit.EndBattle(); // the advantage only lasts for this fight
     }
 
@@ -414,6 +418,8 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained, int batteriesGained = 0)
     {
+        InputLock.Push(EndingLockKey); // nothing can be pressed during the ending (the click to exit is read directly)
+
         if (cardSystemCanvas != null) cardSystemCanvas.gameObject.SetActive(false);
 
         // 1. DIM OVERLAY (Sorting Order 500 - Dims background only)
@@ -819,7 +825,15 @@ public class BattleManager : MonoBehaviour
         return battleTargetScore;
     }
 
+    // Every button is locked while the round intro plays (see InputLock)
     public IEnumerator PlayRoundIntroSequence(int roundNum)
+    {
+        InputLock.Push(RoundIntroLockKey);
+        yield return StartCoroutine(PlayRoundIntroSequenceInner(roundNum));
+        InputLock.Pop(RoundIntroLockKey);
+    }
+
+    private IEnumerator PlayRoundIntroSequenceInner(int roundNum)
     {
         if (roundDimOverlay == null || roundPopupText == null || isMatchOver) yield break;
 

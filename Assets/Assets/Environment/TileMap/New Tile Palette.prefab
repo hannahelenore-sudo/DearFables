@@ -1015,34 +1015,34 @@ Tilemap:
     m_Data: {r: 1, g: 1, b: 1, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.7054014, g: 0.42572504, b: 0.4694167, a: 1}
+    m_Data: {r: 0.9066635, g: 0.4726848, b: 0.48257294, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.88147116, g: 0.5754753, b: 0.63656646, a: 1}
+    m_Data: {r: 0.92669755, g: 0.5119669, b: 0.5885533, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.8544213, g: 0.5065532, b: 0.5467052, a: 1}
+    m_Data: {r: 0.7384007, g: 0.3583082, b: 0.3656326, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.9295359, g: 0.54463726, b: 0.55490774, a: 1}
+    m_Data: {r: 0.9606523, g: 0.58964, b: 0.7090247, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.7328037, g: 0.3568675, b: 0.47050425, a: 1}
+    m_Data: {r: 0.7622025, g: 0.34081888, b: 0.39482352, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.89820033, g: 0.5796641, b: 0.6636474, a: 1}
+    m_Data: {r: 0.71000457, g: 0.31567082, b: 0.35840273, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.8097127, g: 0.5043946, b: 0.5931107, a: 1}
+    m_Data: {r: 0.8810598, g: 0.3663967, b: 0.3722536, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.7697194, g: 0.4515643, b: 0.49671495, a: 1}
+    m_Data: {r: 0.731687, g: 0.41617703, b: 0.45822224, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.7932772, g: 0.49586815, b: 0.59221166, a: 1}
+    m_Data: {r: 0.95170134, g: 0.47840193, b: 0.49263, a: 1}
   - serializedVersion: 2
     m_RefCount: 1
-    m_Data: {r: 0.77702516, g: 0.52381706, b: 0.59350485, a: 1}
+    m_Data: {r: 0.96580696, g: 0.51956856, b: 0.65967596, a: 1}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1076,8 +1076,8 @@ TilemapRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4611675320319731236}
   m_Enabled: 1
-  m_CastShadows: 0
-  m_ReceiveShadows: 0
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
   m_DynamicOccludee: 0
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
@@ -1093,7 +1093,7 @@ TilemapRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  - {fileID: 2100000, guid: 860241deeac5cb34fa35afbe78681e2b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
