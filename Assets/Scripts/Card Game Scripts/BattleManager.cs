@@ -68,7 +68,7 @@ public class BattleManager : MonoBehaviour
     public float roundFadeOutDuration = 0.3f;
 
     [Header("Battle Target Settings")]
-    [Tooltip("Target score at the EASIEST difficulty. Raised automatically as the difficulty meter fills.")]
+    [Tooltip("NO LONGER USED. The score to beat now comes from DifficultyProgress.BlindScores (300, 450, 600, 800 ... 12000).")]
     public int battleTargetScore = 400;
 
     [Header("Tutorial Fight")]
@@ -76,7 +76,7 @@ public class BattleManager : MonoBehaviour
     public int tutorialTargetScore = 200;
 
     [Header("Difficulty")]
-    [Tooltip("Target score at max difficulty = Battle Target Score x this. At 0 difficulty it stays at Battle Target Score.")]
+    [Tooltip("NO LONGER USED (see Battle Target Score).")]
     public float maxScoreMultiplier = 3f;
 
     [Header("Sequence Settings")]
@@ -124,9 +124,13 @@ public class BattleManager : MonoBehaviour
     private bool advantageApplied;
     private float difficultyAtStart;
     private bool isTutorialFight;
+    private bool starDroppedThisFight = true; // false when the enemy that started the fight is not a star enemy
 
     private void Awake()
     {
+        // The enemy that started the fight says whether beating it gives a star (EnemyChase > Drops Star)
+        starDroppedThisFight = BattleStarReward.Take();
+
         // Permanent boons: +hands per round (extra scoring attempts)
         maxRounds += BoonProgress.ExtraHands;
 
@@ -135,8 +139,9 @@ public class BattleManager : MonoBehaviour
 
         // Difficulty meter: the more stars / fights, the higher the score to beat
         difficultyAtStart = DifficultyProgress.Meter; // remembered for the battery reward
-        battleTargetScore = DifficultyProgress.ScaleScore(battleTargetScore, maxScoreMultiplier);
-        Debug.Log("BattleManager: difficulty " + Mathf.RoundToInt(DifficultyProgress.Meter * 100f) + "% -> target score " + battleTargetScore);
+        // Balatro-style blinds: the score depends on how many enemies you have defeated (a star enemy is a bit higher)
+        battleTargetScore = DifficultyProgress.GetEnemyScore(starDroppedThisFight);
+        Debug.Log("BattleManager: " + DifficultyProgress.BlindLabel + (starDroppedThisFight ? " (star enemy)" : "") + " -> target score " + battleTargetScore);
 
         // Tsinelas is no longer automatic: during the number spinner the player gets a popup and chooses (see OnTsinelasUsed)
 
@@ -362,8 +367,13 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerWon = true;
-        if (!isTutorialFight) DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up (not the tutorial)
-        PlayerProgress.AddStars(starsGainedOnWin);
+        if (!isTutorialFight)
+        {
+            DifficultyProgress.AddBattle();
+            DifficultyProgress.AddDefeat(); // enemy defeated: the next one is the next blind (not the tutorial)
+        }
+        int starsEarned = starDroppedThisFight ? starsGainedOnWin : 0;
+        if (starsEarned > 0) PlayerProgress.AddStars(starsEarned);
 
         // Batteries: Balatro style - a base reward plus a bonus for every hand you had left.
         // They drop in the world (BatteryDropper) when you are back in the game scene.
@@ -383,7 +393,7 @@ public class BattleManager : MonoBehaviour
         }
 
         int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
-        StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsGainedOnWin, batteryReward));
+        StartCoroutine(RunEndingSequence(true, battleTargetScore, finalYourScore, starsEarned, batteryReward));
     }
 
     public void TriggerLossCondition()
@@ -471,11 +481,12 @@ public class BattleManager : MonoBehaviour
             // 2. COUNT YOUR SCORE
             yield return StartCoroutine(CountStatSequence(yourScoreTxt, "Your Score: ", yourScore));
 
-            // 3. COUNT STARS GAINED
-            yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
-
-            // 4. COUNT BATTERIES GAINED
+            // 3. COUNT BATTERIES GAINED
             yield return StartCoroutine(CountStatSequence(batteriesGainedTxt, "Batteries Gained: ", batteriesGained));
+
+            // 4. COUNT STARS GAINED (only when this enemy gives a star)
+            if (starDroppedThisFight)
+                yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
 
             // Delay after counting is fully done before the stamp animation plays
             yield return new GameSpeedWait(delayBeforeStamp);
@@ -523,7 +534,7 @@ public class BattleManager : MonoBehaviour
 
         if (targetScoreTxt != null) targetScoreTxt.gameObject.SetActive(visible);
         if (yourScoreTxt != null) yourScoreTxt.gameObject.SetActive(visible);
-        if (starsGainedTxt != null) starsGainedTxt.gameObject.SetActive(visible);
+        if (starsGainedTxt != null) starsGainedTxt.gameObject.SetActive(visible && starDroppedThisFight); // no star = line stays disabled
         if (batteriesGainedTxt != null) batteriesGainedTxt.gameObject.SetActive(visible);
     }
 

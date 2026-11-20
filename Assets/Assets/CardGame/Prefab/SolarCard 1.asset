@@ -22,5 +22,8 @@ MonoBehaviour:
   secondaryValue: 0
   frameColor: {r: 1, g: 1, b: 1, a: 1}
   hoverIcon: {fileID: 21300000, guid: ff9ca4f39a881694da2d9a9000db015f, type: 3}
+  isLowPower: 0
   requiredCards: 5
   multiplier: 1.5
+  bonusSound: {fileID: 0}
+  bonusVolume: 1

@@ -32,6 +32,9 @@ public static class CardGameTutorialGate
 
     // True from the moment the tutorial takes the flag until the card game scene closes.
     static bool activeTutorial;
+    // True once a tutorial fight has been triggered (finished OR skipped). From then on every card game is a normal one.
+    static bool tutorialUsed;
+    public static bool TutorialUsed { get { return tutorialUsed; } }
     // Editor testing: the tutorial forces itself on (see CardGameTutorial.forceRunInEditor).
     static bool forcedInEditor;
 
@@ -43,12 +46,13 @@ public static class CardGameTutorialGate
     {
         get
         {
-            return Pending || activeTutorial || forcedInEditor ||
-                   Time.unscaledTime - lastNpcEngageTime <= EngageWindow;
+            if (activeTutorial || forcedInEditor) return true; // the tutorial fight itself
+            if (tutorialUsed) return false;                    // tutorial already happened: always a normal fight
+            return Pending || Time.unscaledTime - lastNpcEngageTime <= EngageWindow;
         }
     }
 
-    public static void ForceTutorialInEditor() { forcedInEditor = true; }
+    public static void ForceTutorialInEditor() { if (!tutorialUsed) forcedInEditor = true; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
@@ -56,6 +60,7 @@ public static class CardGameTutorialGate
         Pending = false;
         Completed = false;
         activeTutorial = false;
+        tutorialUsed = false;
         forcedInEditor = false;
         lastNpcEngageTime = -999f;
     }
@@ -63,7 +68,7 @@ public static class CardGameTutorialGate
     public static void MarkCompleted() { Completed = true; }
 
     /// <summary>Call from your "New Game" button.</summary>
-    public static void ResetCompleted() { Completed = false; }
+    public static void ResetCompleted() { Completed = false; tutorialUsed = false; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Hook()
@@ -88,7 +93,7 @@ public static class CardGameTutorialGate
     {
         // The card game just opened. If the StarQuest NPC was hit / touched a moment ago,
         // that NPC is what started it.
-        if (scene.name == CardGameSceneName &&
+        if (!tutorialUsed && scene.name == CardGameSceneName &&
             Time.unscaledTime - lastNpcEngageTime <= EngageWindow)
         {
             Pending = true;
@@ -96,17 +101,25 @@ public static class CardGameTutorialGate
     }
 
     /// <summary>Call whenever the StarQuest NPC is hit or touched by the player.</summary>
-    public static void NoteStarQuestEngaged() { lastNpcEngageTime = Time.unscaledTime; }
+    public static void NoteStarQuestEngaged() { if (!tutorialUsed) lastNpcEngageTime = Time.unscaledTime; }
 
     /// <summary>Call this directly from your own battle-start code to be exact.</summary>
-    public static void MarkFromStarQuest() { Pending = true; }
+    public static void MarkFromStarQuest() { if (!tutorialUsed) Pending = true; }
 
     public static bool Consume()
     {
-        bool p = Pending;
+        bool p = Pending && !tutorialUsed;
         Pending = false;
-        if (p) activeTutorial = true;
+        if (p) MarkTutorialTriggered();
         return p;
+    }
+
+    /// <summary>The tutorial fight has started. Whether it is finished or skipped, the NEXT card game is a normal one.</summary>
+    public static void MarkTutorialTriggered()
+    {
+        tutorialUsed = true;
+        activeTutorial = true;
+        Pending = false;
     }
 }
 
@@ -223,14 +236,17 @@ public class CardGameTutorial : MonoBehaviour
 
     void Start()
     {
+        bool alreadyUsed = CardGameTutorialGate.TutorialUsed; // read BEFORE Consume() marks it
         bool fromNpc = CardGameTutorialGate.Consume();
-        bool run = !onlyWhenStartedFromStarQuest || fromNpc ||
-                   (Application.isEditor && forceRunInEditor);
+        bool run = !alreadyUsed && (!onlyWhenStartedFromStarQuest || fromNpc ||
+                   (Application.isEditor && forceRunInEditor));
         if (!run || sections == null || sections.Length == 0)
         {
             enabled = false;
             return;
         }
+
+        CardGameTutorialGate.MarkTutorialTriggered(); // from now on every other card game is normal
 
         tutorialRun = true;
         startTime = Time.unscaledTime;

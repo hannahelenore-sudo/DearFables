@@ -5,6 +5,28 @@ using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
 /// <summary>
+/// Carries "does the enemy that started this fight drop a star?" from the overworld into the card game scene.
+/// EnemyChase sets it when the battle starts, BattleManager reads it once and clears it.
+/// A fight that wasn't started by an EnemyChase (zones, editor tests) keeps the old behaviour: it gives the star.
+/// </summary>
+public static class BattleStarReward
+{
+    private static bool hasValue;
+    private static bool dropsStar = true;
+
+    public static void Set(bool value) { dropsStar = value; hasValue = true; }
+
+    /// <summary>Reads the flag and resets it, so the next fight starts from the default (star given).</summary>
+    public static bool Take()
+    {
+        bool result = !hasValue || dropsStar;
+        hasValue = false;
+        dropsStar = true;
+        return result;
+    }
+}
+
+/// <summary>
 /// Put this on a GameObject with a SpriteRenderer (your enemy image).
 /// - Player comes within detectionRange  -> enemy starts chasing.
 /// - Player leaves the range for loseSightTime seconds -> enemy stops chasing.
@@ -30,6 +52,22 @@ public class EnemyChase : MonoBehaviour
     public float loseSightTime = 3f;
     [Tooltip("Enemy stops this close to the player.")]
     public float stopDistance = 0.5f;
+
+    [Header("Star Reward")]
+    [Tooltip("ON: beating this enemy gives a star (the 'Stars Gained' line shows on the result paper) and the enemy glows yellow in the middle. OFF: no star, and the 'Stars Gained' line is hidden.")]
+    public bool dropsStar = true;
+    [Tooltip("A yellow glow in the middle of the enemy while it is a star enemy.")]
+    public bool glowWhenDropsStar = true;
+    public Color starGlowColor = new Color(1f, 0.9f, 0.15f, 1f);
+    [Tooltip("Glow size compared to the enemy picture (1 = as wide as the picture).")]
+    [Range(0.1f, 1.5f)] public float starGlowSize = 0.7f;
+    [Range(0f, 1f)] public float starGlowMinAlpha = 0.35f;
+    [Range(0f, 1f)] public float starGlowMaxAlpha = 0.85f;
+    public float starGlowPulseSpeed = 3f;
+
+    [Header("Difficulty")]
+    [Tooltip("ON: this enemy is counted when the game works out how many enemies there are (DifficultyProgress spreads the blinds 300 ... 12000 over that many enemies). Turn OFF for enemies that should not count. The StarQuest NPC is never counted.")]
+    public bool countsForDifficulty = true;
 
     [Header("Card Game Unlock")]
     [Tooltip("ON: this enemy stays passive (no chasing, no touch battles) until the player has collected the card (CardPickup). Use it so the card game only starts after the card tutorial.")]
@@ -69,9 +107,9 @@ public class EnemyChase : MonoBehaviour
     [Header("Overpowered (Wind + Sun power > score to beat)")]
     [Tooltip("If your combined Wind + Sun power beats the score to beat, a thrown card makes the enemy explode instead of starting a battle.")]
     public bool explodeWhenOverpowered = true;
-    [Tooltip("Same as 'Battle Target Score' on the BattleManager in your battle scene (the EASIEST-difficulty score).")]
+    [Tooltip("NO LONGER USED. The score to beat now comes from DifficultyProgress.BlindScores.")]
     public int baseTargetScore = 400;
-    [Tooltip("Same as 'Max Score Multiplier' on the BattleManager.")]
+    [Tooltip("NO LONGER USED.")]
     public float maxScoreMultiplier = 3f;
     [Tooltip("Sun + Wind together are multiplied by this before being compared with the score to beat. Higher = the combo obliterates enemies even at high difficulty. 1 = plain Sun + Wind.")]
     public float powerMultiplier = 2f;
@@ -133,6 +171,8 @@ public class EnemyChase : MonoBehaviour
     private Vector3 startPosition;
     private SpriteRenderer spriteRenderer;
     private Color baseColor = Color.white;
+    private SpriteRenderer starGlow;
+    private static Sprite starGlowSprite;
 
     // Stun
     private float stunTimer;
@@ -150,6 +190,28 @@ public class EnemyChase : MonoBehaviour
 
     // Remembers which enemies already caught the player. Static = survives scene loads.
     private static readonly HashSet<string> caughtEnemies = new HashSet<string>();
+
+    // Every enemy that has ever shown up in a loaded scene (scene/id). Static = survives scene loads, so the total is
+    // known in the card game scene too, and enemies already beaten (which are destroyed on load) still count.
+    private static readonly HashSet<string> knownEnemies = new HashSet<string>();
+
+    /// <summary>How many different EnemyChase enemies exist (in the scenes visited so far). Drives the difficulty.</summary>
+    public static int KnownEnemyCount { get { return knownEnemies.Count; } }
+
+    private bool countsInDifficulty;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetKnownEnemies()
+    {
+        knownEnemies.Clear();
+    }
+
+    private void Awake()
+    {
+        // The StarQuest NPC is the tutorial enemy: not part of the difficulty
+        countsInDifficulty = countsForDifficulty && GetComponent<StarQuestNPC>() == null;
+        if (countsInDifficulty) knownEnemies.Add(GetId());
+    }
 
     /// <summary>Call this to bring all enemies back (e.g. from a "New Game" button).</summary>
     public static void ResetCaughtEnemies()
@@ -226,7 +288,7 @@ public class EnemyChase : MonoBehaviour
     /// <summary>The score to beat this enemy would have (difficulty scaling only; the random Tsinelas reroll is ignored).</summary>
     public int GetScoreToBeat()
     {
-        return DifficultyProgress.ScaleScore(baseTargetScore, maxScoreMultiplier);
+        return DifficultyProgress.GetEnemyScore(dropsStar); // the blind you are on (star enemies are a bit higher)
     }
 
     /// <summary>Your combined Sun + Wind power times 'Power Multiplier'.</summary>
@@ -311,6 +373,7 @@ public class EnemyChase : MonoBehaviour
     {
         battleStarted = true; // no fight, no chasing, no more hits
         caughtEnemies.Add(GetId()); // stays gone when you come back to this scene
+        if (countsInDifficulty) DifficultyProgress.AddDefeat(); // an exploded enemy is a defeated enemy: the next one is the next blind
 
         stunTimer = 0f;
         if (stars != null) stars.SetActive(false);
@@ -335,7 +398,7 @@ public class EnemyChase : MonoBehaviour
 
     private void DropStars(Vector3 pos)
     {
-        if (starsDropped <= 0) return;
+        if (!dropsStar || starsDropped <= 0) return; // not a star enemy: no stars
 
         if (starPickupPrefab != null)
         {
@@ -360,7 +423,15 @@ public class EnemyChase : MonoBehaviour
         if (batteriesDropped <= 0) return;
 
         BatteryDropper dropper = GetComponent<BatteryDropper>();
-        if (dropper == null) dropper = Object.FindAnyObjectByType<BatteryDropper>(); // reuse your prefab setup
+        if (dropper == null)
+        {
+            // Reuse your prefab setup: prefer a dropper that actually has a pickup prefab assigned
+            foreach (BatteryDropper d in Object.FindObjectsByType<BatteryDropper>(FindObjectsSortMode.None))
+            {
+                if (dropper == null) dropper = d;
+                if (d.pickupPrefab != null) { dropper = d; break; }
+            }
+        }
         if (dropper == null) dropper = gameObject.AddComponent<BatteryDropper>();     // plain yellow dots
         dropper.DropAt(pos, batteriesDropped);
     }
@@ -406,6 +477,16 @@ public class EnemyChase : MonoBehaviour
         }
         spriteRenderer.color = baseColor;
         flashRoutine = null;
+    }
+
+    private void OnEnable()
+    {
+        if (starGlow != null) starGlow.gameObject.SetActive(true);
+    }
+
+    private void OnDisable()
+    {
+        if (starGlow != null) starGlow.gameObject.SetActive(false);
     }
 
     private void Start()
@@ -545,6 +626,9 @@ public class EnemyChase : MonoBehaviour
         if (customBattlePicture)
             BattleEnemy.SetStyle(battleFlip, battleScale, battleOffset, battleImageOffset);
 
+        // The battle scene decides from this whether the win gives a star
+        BattleStarReward.Set(dropsStar);
+
         // Stun is over, the fight begins
         stunTimer = 0f;
         if (stars != null) stars.SetActive(false);
@@ -576,8 +660,84 @@ public class EnemyChase : MonoBehaviour
         GameSFX.Play(hitSound, hitVolume, pitch);
     }
 
+    // ---------------- Star glow ----------------
+
+    private void UpdateStarGlow()
+    {
+        bool show = dropsStar && glowWhenDropsStar && !battleStarted && spriteRenderer != null && spriteRenderer.sprite != null;
+
+        if (!show)
+        {
+            if (starGlow != null && starGlow.gameObject.activeSelf) starGlow.gameObject.SetActive(false);
+            return;
+        }
+
+        if (starGlow == null) starGlow = CreateStarGlow();
+        if (!starGlow.gameObject.activeSelf) starGlow.gameObject.SetActive(true);
+
+        // Sits in the middle of the picture (child of the sprite, so it follows flips, spins and sways)
+        Bounds b = spriteRenderer.sprite.bounds;
+        Vector3 center = b.center;
+        if (spriteRenderer.flipX) center.x = -center.x;
+        if (spriteRenderer.flipY) center.y = -center.y;
+
+        Transform t = starGlow.transform;
+        t.localPosition = center;
+        t.localRotation = Quaternion.identity;
+
+        float pulse = (Mathf.Sin(Time.time * starGlowPulseSpeed) + 1f) * 0.5f;
+        float diameter = Mathf.Min(b.size.x, b.size.y) * starGlowSize * (1f + pulse * 0.08f);
+        t.localScale = new Vector3(diameter, diameter, 1f);
+
+        Color c = starGlowColor;
+        c.a = Mathf.Lerp(starGlowMinAlpha, starGlowMaxAlpha, pulse);
+        starGlow.color = c;
+
+        starGlow.sortingLayerID = spriteRenderer.sortingLayerID;
+        starGlow.sortingOrder = spriteRenderer.sortingOrder + 1;
+    }
+
+    private SpriteRenderer CreateStarGlow()
+    {
+        GameObject go = new GameObject("StarGlow");
+        go.transform.SetParent(spriteRenderer.transform, false);
+
+        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = GetStarGlowSprite();
+        return sr;
+    }
+
+    // Soft round dot: opaque in the middle, fading to nothing at the edge (1 world unit wide)
+    private static Sprite GetStarGlowSprite()
+    {
+        if (starGlowSprite != null) return starGlowSprite;
+
+        const int size = 128;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+
+        Vector2 c = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.5f;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = Mathf.Clamp01(Vector2.Distance(new Vector2(x, y), c) / radius);
+                float a = Mathf.Pow(1f - d, 1.8f);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        }
+        tex.Apply();
+
+        starGlowSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        return starGlowSprite;
+    }
+
     private void LateUpdate()
     {
+        UpdateStarGlow();
+
         if (!faceCamera || Camera.main == null) return;
 
         // Turn only around the Y axis so the sprite stays upright

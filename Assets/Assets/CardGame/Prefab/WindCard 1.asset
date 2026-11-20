@@ -18,9 +18,12 @@ MonoBehaviour:
   cardType: 0
   energyCost: 1
   targetType: 0
-  primaryValue: 20
+  primaryValue: 10
   secondaryValue: 0
   frameColor: {r: 1, g: 1, b: 1, a: 1}
   hoverIcon: {fileID: 0}
+  isLowPower: 0
   requiredCards: 0
   multiplier: 1
+  bonusSound: {fileID: 0}
+  bonusVolume: 1

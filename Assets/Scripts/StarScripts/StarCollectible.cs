@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class StarHover : MonoBehaviour
 {
@@ -10,9 +12,57 @@ public class StarHover : MonoBehaviour
     public AudioClip collectSound;
     [Range(0f, 1f)] public float collectVolume = 1f;
 
+    [Header("Respawn")]
+    [Tooltip("ON: once collected, this star stays gone when the scene loads again (e.g. after a card game). Turn OFF for stars that should always come back.")]
+    public bool stayGoneWhenCollected = true;
+    [Tooltip("Optional. Unique name for this star. Leave empty: it is worked out from the scene, the object's path and its position.")]
+    public string starId = "";
+
     private Vector3 originalPosition;
     private float bounceTime;
     private bool collected;
+    private string rememberedKey;
+
+    // Stars collected this session (static = survives scene loads, like the card game round trip)
+    private static readonly HashSet<string> collectedStars = new HashSet<string>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetOnLaunch()
+    {
+        collectedStars.Clear();
+    }
+
+    /// <summary>Brings every collected star back (call it from your "New Game" button).</summary>
+    public static void ResetCollected()
+    {
+        collectedStars.Clear();
+    }
+
+    private string BuildKey()
+    {
+        string id = starId;
+        if (string.IsNullOrEmpty(id))
+        {
+            // Scene + hierarchy path + position, so two stars with the same name are still different
+            string path = name;
+            for (Transform t = transform.parent; t != null; t = t.parent) path = t.name + "/" + path;
+            Vector3 p = transform.position;
+            id = path + "@" + p.x.ToString("F2") + "," + p.y.ToString("F2") + "," + p.z.ToString("F2");
+        }
+        return gameObject.scene.name + "/" + id;
+    }
+
+    void Awake()
+    {
+        if (!stayGoneWhenCollected) return;
+
+        rememberedKey = BuildKey();
+        if (collectedStars.Contains(rememberedKey))
+        {
+            collected = true; // can't be collected again in the frame before it is destroyed
+            Destroy(gameObject); // collected earlier: it does not respawn
+        }
+    }
 
     void Start()
     {
@@ -49,6 +99,8 @@ public class StarHover : MonoBehaviour
         }
 
         collected = true;
+        if (stayGoneWhenCollected && !string.IsNullOrEmpty(rememberedKey))
+            collectedStars.Add(rememberedKey);
 
         if (StarManager.Instance != null)
         {

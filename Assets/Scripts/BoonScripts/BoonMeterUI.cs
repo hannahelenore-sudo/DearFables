@@ -40,6 +40,12 @@ public class BoonMeterUI : MonoBehaviour
     public float readyHoldTime = 0.6f;
     public float gainPulseScale = 1.1f;
 
+    [Header("Cutscenes")]
+    [Tooltip("ON: if a cutscene is playing when the boon is about to appear, the boon waits and only starts after the cutscene has finished.")]
+    public bool waitForCutscenes = true;
+    [Tooltip("After a cutscene ends, wait this long (and check again) before the boon starts, in case another cutscene follows right away.")]
+    public float cutsceneSettleTime = 0.35f;
+
     [Header("Player")]
     [Tooltip("Frozen while choosing a boon. Leave empty to auto-find the object tagged 'Player' and its PlayerMovement script.")]
     public Behaviour playerMovement;
@@ -71,6 +77,7 @@ public class BoonMeterUI : MonoBehaviour
     private Color liquidBaseColor = Color.white;
     private Vector3 containerBaseScale = Vector3.one;
     private RectTransform pulseTarget;
+    private IntroCutscene[] cutscenes;
 
     // -------------------------------------------------------------------
     // Setup
@@ -190,20 +197,33 @@ public class BoonMeterUI : MonoBehaviour
                 break;
             }
 
-            // 3. Full -> a boon is ready
+            // 3. Full -> a boon is ready (but it waits while a cutscene is playing)
+            yield return StartCoroutine(WaitForCutscenes());
+
             SetReady(true);
             PlaySFX(readySound);
             yield return new WaitForSecondsRealtime(readyHoldTime);
+
+            // A cutscene may have started during the hold: the boon stays on hold until it is over
+            yield return StartCoroutine(WaitForCutscenes());
 
             if (!autoOpenWhenFull)
             {
                 clickRequested = false;
                 if (meterButton != null) meterButton.interactable = true;
 
-                while (!clickRequested) yield return null;
+                // Clicks during a cutscene are ignored
+                while (!clickRequested || CutscenePlaying())
+                {
+                    if (CutscenePlaying()) clickRequested = false;
+                    yield return null;
+                }
 
                 if (meterButton != null) meterButton.interactable = false;
             }
+
+            // Last check right before the screen opens
+            yield return StartCoroutine(WaitForCutscenes());
 
             // 4. Let the player pick
             FreezePlayer(true);
@@ -222,6 +242,35 @@ public class BoonMeterUI : MonoBehaviour
         }
 
         running = false;
+    }
+
+    // True while any IntroCutscene in the scene is playing
+    private bool CutscenePlaying()
+    {
+        if (!waitForCutscenes) return false;
+
+        if (cutscenes == null || cutscenes.Length == 0)
+            cutscenes = FindObjectsByType<IntroCutscene>(FindObjectsSortMode.None);
+
+        foreach (IntroCutscene c in cutscenes)
+            if (c != null && c.IsPlaying) return true;
+
+        return false;
+    }
+
+    // Returns at once if nothing is playing. Otherwise waits for the cutscene to end (plus a short settle time,
+    // restarting if another cutscene begins), so the boon never opens on top of a cutscene.
+    private IEnumerator WaitForCutscenes()
+    {
+        if (!CutscenePlaying()) yield break;
+
+        float clearFor = 0f;
+        while (clearFor < cutsceneSettleTime)
+        {
+            if (CutscenePlaying()) clearFor = 0f;
+            else clearFor += Time.unscaledDeltaTime;
+            yield return null;
+        }
     }
 
     private IEnumerator AnimateFill(float from, float to, float duration, bool gaining)

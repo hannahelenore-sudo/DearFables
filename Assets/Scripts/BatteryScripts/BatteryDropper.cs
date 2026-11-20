@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Spawns BatteryPickups that burst out like Mario coins.
@@ -35,6 +36,49 @@ public class BatteryDropper : MonoBehaviour
     public bool trackPlayerPosition = false;
 
     private PlayerMovement player;
+    private float nextPlayerSearch;
+
+    // Safety net: if the scene you return to has no scene-level dropper, make one, so won batteries ALWAYS drop.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void HookSceneLoad()
+    {
+        SceneManager.sceneLoaded -= EnsureSceneDropper;
+        SceneManager.sceneLoaded += EnsureSceneDropper;
+    }
+
+    private static void EnsureSceneDropper(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name == CardGameTutorialGate.CardGameSceneName) return; // only the game scene drops / tracks
+
+        BatteryDropper template = null; // a dropper of yours that has a pickup prefab assigned
+        foreach (BatteryDropper d in Object.FindObjectsByType<BatteryDropper>(FindObjectsSortMode.None))
+        {
+            if (d.dropPendingOnStart) return; // you already set one up
+            if (template == null && d.pickupPrefab != null) template = d;
+        }
+
+        GameObject go = new GameObject("BatteryDropper (auto)");
+        BatteryDropper auto = go.AddComponent<BatteryDropper>();
+        auto.dropPendingOnStart = true;
+        auto.trackPlayerPosition = true;
+
+        // Use YOUR pickup prefab and settings instead of the plain yellow dot
+        if (template != null) auto.CopySettingsFrom(template);
+    }
+
+    /// <summary>Takes the prefab and drop settings of another dropper (not the pending-drop switches).</summary>
+    public void CopySettingsFrom(BatteryDropper other)
+    {
+        if (other == null) return;
+        pickupPrefab = other.pickupPrefab;
+        amount = other.amount;
+        valuePerPickup = other.valuePerPickup;
+        maxPickups = other.maxPickups;
+        spawnOffset = other.spawnOffset;
+        popUpSpeed = other.popUpSpeed;
+        scatterSpeed = other.scatterSpeed;
+        startDelay = other.startDelay;
+    }
 
     private void Start()
     {
@@ -44,7 +88,13 @@ public class BatteryDropper : MonoBehaviour
         int total = BatteryManager.TakePendingDrop();
         if (total <= 0) return;
 
-        Vector3 where = BatteryManager.HasLastPlayerPosition ? BatteryManager.LastPlayerPosition : transform.position;
+        Vector3 where;
+        if (BatteryManager.HasLastPlayerPosition) where = BatteryManager.LastPlayerPosition;
+        else
+        {
+            PlayerMovement p = Object.FindAnyObjectByType<PlayerMovement>();
+            where = p != null ? p.transform.position : transform.position; // no saved spot: drop at the player
+        }
         StartCoroutine(DropAfterDelay(where, total));
     }
 
@@ -52,7 +102,11 @@ public class BatteryDropper : MonoBehaviour
     {
         if (!trackPlayerPosition) return;
 
-        if (player == null) player = Object.FindAnyObjectByType<PlayerMovement>();
+        if (player == null && Time.unscaledTime >= nextPlayerSearch)
+        {
+            player = Object.FindAnyObjectByType<PlayerMovement>();
+            nextPlayerSearch = Time.unscaledTime + 0.5f; // don't search every frame (menus have no player)
+        }
         if (player != null && Time.timeScale > 0f)
             BatteryManager.RememberPlayerPosition(player.transform.position);
     }

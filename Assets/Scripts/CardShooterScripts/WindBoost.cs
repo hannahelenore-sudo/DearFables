@@ -1,4 +1,6 @@
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// The Wind Card: click once while it is selected and the boost stays on until the bar runs dry
@@ -23,6 +25,23 @@ public class WindBoost : MonoBehaviour
     [Tooltip("Movement bigger than this in one frame is treated as a teleport and ignored.")]
     public float teleportLimit = 2f;
 
+    [Header("Speed Up Popup")]
+    [Tooltip("Shows a text above the player's head when the Wind Card is switched on.")]
+    public bool showPopup = true;
+    public string popupText = "Speed Up!";
+    [Tooltip("Optional. Leave empty to use TextMeshPro's default font.")]
+    public TMP_FontAsset popupFont;
+    public float popupFontSize = 56f;
+    public Color popupColor = new Color(0.75f, 0.93f, 1f, 1f);
+    public Color popupOutlineColor = new Color(0.05f, 0.15f, 0.3f, 1f);
+    [Range(0f, 1f)] public float popupOutlineWidth = 0.25f;
+    [Tooltip("Seconds the text is on screen.")]
+    public float popupDuration = 1.1f;
+    [Tooltip("How far the text floats upward while it fades (pixels at 1920x1080).")]
+    public float popupRisePixels = 70f;
+    [Tooltip("How far above the character's head the text starts, as a fraction of the character's height. The held item icon sits just above the head, so keep this higher than the icon.")]
+    public float popupHeightAbove = 0.6f;
+
     /// <summary>1 normally, speedMultiplier while boosting. Read this in your movement script.</summary>
     public static float SpeedMultiplier { get; private set; } = 1f;
     public static bool IsBoosting { get; private set; }
@@ -36,6 +55,15 @@ public class WindBoost : MonoBehaviour
     private Vector3 lastPos;
     private float movingTimer;
 
+    // Popup
+    private SpriteRenderer characterRenderer;
+    private GameObject popupCanvasGO;
+    private Canvas popupCanvas;
+    private CanvasGroup popupGroup;
+    private RectTransform popupRect;
+    private TextMeshProUGUI popupLabel;
+    private float popupTimer;
+
     public bool CanStart
     {
         get { return stamina != null && !stamina.IsExhausted && stamina.CardsLeft >= minCardsToStart; }
@@ -43,6 +71,7 @@ public class WindBoost : MonoBehaviour
 
     public void Init(CardStamina cardStamina, SpriteRenderer characterRenderer)
     {
+        this.characterRenderer = characterRenderer;
         stamina = cardStamina;
         cc = GetComponent<CharacterController>();
 
@@ -57,6 +86,7 @@ public class WindBoost : MonoBehaviour
     /// <summary>CardShooter calls this when the player clicks with the Wind Card selected.</summary>
     public void Activate()
     {
+        if (!wantBoost) ShowPopup(); // only when it actually switches on, not on every click
         wantBoost = true;
     }
 
@@ -109,6 +139,8 @@ public class WindBoost : MonoBehaviour
         if (aura != null) aura.SetActive(boost && movingTimer > 0f);
 
         lastPos = transform.position;
+
+        UpdatePopup();
     }
 
     private void OnDisable()
@@ -117,5 +149,106 @@ public class WindBoost : MonoBehaviour
         IsBoosting = false;
         SpeedMultiplier = 1f;
         if (aura != null) aura.SetActive(false);
+
+        popupTimer = 0f;
+        if (popupGroup != null) popupGroup.alpha = 0f;
+    }
+
+    private void OnDestroy()
+    {
+        if (popupCanvasGO != null) Destroy(popupCanvasGO);
+    }
+
+    // ---------------- "Speed Up!" popup ----------------
+
+    private void ShowPopup()
+    {
+        if (!showPopup) return;
+        if (popupCanvasGO == null) BuildPopup();
+
+        // Applied on every show, so you can tweak these while playing
+        popupLabel.text = popupText;
+        popupLabel.fontSize = popupFontSize;
+        popupLabel.color = popupColor;
+        if (popupFont != null) popupLabel.font = popupFont;
+        popupLabel.outlineWidth = popupOutlineWidth;
+        popupLabel.outlineColor = popupOutlineColor;
+
+        popupTimer = Mathf.Max(0.1f, popupDuration);
+    }
+
+    private void BuildPopup()
+    {
+        popupCanvasGO = new GameObject("SpeedUpPopupUI");
+        popupCanvas = popupCanvasGO.AddComponent<Canvas>();
+        popupCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        popupCanvas.sortingOrder = 60;
+
+        CanvasScaler scaler = popupCanvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        popupGroup = popupCanvasGO.AddComponent<CanvasGroup>();
+        popupGroup.interactable = false;
+        popupGroup.blocksRaycasts = false;
+        popupGroup.alpha = 0f;
+
+        GameObject textGO = new GameObject("Text", typeof(RectTransform));
+        textGO.transform.SetParent(popupCanvasGO.transform, false);
+
+        popupLabel = textGO.AddComponent<TextMeshProUGUI>();
+        popupLabel.alignment = TextAlignmentOptions.Center;
+        popupLabel.fontStyle = FontStyles.Bold;
+        popupLabel.raycastTarget = false;
+
+        popupRect = popupLabel.rectTransform;
+        popupRect.sizeDelta = new Vector2(800f, 120f);
+        popupRect.pivot = new Vector2(0.5f, 0.5f);
+    }
+
+    // Pops in (small overshoot), floats up, then fades out. Follows the player's head on screen.
+    private void UpdatePopup()
+    {
+        if (popupGroup == null) return;
+
+        if (popupTimer <= 0f)
+        {
+            if (popupGroup.alpha > 0f) popupGroup.alpha = 0f;
+            return;
+        }
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        popupTimer -= Time.unscaledDeltaTime;
+        float t = 1f - Mathf.Clamp01(popupTimer / Mathf.Max(0.1f, popupDuration)); // 0 -> 1 over the popup
+
+        float charH = 2f;
+        Vector3 head = transform.position + Vector3.up * 2f;
+        if (characterRenderer != null)
+        {
+            Bounds b = characterRenderer.bounds;
+            charH = Mathf.Max(0.5f, b.size.y);
+            head = new Vector3(transform.position.x, b.max.y, transform.position.z);
+        }
+        head += Vector3.up * (charH * popupHeightAbove);
+
+        Vector3 sp = cam.WorldToScreenPoint(head);
+        if (sp.z <= 0f) { popupGroup.alpha = 0f; return; }
+
+        float scale = popupCanvas.scaleFactor;
+        float rise = popupRisePixels * (1f - (1f - t) * (1f - t)) * scale;
+        popupRect.position = new Vector2(sp.x, sp.y + rise);
+
+        // Ease-out-back pop during the first 20%
+        float pt = Mathf.Clamp01(t / 0.2f);
+        const float c1 = 1.70158f;
+        const float c3 = c1 + 1f;
+        float eased = 1f + c3 * Mathf.Pow(pt - 1f, 3f) + c1 * Mathf.Pow(pt - 1f, 2f);
+        popupRect.localScale = Vector3.one * Mathf.Max(0.01f, eased);
+
+        // Fully visible, then fades over the last 40%
+        popupGroup.alpha = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
     }
 }

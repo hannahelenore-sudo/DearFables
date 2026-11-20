@@ -174,6 +174,7 @@ public class IntroCutscene : MonoBehaviour
     private bool acceptingInput;
     private bool isTyping;
     private bool originalMovementEnabled;
+    private bool originalInputLocked;
     private float inputLockUntil;
     private int lastAdvanceFrame = -1;
 
@@ -255,12 +256,45 @@ public class IntroCutscene : MonoBehaviour
             Debug.LogWarning("IntroCutscene: couldn't find the player movement script. Assign it in the Inspector.", this);
     }
 
+    // Uses PlayerMovement.InputLocked when possible: the script keeps running, cancels walk / dash / jump / dust
+    // and plays the idle animation by itself. (Switching the script off would leave the walk animation stuck.)
+    private void FreezePlayer()
+    {
+        if (playerMovement == null) return;
+
+        PlayerMovement pm = playerMovement as PlayerMovement;
+        originalMovementEnabled = playerMovement.enabled;
+
+        if (pm != null)
+        {
+            originalInputLocked = pm.InputLocked;
+            pm.InputLocked = true;
+        }
+        else
+        {
+            playerMovement.enabled = false;
+        }
+
+        StopPlayerMotion();
+    }
+
+    private void UnfreezePlayer()
+    {
+        if (playerMovement == null) return;
+
+        PlayerMovement pm = playerMovement as PlayerMovement;
+        if (pm != null)
+            pm.InputLocked = originalInputLocked;
+        else
+            playerMovement.enabled = originalMovementEnabled;
+    }
+
     private void StopPlayerMotion()
     {
         if (playerMovement == null) return;
 
         Rigidbody rb = playerMovement.GetComponent<Rigidbody>();
-        if (rb != null) rb.linearVelocity = Vector3.zero;
+        if (rb != null) { rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f); rb.angularVelocity = Vector3.zero; }
 
         Rigidbody2D rb2d = playerMovement.GetComponent<Rigidbody2D>();
         if (rb2d != null) rb2d.linearVelocity = Vector2.zero;
@@ -408,12 +442,7 @@ public class IntroCutscene : MonoBehaviour
 
         // Freeze the player right away
         FindPlayerMovement();
-        if (playerMovement != null)
-        {
-            originalMovementEnabled = playerMovement.enabled;
-            playerMovement.enabled = false;
-            StopPlayerMotion();
-        }
+        FreezePlayer();
 
         if (activeTutorial)
         {
@@ -453,8 +482,7 @@ public class IntroCutscene : MonoBehaviour
             yield return FadeDim(false, fadeOutDuration);
             EndTutorialMode();
 
-            if (playerMovement != null)
-                playerMovement.enabled = originalMovementEnabled;
+            UnfreezePlayer();
 
             FinishCutscene();
             yield break;
@@ -465,8 +493,7 @@ public class IntroCutscene : MonoBehaviour
         StopAllAnimations();
         HideCutsceneUI();
 
-        if (playerMovement != null)
-            playerMovement.enabled = originalMovementEnabled;
+        UnfreezePlayer();
 
         yield return Fade(0f, fadeInDuration);
 

@@ -15,6 +15,7 @@ public static class StarQuestProgress
     private static readonly HashSet<string> accepted = new HashSet<string>();
     private static readonly HashSet<string> done = new HashSet<string>();
     private static readonly HashSet<string> enemy = new HashSet<string>();
+    private static readonly HashSet<string> afterGame = new HashSet<string>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetOnLaunch()
@@ -27,6 +28,7 @@ public static class StarQuestProgress
         accepted.Clear();
         done.Clear();
         enemy.Clear();
+        afterGame.Clear();
     }
 
     public static bool IsAccepted(string questId) { return accepted.Contains(questId ?? ""); }
@@ -36,6 +38,10 @@ public static class StarQuestProgress
     /// <summary>True once the quest giver has turned into the stationary enemy (after the card game talk).</summary>
     public static bool IsEnemy(string questId) { return enemy.Contains(questId ?? ""); }
     public static void StartEnemy(string questId) { enemy.Add(questId ?? ""); }
+
+    /// <summary>True once the cutscene that plays after the card game has been shown (it only plays once).</summary>
+    public static bool IsAfterGameDone(string questId) { return afterGame.Contains(questId ?? ""); }
+    public static void MarkAfterGameDone(string questId) { afterGame.Add(questId ?? ""); }
 
     public static void Complete(string questId)
     {
@@ -89,6 +95,14 @@ public class StarQuestNPC : NPCTrigger
     [Tooltip("Switched ON when the tutorial is done (and stay on after loading back from a battle). Start them disabled in the scene: the card NPC, a marker, the Enemies group...")]
     public GameObject[] activateWhenDone;
 
+    [Header("After the card game is won")]
+    [Tooltip("Dialogue / cutscene that plays in the game scene after the player beat this NPC in the card game (right after coming back). Plays once, then the NPC is gone. Write its lines on the IntroCutscene like the other Ids. Leave EMPTY for no extra cutscene.")]
+    public string afterGameId = "After Card Game";
+    [Tooltip("Seconds to wait after the game scene appears (lets the fade-in and the battery drop start) before the cutscene begins.")]
+    public float afterGameDelay = 1.2f;
+    [Tooltip("Runs when the after-card-game cutscene has finished.")]
+    public UnityEvent onAfterGameDone;
+
     [Header("Requirement above the character")]
     [Tooltip("The star picture shown next to the number.")]
     public Sprite starSprite;
@@ -138,6 +152,7 @@ public class StarQuestNPC : NPCTrigger
         yield return completeId;
         yield return doneId;
         yield return followUpId;
+        yield return afterGameId;
     }
 
     protected override string CurrentCutsceneId()
@@ -178,6 +193,15 @@ public class StarQuestNPC : NPCTrigger
                 // Loaded back after the quest (e.g. from the battle): already beaten = gone, otherwise it's an enemy again
                 if (enemy != null && enemy.WasCaught)
                 {
+                    ActivateObjects();
+
+                    // Beaten in the card game: play the after-game cutscene once, THEN disappear
+                    if (!string.IsNullOrWhiteSpace(afterGameId) && !StarQuestProgress.IsAfterGameDone(questId))
+                    {
+                        BeginAfterGame();
+                        return;
+                    }
+
                     Destroy(gameObject);
                     return;
                 }
@@ -273,6 +297,38 @@ public class StarQuestNPC : NPCTrigger
             StartCoroutine(FollowUpRoutine());
         else
             BecomeEnemy();
+    }
+
+    // The NPC was beaten: hide it right away, play the after-card-game cutscene, then remove it
+    private void BeginAfterGame()
+    {
+        foreach (Renderer r in GetComponentsInChildren<Renderer>(true)) r.enabled = false;
+        foreach (Collider c in GetComponentsInChildren<Collider>(true)) c.enabled = false;
+        if (enemy != null) enemy.enabled = false;
+
+        StartCoroutine(AfterGameRoutine());
+    }
+
+    private IEnumerator AfterGameRoutine()
+    {
+        // Remember first, so reloading the scene mid-cutscene can never play it twice
+        StarQuestProgress.MarkAfterGameDone(questId);
+
+        if (afterGameDelay > 0f) yield return new WaitForSecondsRealtime(afterGameDelay);
+
+        // Wait if some other dialogue is playing
+        while (cutscene != null && cutscene.IsPlaying)
+            yield return null;
+
+        if (cutscene != null && PlayId(afterGameId))
+        {
+            yield return null;
+            while (cutscene != null && cutscene.IsPlaying)
+                yield return null;
+        }
+
+        onAfterGameDone?.Invoke();
+        Destroy(gameObject);
     }
 
     /// <summary>Turns this NPC into a stationary enemy: a thrown card starts the card game.</summary>
