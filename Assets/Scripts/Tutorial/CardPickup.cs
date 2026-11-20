@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// A card the player walks into to pick up.
@@ -90,6 +91,24 @@ public class CardPickup : MonoBehaviour
     [Tooltip("Id of the entry in the manager's Cutscenes list to play. Edit its lines on the IntroCutscene.")]
     public string tutorialId = "Card Tutorial";
 
+    [Header("Highlight (same spotlight as the card game tutorial)")]
+    [Tooltip("Dims the screen and leaves the card lit up inside a frame, so the player notices it. Only used when the card is collected by touching it. It never pauses the game or blocks any clicks.")]
+    public bool highlightPickup = true;
+    [Tooltip("Seconds after the scene starts before the highlight fades in. Waits while a cutscene is playing.")]
+    public float highlightDelay = 0.5f;
+    [Tooltip("How long the highlight stays on. 0 = until the card is picked up.")]
+    public float highlightDuration = 4f;
+    public float highlightFade = 0.4f;
+    public Color dimColor = new Color(0f, 0f, 0f, 0.8f);
+    public Color frameColor = new Color(1f, 0.85f, 0.25f, 1f);
+    public float frameThickness = 4f;
+    [Tooltip("Extra space (in screen pixels) around the card inside the frame.")]
+    public float highlightPadding = 40f;
+    [Tooltip("Camera used to find the card on screen. Empty = Camera.main.")]
+    public Camera worldCamera;
+    [Tooltip("Stays under the tutorial overlay (32000) so dialogue always shows on top.")]
+    public int overlaySortingOrder = 31000;
+
     [Header("Sound")]
     public AudioClip pickupSound;
     [Range(0f, 1f)] public float pickupVolume = 1f;
@@ -97,6 +116,15 @@ public class CardPickup : MonoBehaviour
     private Vector3 startPos;
     private bool taken;
     private float questDoneTimer;
+
+    // highlight runtime
+    private GameObject hlRoot;
+    private TutorialSpotlightGraphic hlSpot;
+    private float hlTimer;
+    private bool hlDone;
+    private bool hlLookedForCutscene;
+    private readonly List<Rect> hlHoles = new List<Rect>(1);
+    private readonly Vector3[] hlCorners = new Vector3[8];
 
     // -------------------------------------------------------------------
     // Unity
@@ -172,6 +200,16 @@ public class CardPickup : MonoBehaviour
         transform.Rotate(0f, spinSpeed * Time.deltaTime, 0f, Space.World);
     }
 
+    private void LateUpdate()
+    {
+        UpdateHighlight();
+    }
+
+    private void OnDestroy()
+    {
+        if (hlRoot != null) Destroy(hlRoot);
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (taken || !touchToCollect || !string.IsNullOrEmpty(unlockWhenQuestDone)) return;
@@ -210,6 +248,7 @@ public class CardPickup : MonoBehaviour
         taken = true;
         Collected = true;
         Locked = false;
+        EndHighlight();
 
         if (pickupSound != null)
             GameSFX.Play(pickupSound, pickupVolume, 1f);
@@ -277,6 +316,153 @@ public class CardPickup : MonoBehaviour
         }
 
         Destroy(gameObject);
+    }
+
+    // -------------------------------------------------------------------
+    // Highlight (dim + lit-up cut-out + frame, like CardGameTutorial)
+    // -------------------------------------------------------------------
+
+    private void UpdateHighlight()
+    {
+        if (hlDone) return;
+
+        if (taken || !highlightPickup || !touchToCollect || !string.IsNullOrEmpty(unlockWhenQuestDone))
+        {
+            EndHighlight();
+            return;
+        }
+
+        // Don't compete with a cutscene: wait until it is over
+        if (!hlLookedForCutscene)
+        {
+            hlLookedForCutscene = true;
+            if (tutorial == null) tutorial = FindAnyObjectByType<IntroCutscene>(FindObjectsInactive.Include);
+        }
+        if (tutorial != null && tutorial.IsPlaying)
+        {
+            SetHighlightVisible(false);
+            return;
+        }
+
+        hlTimer += Time.unscaledDeltaTime;
+        float t = hlTimer - highlightDelay;
+        if (t < 0f) return;
+
+        if (highlightDuration > 0f && t >= highlightDuration)
+        {
+            EndHighlight();
+            return;
+        }
+
+        float fade = Mathf.Max(0.01f, highlightFade);
+        float a = Mathf.Clamp01(t / fade);
+        if (highlightDuration > 0f) a = Mathf.Min(a, Mathf.Clamp01((highlightDuration - t) / fade));
+
+        if (!TryGetScreenRect(out Rect rect))
+        {
+            SetHighlightVisible(false); // card is off screen / behind the camera
+            return;
+        }
+
+        rect.xMin -= highlightPadding; rect.xMax += highlightPadding;
+        rect.yMin -= highlightPadding; rect.yMax += highlightPadding;
+
+        EnsureHighlightOverlay();
+        SetHighlightVisible(true);
+
+        Color dc = dimColor; dc.a *= a;
+        Color fc = frameColor; fc.a *= a;
+        hlHoles.Clear();
+        hlHoles.Add(rect);
+        hlSpot.SetHoles(hlHoles, dc, fc, frameThickness);
+    }
+
+    private void EndHighlight()
+    {
+        hlDone = true;
+        if (hlRoot != null) Destroy(hlRoot);
+        hlRoot = null;
+        hlSpot = null;
+    }
+
+    private void SetHighlightVisible(bool visible)
+    {
+        if (hlRoot != null && hlRoot.activeSelf != visible) hlRoot.SetActive(visible);
+    }
+
+    private void EnsureHighlightOverlay()
+    {
+        if (hlRoot != null) return;
+
+        hlRoot = new GameObject("CardPickupHighlight", typeof(RectTransform));
+
+        Canvas canvas = hlRoot.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = overlaySortingOrder;
+
+        // Same canvas setup as the tutorial overlay so the cut-out lines up the same way
+        CanvasScaler scaler = hlRoot.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        // No GraphicRaycaster and raycastTarget off: the player can keep walking / clicking underneath
+        GameObject dimGo = new GameObject("Dim", typeof(RectTransform), typeof(CanvasRenderer));
+        dimGo.transform.SetParent(hlRoot.transform, false);
+        RectTransform dimRt = dimGo.GetComponent<RectTransform>();
+        dimRt.anchorMin = Vector2.zero; dimRt.anchorMax = Vector2.one;
+        dimRt.offsetMin = dimRt.offsetMax = Vector2.zero;
+        dimRt.pivot = Vector2.zero;
+        hlSpot = dimGo.AddComponent<TutorialSpotlightGraphic>();
+        hlSpot.raycastTarget = false;
+    }
+
+    /// <summary>Screen-space box around the card (it bobs and spins, so this is recalculated every frame).</summary>
+    private bool TryGetScreenRect(out Rect rect)
+    {
+        rect = default;
+        Camera cam = worldCamera != null ? worldCamera : Camera.main;
+        if (cam == null) return false;
+
+        Bounds b = default;
+        bool hasBounds = false;
+        foreach (Renderer r in GetComponentsInChildren<Renderer>())
+        {
+            if (!r.enabled) continue;
+            if (!hasBounds) { b = r.bounds; hasBounds = true; }
+            else b.Encapsulate(r.bounds);
+        }
+        if (!hasBounds)
+        {
+            Collider col = GetComponent<Collider>();
+            if (col == null) return false;
+            b = col.bounds;
+        }
+
+        float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+        bool any = false;
+        for (int i = 0; i < 8; i++)
+        {
+            hlCorners[i] = new Vector3(
+                (i & 1) == 0 ? b.min.x : b.max.x,
+                (i & 2) == 0 ? b.min.y : b.max.y,
+                (i & 4) == 0 ? b.min.z : b.max.z);
+            Vector3 sp = cam.WorldToScreenPoint(hlCorners[i]);
+            if (sp.z <= 0f) continue;
+            any = true;
+            minX = Mathf.Min(minX, sp.x); maxX = Mathf.Max(maxX, sp.x);
+            minY = Mathf.Min(minY, sp.y); maxY = Mathf.Max(maxY, sp.y);
+        }
+        if (!any) return false;
+
+        minX = Mathf.Max(0f, minX); minY = Mathf.Max(0f, minY);
+        maxX = Mathf.Min(Screen.width, maxX); maxY = Mathf.Min(Screen.height, maxY);
+        if (maxX - minX < 2f || maxY - minY < 2f) return false;
+
+        rect = Rect.MinMaxRect(minX, minY, maxX, maxY);
+        return true;
     }
 
     // -------------------------------------------------------------------

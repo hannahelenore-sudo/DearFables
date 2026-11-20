@@ -71,6 +71,10 @@ public class BattleManager : MonoBehaviour
     [Tooltip("Target score at the EASIEST difficulty. Raised automatically as the difficulty meter fills.")]
     public int battleTargetScore = 400;
 
+    [Header("Tutorial Fight")]
+    [Tooltip("When the fight is the card game tutorial, the score to beat is exactly this, and the difficulty meter is ignored.")]
+    public int tutorialTargetScore = 200;
+
     [Header("Difficulty")]
     [Tooltip("Target score at max difficulty = Battle Target Score x this. At 0 difficulty it stays at Battle Target Score.")]
     public float maxScoreMultiplier = 3f;
@@ -119,6 +123,7 @@ public class BattleManager : MonoBehaviour
     private int scoreBeforeAdvantage;
     private bool advantageApplied;
     private float difficultyAtStart;
+    private bool isTutorialFight;
 
     private void Awake()
     {
@@ -152,6 +157,10 @@ public class BattleManager : MonoBehaviour
 
         if (scoreToBeatUI != null) SetCanvasGroupState(scoreToBeatUI.gameObject, false, 0f);
         if (numberSpinnerUI != null) SetCanvasGroupState(numberSpinnerUI.gameObject, false, 0f);
+
+        // Opening sequence = look only. Nothing can be pressed (the Tsinelas popup is unlocked later, only if the player owns it)
+        if (scoreToBeatUI != null) SetGroupInteractable(scoreToBeatUI.gameObject, false);
+        if (numberSpinnerUI != null) SetGroupInteractable(numberSpinnerUI.gameObject, false);
 
         if (roundDimOverlay != null) roundDimOverlay.gameObject.SetActive(false);
         if (roundPopupText != null) roundPopupText.gameObject.SetActive(false);
@@ -222,6 +231,18 @@ public class BattleManager : MonoBehaviour
 
     private void Start()
     {
+        // Tutorial fight: fixed easy score, no difficulty scaling and no Advantage Hit change.
+        // Decided here (not in Awake) because the tutorial flag is only reliable once the scene has loaded.
+        isTutorialFight = CardGameTutorialGate.IsTutorialFight;
+        if (isTutorialFight)
+        {
+            battleTargetScore = tutorialTargetScore;
+            scoreBeforeAdvantage = battleTargetScore;
+            advantageApplied = false;
+            difficultyAtStart = 0f; // battery reward is also calculated without difficulty
+            Debug.Log("BattleManager: tutorial fight -> target score " + battleTargetScore + " (difficulty not applied)");
+        }
+
         if (deckManager != null)
         {
             deckManager.battleManager = this;
@@ -269,8 +290,21 @@ public class BattleManager : MonoBehaviour
         }
     }
 
+    /// <summary>Turns clicks / taps on or off for one UI object (adds a CanvasGroup if needed).</summary>
+    private void SetGroupInteractable(GameObject targetObj, bool isInteractable)
+    {
+        if (targetObj == null) return;
+        CanvasGroup cg = targetObj.GetComponent<CanvasGroup>();
+        if (cg == null) cg = targetObj.AddComponent<CanvasGroup>();
+        cg.interactable = isInteractable;
+        cg.blocksRaycasts = isInteractable;
+    }
+
     public void SetBattleUIInteractable(bool isInteractable)
     {
+        // While the opening sequence plays, nothing may be unlocked (even by other scripts calling this)
+        if (isOpeningSequenceActive && isInteractable) return;
+
         GameObject targetObj = battleUIParent;
 
         if (targetObj == null)
@@ -328,7 +362,7 @@ public class BattleManager : MonoBehaviour
         if (isMatchOver) return;
         isMatchOver = true;
         hasPlayerWon = true;
-        DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up
+        if (!isTutorialFight) DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up (not the tutorial)
         PlayerProgress.AddStars(starsGainedOnWin);
 
         // Batteries: Balatro style - a base reward plus a bonus for every hand you had left.
@@ -360,7 +394,7 @@ public class BattleManager : MonoBehaviour
 
         PlayerHealth.Lose(1); // losing the card game costs a health card
         MoodManager.OnFightEnded(); // timed moods count down
-        DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up
+        if (!isTutorialFight) DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up (not the tutorial)
         BoonProgress.AddMeter(boonMeterFillOnLoss); // fills the boon meter in the overworld
         SetBattleUIInteractable(false);
 
@@ -704,6 +738,11 @@ public class BattleManager : MonoBehaviour
         if (numberSpinnerUI != null)
         {
             numberSpinnerUI.SetNumberLimits(1, 10);
+
+            // The ONLY allowed interaction in the opening: tapping the Tsinelas popup (and only if the player has it)
+            bool canUseTsinelas = TrinketInventory.Has(TrinketType.Tsinelas);
+            SetGroupInteractable(numberSpinnerUI.gameObject, canUseTsinelas);
+
             Coroutine spinnerFadeIn = StartCoroutine(FadeCanvasGroup(numberSpinnerUI.gameObject, 0f, 1f, crossFadeDuration));
 
             bool isSpinnerComplete = false;
@@ -717,6 +756,7 @@ public class BattleManager : MonoBehaviour
                 isSpinnerComplete = true;
             }, true, tsinelasOffer); // the fade-in above controls the alpha
             while (!isSpinnerComplete) yield return null;
+            SetGroupInteractable(numberSpinnerUI.gameObject, false); // spinner is done: locked again for the rest of the opening
             yield return spinnerFadeIn;
         }
 
@@ -743,6 +783,9 @@ public class BattleManager : MonoBehaviour
 
         hasMatchStartedOnce = true;
         isOpeningSequenceActive = false;
+
+        if (scoreToBeatUI != null) SetGroupInteractable(scoreToBeatUI.gameObject, true);
+        if (numberSpinnerUI != null) SetGroupInteractable(numberSpinnerUI.gameObject, true);
 
         SetCameraState(battleViewActive: true);
         SetPersistentUITextsActive(true);
@@ -788,6 +831,7 @@ public class BattleManager : MonoBehaviour
         PlaySFX((roundNum >= maxRounds && finalRoundSound != null) ? finalRoundSound : roundIntroSound);
 
         roundDimOverlay.gameObject.SetActive(true);
+        roundDimOverlay.raycastTarget = true; // the dim overlay swallows clicks during the intro
         roundPopupText.gameObject.SetActive(true);
 
         Color dimColor = roundDimOverlay.color;

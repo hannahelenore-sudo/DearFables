@@ -888,7 +888,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -728, y: 332}
+  m_AnchoredPosition: {x: -355, y: 430}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &138531187
@@ -922,7 +922,7 @@ MonoBehaviour:
   m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -988,7 +988,7 @@ MonoBehaviour:
   m_margin: {x: -96.671295, y: 0, z: -151.4078, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &205212862
@@ -1691,7 +1691,7 @@ MonoBehaviour:
   m_text: Round 1
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1757,7 +1757,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: -10.128398, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &341337225
@@ -3111,7 +3111,7 @@ MonoBehaviour:
   m_text: Reshuffle
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -3177,7 +3177,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &575713374
@@ -4301,7 +4301,7 @@ MonoBehaviour:
   m_text: New Text
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4367,7 +4367,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &860585525
@@ -5804,7 +5804,7 @@ MonoBehaviour:
   m_text: New Text
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -5870,7 +5870,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1180298870
@@ -6577,7 +6577,7 @@ MonoBehaviour:
   m_text: New Text
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -6643,7 +6643,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &1408197532
@@ -6986,12 +6986,11 @@ MonoBehaviour:
   margin: {x: 30, y: 30}
   sortingOrder: 999
   backgroundColor: {r: 0.1, g: 0.1, b: 0.1, a: 0.75}
-  activeTint: {r: 1, g: 0.85, b: 0.3, a: 1}
+  activeTint: {r: 0.2980392, g: 1, b: 0.9856653, a: 1}
   fontSize: 32
   speeds:
   - 1
   - 2
-  - 4
   clickSound: {fileID: 0}
   clickVolume: 1
 --- !u!4 &1527473521
@@ -7208,7 +7207,7 @@ MonoBehaviour:
 '
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -7274,7 +7273,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1544728640
@@ -7714,7 +7713,7 @@ MonoBehaviour:
   m_text: New Text
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -7780,7 +7779,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &1771863015
@@ -8661,6 +8660,210 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1887225792}
   m_CullTransparentMesh: 1
+--- !u!1 &1900000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1900000002}
+  - component: {fileID: 1900000003}
+  m_Layer: 0
+  m_Name: == TUTORIAL ==
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1900000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1900000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c1e5a9d3b2f4e08a6d4f1b9c0e2a735, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardGameTutorial
+  onlyWhenStartedFromStarQuest: 1
+  forceRunInEditor: 1
+  battleManager: {fileID: 426697763}
+  openingFlagField: isOpeningSequenceActive
+  openingFallbackDelay: 6
+  openingMaxWait: 15
+  defaultPortrait: {fileID: 21300000, guid: a0a48ebf8b8fc5d42941af87cfb1c01f, type: 3}
+  fontSource: {fileID: 320521827}
+  dimColor: {r: 0, g: 0, b: 0, a: 0.8}
+  frameColor: {r: 0, g: 1, b: 1, a: 1}
+  frameThickness: 4
+  mergeHighlights: 1
+  overlaySortingOrder: 32000
+  charsPerSecond: 70
+  nextLabel: Next
+  lastStepLabel: Got it!
+  skipLabel: Skip tutorial
+  pauseGame: 1
+  wonFlagField: hasPlayerWon
+  lostFlagField: hasPlayerLost
+  requireWin: 0
+  sections:
+  - id: enemy-and-score
+    trigger: 0
+    visibleTarget: {fileID: 0}
+    visibleGroup: {fileID: 0}
+    worldCamera: {fileID: 288812202}
+    delayAfterReady: 0.5
+    steps:
+    - speaker: Bee
+      text: This is your opponent. To win, you have to out-score its defence before
+        the rounds run out.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1126097986}
+      padding: 24
+    - speaker: Bee
+      text: This is the enemy's strength. The 'x' number multiplies its defence,
+        so a bigger number means a tougher fight.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1880390504}
+      - {fileID: 664313841}
+      padding: 20
+    - speaker: Bee
+      text: This is the Score to Beat, the enemy's defence. Your total score has
+        to reach it. If you hit the enemy with a card before the fight, this number
+        starts lower.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 2103308114}
+      - {fileID: 1230810601}
+      padding: 20
+    - speaker: Bee
+      text: You only get a limited number of rounds. If you haven't reached the Score
+        to Beat by the last round, the enemy wins.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1863097499}
+      - {fileID: 1534126438}
+      padding: 20
+    - speaker: Bee
+      text: Press this button to open your hand of cards and start scoring.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 877066048}
+      padding: 24
+  - id: player-advantage
+    trigger: 1
+    visibleTarget: {fileID: 2124731805}
+    visibleGroup: {fileID: 2124731811}
+    worldCamera: {fileID: 0}
+    delayAfterReady: 0.6
+    steps:
+    - speaker: Bee
+      text: Welcome to the Player Advantage roll! Your shield is on the left and
+        the enemy's shield is on the right.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1776458615}
+      - {fileID: 1771863016}
+      padding: 24
+    - speaker: Bee
+      text: Click your shield to roll a number from 1 to 20.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1776458615}
+      padding: 24
+    - speaker: Bee
+      text: Roll higher than the enemy and you earn an advantage that boosts your
+        score. Roll lower and it works against you. If the two numbers are very close,
+        it's a tie.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 354425064}
+      - {fileID: 2087629742}
+      padding: 24
+    - speaker: Bee
+      text: When you're done here, press Back to return to the battle.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 962202701}
+      padding: 20
+  - id: card-system
+    trigger: 1
+    visibleTarget: {fileID: 2064940597}
+    visibleGroup: {fileID: 0}
+    worldCamera: {fileID: 1239587810}
+    delayAfterReady: 1.2
+    steps:
+    - speaker: Bee
+      text: These are your cards. Click a card to select it, and drag cards around
+        to rearrange your hand.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1660299530}
+      padding: 20
+    - speaker: Bee
+      text: Your score is Power times multiplier. The cards you pick add the chips,
+        while your roll advantage and bonuses boost the multiplier.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1915275747}
+      - {fileID: 860585526}
+      padding: 24
+    - speaker: Bee
+      text: And here's the Score to Beat again. Keep an eye on it while you build
+        your hand.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1760928008}
+      padding: 24
+    - speaker: Bee
+      text: This shows how many cards you've selected, and how many are left in your
+        deck.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 2015069719}
+      - {fileID: 1180298868}
+      - {fileID: 1378936278}
+      padding: 20
+    - speaker: Bee
+      text: Play scores the cards you've selected.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 112385958}
+      padding: 24
+    - speaker: Bee
+      text: Reshuffle swaps cards you don't want for fresh ones. You only get a few
+        of these, so use them wisely.
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 1134774081}
+      padding: 24
+    - speaker: Bee
+      text: Back takes you to the battle screen. Good luck out there!
+      portrait: {fileID: 0}
+      highlight:
+      - {fileID: 566403907}
+      padding: 24
 --- !u!1 &1915275746
 GameObject:
   m_ObjectHideFlags: 0
@@ -8729,7 +8932,7 @@ MonoBehaviour:
   m_text: 1 X 1
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -8795,7 +8998,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &1963273246
@@ -8972,7 +9175,7 @@ MonoBehaviour:
   m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: -1054171074177636987, guid: 71ccd16f13d987044a20f4a2da047bef, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -9038,7 +9241,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1968814081
@@ -10000,6 +10203,7 @@ CanvasRenderer:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 1900000002}
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 581348593}
