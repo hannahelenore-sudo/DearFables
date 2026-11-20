@@ -10959,8 +10959,8 @@ MonoBehaviour:
   openingMaxWait: 15
   defaultPortrait: {fileID: 21300000, guid: a0a48ebf8b8fc5d42941af87cfb1c01f, type: 3}
   fontSource: {fileID: 320521827}
-  dimColor: {r: 0, g: 0, b: 0, a: 0.8}
-  frameColor: {r: 0, g: 1, b: 1, a: 1}
+  dimColor: {r: 0.14631541, g: 0.15919921, b: 0.2264151, a: 0.8}
+  frameColor: {r: 0.45937166, g: 0.63067776, b: 0.8773585, a: 1}
   frameThickness: 4
   mergeHighlights: 1
   overlaySortingOrder: 32000

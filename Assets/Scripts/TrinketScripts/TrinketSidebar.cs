@@ -60,6 +60,9 @@ public class TrinketSidebar : MonoBehaviour
     public bool statsLiveInBuffBar = true;
     [Tooltip("0 = work out the height of the removed stat area automatically. Otherwise this many pixels are cut off the bottom of the bar.")]
     public float removedStatsHeight = 0f;
+    [Tooltip("OFF (default): the bar is exactly what the builder made; the stat area is already hidden and the bar already short, so nothing changes when the game starts. " +
+             "Turn ON only for an OLD bar made before this change. Better: delete it and re-create it with Tools > Shop > Create Trinket Sidebar.")]
+    public bool legacyRuntimeLayout = false;
 
     [Header("Info Card (hover / selected trinket)")]
     public RectTransform infoCard;
@@ -208,7 +211,11 @@ public class TrinketSidebar : MonoBehaviour
         if (sellButton != null) sellButton.onClick.AddListener(SellSelected);
 
         if (slideRoot != null) slideRoot.localScale = new Vector3(panelScale, panelScale, 1f);
-        if (statsLiveInBuffBar) RemoveStatsArea();
+        if (statsLiveInBuffBar)
+        {
+            if (legacyRuntimeLayout) RemoveStatsArea(); // old bars only: hides the stats and shortens the bar now
+            else statsRemoved = true;                    // new bars: the builder already did it
+        }
 
         open = startOpen;
         SnapSlide();

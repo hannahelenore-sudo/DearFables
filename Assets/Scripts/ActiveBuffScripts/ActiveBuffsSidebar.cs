@@ -11,15 +11,11 @@ using TMPro;
 
 /// <summary>
 /// The Active Buffs bar on the LEFT side of the screen (the Trinket bar is on the right).
-/// Compact version: every section (Mood, Boons, Trinkets, Advantage Hit) is just an icon.
-/// Hover an icon to see its stats in a tooltip next to it.
-/// - Mood: what the current mood gives you (Power, Mult, hands...).
-/// - Boons: your permanent boons.
-/// - Trinkets: only the stat values your trinkets give (trinkets that give no stats are not listed).
-/// - Advantage Hit: the score-to-beat reduction from hitting the enemy with a card (during that fight).
-/// - At the bottom: the overall stats (Sun Power, Wind Power, Speed).
-/// Build it with  Tools > HUD > Create Active Buffs Bar.
-/// Swap the section icons by changing the sprite on each section's Icon image.
+/// New look: the same hand-drawn ruled card as the Stats page of the GameMenu (b_gg.png).
+///   - Top of the card:  Sun / Wind / Speed numbers.
+///   - On the ruled lines: Moods, Boons, Blueprints, Trinkets, Advantage hit (always visible, no hovering needed).
+/// Click the little tab on the card's right edge to slide it in / out.
+/// Build it with  Tools > HUD > Create Active Buffs Bar  (delete the old bar first).
 /// It survives scene loads. If a scene contains a second copy, the copy deletes itself.
 /// </summary>
 public class ActiveBuffsSidebar : MonoBehaviour
@@ -27,23 +23,14 @@ public class ActiveBuffsSidebar : MonoBehaviour
     [Serializable]
     public class Section
     {
-        [Tooltip("Shown as the tooltip title.")]
+        [Tooltip("Written in front of the line, e.g. \"Moods\".")]
         public string title;
-        [Tooltip("The square button for this section. Hover it to open the tooltip.")]
-        public RectTransform box;
-        [Tooltip("The section icon. Change its sprite to change the icon. Dimmed while the section is empty.")]
-        public Image icon;
-        [Tooltip("Letter shown while the icon has no sprite yet.")]
-        public TMP_Text fallbackLabel;
+        [Tooltip("The text on the card's ruled line.")]
+        public TMP_Text text;
+        [Tooltip("Only used by Trinkets: extra ruled lines to continue on when the first one is full.")]
+        public TMP_Text[] moreLines;
 
-        [NonSerialized] public List<RowData> data = new List<RowData>();
-    }
-
-    public class RowData
-    {
-        public Sprite icon;
-        public string text;
-        public Color color;
+        [NonSerialized] public List<string> data = new List<string>();
     }
 
     [Serializable]
@@ -51,6 +38,8 @@ public class ActiveBuffsSidebar : MonoBehaviour
     {
         public Image icon;
         public TMP_Text valueText;
+        [Tooltip("Shown instead of the icon while the icon has no sprite (e.g. \"SPD\").")]
+        public TMP_Text fallbackLabel;
 
         [NonSerialized] public float last = float.NaN;
         [NonSerialized] public Color baseColor = Color.white;
@@ -61,38 +50,37 @@ public class ActiveBuffsSidebar : MonoBehaviour
     // ---------------- Setup (filled by the builder) ----------------
 
     [Header("Panel")]
-    [Tooltip("The bar itself. It slides in and out to the left.")]
+    [Tooltip("The whole card (a 1920 x 1080 block like the PNG). It slides in and out to the left.")]
     public RectTransform slideRoot;
-    [Tooltip("Size of the whole bar. Use the same number as the Trinket bar's Panel Scale so they match.")]
-    [Range(0.3f, 1.5f)] public float panelScale = 0.75f;
-    [Tooltip("The object that holds the section icons (it has the vertical layout on it).")]
-    public RectTransform layoutRoot;
+    [Tooltip("Size of the whole card on screen.")]
+    [Range(0.2f, 1.2f)] public float panelScale = 0.5f;
+    [Tooltip("Invisible rectangle over the visible part of the card. The mouse is 'over the bar' while it is inside this.")]
+    public RectTransform hitArea;
     public Button toggleButton;
     public TMP_Text toggleArrow;
-    [Tooltip("A hidden row (Icon + Label) that gets cloned for every line in the tooltip.")]
-    public RectTransform rowTemplate;
 
-    [Header("Tooltip")]
-    [Tooltip("The popup that appears next to a hovered icon. Rows are added inside it.")]
-    public RectTransform tooltip;
-    public TMP_Text tooltipTitle;
+    [Header("Card art (in the PNG's own pixels)")]
+    [Tooltip("Where the drawn card starts on the PNG (the PNG has empty space around the card).")]
+    public float cardLeft = 301f;
+    [Tooltip("Where the drawn card ends on the PNG. The toggle tab sticks out from here.")]
+    public float cardRight = 1591f;
+
+    [Header("Text")]
     public string emptyText = "None";
-    [Tooltip("Gap between the icon and the tooltip (in reference pixels).")]
-    public float tooltipGap = 10f;
-    [Tooltip("Also write the trinket's name in front of its stats in the Trinkets tooltip.")]
+    [Tooltip("Also write the trinket's name in front of its stats in the Trinkets line.")]
     public bool showTrinketNames = false;
     [Tooltip("Number fields on TrinketData that are NOT stats (e.g. price). Matching is not case sensitive.")]
     public string[] ignoredTrinketFields = { "price", "cost", "sellPrice", "buyPrice", "rarity", "weight", "id", "index" };
 
-    [Header("Sections")]
+    [Header("Sections (one ruled line each)")]
     public Section moodSection = new Section();
     public Section boonsSection = new Section();
     public Section trinketsSection = new Section();
     public Section advantageSection = new Section();
-    [Tooltip("Blueprint Shop structure (Solar Panel / Windmill) and its upgrades. If left empty, the rows are shown under Boons.")]
+    [Tooltip("Blueprint Shop structure (Solar Panel / Windmill) and its upgrades. If left empty, its info is shown on the Boons line.")]
     public Section structureSection = new Section();
 
-    [Header("Stats (bottom of the bar)")]
+    [Header("Stats (top of the card)")]
     public StatRow sunPower = new StatRow();
     public StatRow windPower = new StatRow();
     public StatRow moveSpeed = new StatRow();
@@ -100,21 +88,8 @@ public class ActiveBuffsSidebar : MonoBehaviour
     public SolarCard sunCard;
     [Tooltip("Drag your Wind card asset here. Its current value is the Wind stat (leave empty to find it automatically).")]
     public WindCard windCard;
-    public Color statUpColor = new Color(0.4f, 1f, 0.4f);
-    public Color statDownColor = new Color(1f, 0.4f, 0.4f);
-
-    [Header("Icons (taken from the Trinket bar's stat icons if left empty)")]
-    public Sprite sunIcon;
-    public Sprite windIcon;
-
-    [Header("Colours")]
-    public Color buffColor = Color.white;
-    public Color dimColor = new Color(1f, 1f, 1f, 0.6f);
-    public Color advantageColor = new Color(0.55f, 1f, 0.55f);
-    [Tooltip("Section icon colour while the section has something in it.")]
-    public Color iconActiveColor = Color.white;
-    [Tooltip("Section icon colour while the section is empty.")]
-    public Color iconEmptyColor = new Color(1f, 1f, 1f, 0.3f);
+    public Color statUpColor = new Color(0.1f, 0.6f, 0.2f);
+    public Color statDownColor = new Color(0.8f, 0.15f, 0.15f);
 
     // ---------------- Behaviour ----------------
 
@@ -127,10 +102,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
     [Header("Animation")]
     public float slideSpeed = 12f;
 
-    [Header("Position")]
-    [Tooltip("Moves the whole bar down (reference pixels) so it does not overlap the star / money counter. Raise it to go lower.")]
-    public float lowerBy = 60f;
-
     [Header("Sounds")]
     [Range(0f, 1f)] public float sfxVolume = 1f;
     public AudioClip openSound;
@@ -140,7 +111,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
 
     public static ActiveBuffsSidebar Instance { get; private set; }
 
-    /// <summary>True while the mouse is over the bar. Used to stop clicks leaking into the world.</summary>
+    /// <summary>True while the mouse is over the card. Used to stop clicks leaking into the world.</summary>
     public static bool IsPointerOver
     {
         get { return Instance != null && Instance.PointerInside(); }
@@ -159,10 +130,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
     private float lastSpeed;
     private float nextFindTime;
 
-    private Section hovered;
-    private bool tooltipDirty;
-    private readonly List<GameObject> tooltipRows = new List<GameObject>();
-    private readonly Vector3[] corners = new Vector3[4];
     private FieldInfo[] trinketFields;
 
     private RectTransform ToggleRect { get { return toggleButton != null ? toggleButton.transform as RectTransform : null; } }
@@ -199,71 +166,17 @@ public class ActiveBuffsSidebar : MonoBehaviour
             DontDestroyOnLoad(gameObject);
         }
 
+        FillMenuIcons();
         CaptureStat(sunPower);
         CaptureStat(windPower);
         CaptureStat(moveSpeed);
 
-        if (rowTemplate != null) rowTemplate.gameObject.SetActive(false);
         if (toggleButton != null) toggleButton.onClick.AddListener(Toggle);
         if (slideRoot != null) slideRoot.localScale = new Vector3(panelScale, panelScale, 1f);
-        EnsureStructureSection();
-        if (slideRoot != null)
-        {
-            Vector2 sp = slideRoot.anchoredPosition;
-            sp.y -= lowerBy;
-            slideRoot.anchoredPosition = sp;
-        }
-        if (tooltip != null)
-        {
-            tooltip.localScale = new Vector3(panelScale, panelScale, 1f);
-            tooltip.gameObject.SetActive(false);
-        }
 
         open = startOpen;
         SnapSlide();
         UpdateArrow();
-    }
-
-    // Bars made before the Blueprint square existed get one added here: a copy of the last square, with the bar made taller.
-    private void EnsureStructureSection()
-    {
-        if (structureSection != null && structureSection.box != null) return;
-
-        Section src = (advantageSection != null && advantageSection.box != null) ? advantageSection : boonsSection;
-        if (src == null || src.box == null || slideRoot == null) return;
-
-        RectTransform box = Instantiate(src.box, src.box.parent);
-        box.name = "Blueprint";
-        box.SetSiblingIndex(src.box.GetSiblingIndex() + 1);
-
-        Transform iconTf = box.Find("Icon");
-        Transform letterTf = box.Find("Letter");
-
-        structureSection = new Section();
-        structureSection.title = "Blueprint";
-        structureSection.box = box;
-        structureSection.icon = iconTf != null ? iconTf.GetComponent<Image>() : null;
-        structureSection.fallbackLabel = letterTf != null ? letterTf.GetComponent<TMP_Text>() : null;
-        if (structureSection.icon != null) structureSection.icon.sprite = null; // shows the letter "B" until you assign an icon
-
-        // Make room for the extra square
-        float spacing = 0f;
-        if (layoutRoot != null)
-        {
-            VerticalLayoutGroup vlg = layoutRoot.GetComponent<VerticalLayoutGroup>();
-            if (vlg != null) spacing = vlg.spacing;
-        }
-        LayoutElement le = box.GetComponent<LayoutElement>();
-        float added = (le != null && le.preferredHeight > 0f ? le.preferredHeight : box.rect.height) + spacing;
-
-        Vector2 size = slideRoot.sizeDelta;
-        size.y += added;
-        slideRoot.sizeDelta = size;
-
-        // The bar grows up and down equally: move it down by half so the top stays where it was
-        Vector2 pos = slideRoot.anchoredPosition;
-        pos.y -= added * panelScale * 0.5f;
-        slideRoot.anchoredPosition = pos;
     }
 
     private void OnEnable()
@@ -296,7 +209,9 @@ public class ActiveBuffsSidebar : MonoBehaviour
         BorrowIcons();
         UpdateSlide();
         RefreshBuffs();
-        UpdateHover();
+        SyncStatIcon(sunPower);
+        SyncStatIcon(windPower);
+        SyncStatIcon(moveSpeed);
         UpdateStat(sunPower, GetSun());
         UpdateStat(windPower, GetWind());
         UpdateStat(moveSpeed, GetSpeed());
@@ -305,8 +220,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         player = null;
-        lastSignature = null; // rebuild the rows
-        HideTooltip();
+        lastSignature = null; // rebuild the lines
         ApplySceneVisibility();
         EnsureEventSystem();
     }
@@ -336,7 +250,42 @@ public class ActiveBuffsSidebar : MonoBehaviour
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
     }
 
-    // The stat icons come from the Trinket bar (where the stats used to be) unless you set your own
+    // -------------------------------------------------------------------
+    // Stat icons
+    // -------------------------------------------------------------------
+
+    // Same icons the GameMenu Stats card uses (Resources/MenuUI: Sun_Icon, Wind_Icon, Speed_Icon), if they exist
+    private void FillMenuIcons()
+    {
+        Sprite[] all = Resources.LoadAll<Sprite>("MenuUI");
+        FillIcon(sunPower, all, "Sun_Icon");
+        FillIcon(windPower, all, "Wind_Icon");
+        FillIcon(moveSpeed, all, "Speed_Icon");
+    }
+
+    // "Sun_Icon", "Sun Icon" and "sun-icon" all count as the same name
+    private static string Norm(string s)
+    {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.Length; i++)
+            if (char.IsLetterOrDigit(s[i])) sb.Append(char.ToLowerInvariant(s[i]));
+        return sb.ToString();
+    }
+
+    private static void FillIcon(StatRow row, Sprite[] all, string name)
+    {
+        if (row == null || row.icon == null || row.icon.sprite != null) return;
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (Norm(all[i].name) == Norm(name))
+            {
+                row.icon.sprite = all[i];
+                return;
+            }
+        }
+    }
+
+    // Anything still without an icon is taken from the Trinket bar (where the stats used to be)
     private void BorrowIcons()
     {
         if (iconsBorrowed || TrinketSidebar.Instance == null) return;
@@ -346,16 +295,22 @@ public class ActiveBuffsSidebar : MonoBehaviour
         Borrow(sunPower, t.sunPower);
         Borrow(windPower, t.windPower);
         Borrow(moveSpeed, t.moveSpeed);
-
-        if (sunIcon == null && sunPower.icon != null) sunIcon = sunPower.icon.sprite;
-        if (windIcon == null && windPower.icon != null) windIcon = windPower.icon.sprite;
-        lastSignature = null;
     }
 
     private static void Borrow(StatRow mine, TrinketSidebar.StatRow theirs)
     {
         if (mine == null || theirs == null || mine.icon == null || theirs.icon == null) return;
         if (mine.icon.sprite == null) mine.icon.sprite = theirs.icon.sprite;
+    }
+
+    // No sprite: hide the (white) icon box and show the small text label instead
+    private static void SyncStatIcon(StatRow row)
+    {
+        if (row == null) return;
+        bool has = row.icon != null && row.icon.sprite != null;
+        if (row.icon != null && row.icon.enabled != has) row.icon.enabled = has;
+        if (row.fallbackLabel != null && row.fallbackLabel.gameObject.activeSelf == has)
+            row.fallbackLabel.gameObject.SetActive(!has);
     }
 
     // -------------------------------------------------------------------
@@ -380,24 +335,30 @@ public class ActiveBuffsSidebar : MonoBehaviour
         if (toggleArrow != null) toggleArrow.text = open ? "<" : ">";
     }
 
-    // How far the bar must move left to be hidden (the tab stays visible)
+    // Open: the drawn card's left edge sits on the screen's left edge
+    private float OpenX
+    {
+        get { return slideRoot != null ? -cardLeft * slideRoot.localScale.x : 0f; }
+    }
+
+    // Closed: the whole drawn card is off screen, only the tab stays visible
     private float ClosedX
     {
-        get { return slideRoot != null ? -slideRoot.rect.width * slideRoot.localScale.x : 0f; }
+        get { return slideRoot != null ? -cardRight * slideRoot.localScale.x : 0f; }
     }
 
     private void SnapSlide()
     {
         if (slideRoot == null) return;
         Vector2 p = slideRoot.anchoredPosition;
-        p.x = open ? 0f : ClosedX;
+        p.x = open ? OpenX : ClosedX;
         slideRoot.anchoredPosition = p;
     }
 
     private void UpdateSlide()
     {
         if (slideRoot == null) return;
-        float target = open ? 0f : ClosedX;
+        float target = open ? OpenX : ClosedX;
         Vector2 p = slideRoot.anchoredPosition;
         p.x = Mathf.Lerp(p.x, target, 1f - Mathf.Exp(-slideSpeed * Time.unscaledDeltaTime));
         if (Mathf.Abs(p.x - target) < 0.1f) p.x = target;
@@ -416,7 +377,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
         RebuildData();
     }
 
-    // Everything the tooltips show, as one string: the data is only rebuilt when it changes
+    // Everything the card shows, as one string: the lines are only rebuilt when it changes
     private string BuildSignature()
     {
         StringBuilder sb = new StringBuilder(96);
@@ -453,45 +414,45 @@ public class ActiveBuffsSidebar : MonoBehaviour
             if (power != 0)
             {
                 // "+50 Power to all Power types"
-                AddRow(moodSection, sunIcon, Signed(power), buffColor);
-                AddRow(moodSection, windIcon, Signed(power), buffColor);
+                AddRow(moodSection, Signed(power) + " Sun");
+                AddRow(moodSection, Signed(power) + " Wind");
             }
 
             float mult = MoodManager.ScoreMultiplier;
-            if (mult > 1.001f) AddRow(moodSection, null, "X" + mult.ToString("0.##") + " Mult", buffColor);
-            if (MoodManager.HandsModifier != 0) AddRow(moodSection, null, Signed(MoodManager.HandsModifier) + " Hand", buffColor);
-            if (MoodManager.ReshufflesModifier != 0) AddRow(moodSection, null, Signed(MoodManager.ReshufflesModifier) + " Reshuffle", buffColor);
+            if (mult > 1.001f) AddRow(moodSection, "X" + mult.ToString("0.##") + " Mult");
+            if (MoodManager.HandsModifier != 0) AddRow(moodSection, Signed(MoodManager.HandsModifier) + " Hand");
+            if (MoodManager.ReshufflesModifier != 0) AddRow(moodSection, Signed(MoodManager.ReshufflesModifier) + " Reshuffle");
 
             int left = MoodManager.FightsLeft;
-            if (left > 0) AddRow(moodSection, null, left + (left == 1 ? " fight left" : " fights left"), dimColor);
+            if (left > 0) AddRow(moodSection, left + (left == 1 ? " fight left" : " fights left"));
         }
 
         // Boons
-        if (BoonProgress.BonusWindPower > 0) AddRow(boonsSection, windIcon, Signed(BoonProgress.BonusWindPower), buffColor);
-        if (BoonProgress.ExtraHands > 0) AddRow(boonsSection, null, Signed(BoonProgress.ExtraHands) + " Hand", buffColor);
-        if (BoonProgress.ExtraHandSize > 0) AddRow(boonsSection, null, Signed(BoonProgress.ExtraHandSize) + " Hand Size", buffColor);
+        if (BoonProgress.BonusWindPower > 0) AddRow(boonsSection, Signed(BoonProgress.BonusWindPower) + " Wind");
+        if (BoonProgress.ExtraHands > 0) AddRow(boonsSection, Signed(BoonProgress.ExtraHands) + " Hand");
+        if (BoonProgress.ExtraHandSize > 0) AddRow(boonsSection, Signed(BoonProgress.ExtraHandSize) + " Hand Size");
 
-        // Blueprint Shop structure (falls back to the Boons icon if there is no Structure section in the bar)
+        // Blueprint Shop structure (falls back to the Boons line if there is no Blueprint line on the card)
         if (StructureProgress.IsBuilt)
         {
             StructureType st = StructureProgress.Current;
-            Section ss = (structureSection != null && structureSection.box != null) ? structureSection : boonsSection;
-            Sprite cardIcon = st == StructureType.Solar ? sunIcon : windIcon;
+            Section ss = (structureSection != null && structureSection.text != null) ? structureSection : boonsSection;
+            string cardWord = st == StructureType.Solar ? "Sun" : "Wind";
 
-            AddRow(ss, null, StructureProgress.DisplayName(st), dimColor);
+            AddRow(ss, StructureProgress.DisplayName(st));
 
             int sPower = StructureProgress.PowerBonus(st);
-            if (sPower > 0) AddRow(ss, cardIcon, Signed(sPower), buffColor);
+            if (sPower > 0) AddRow(ss, Signed(sPower) + " " + cardWord);
 
             int stab = StructureProgress.Level(StructureUpgrade.Stability);
             if (stab > 0)
             {
                 int pct = Mathf.RoundToInt((1f - StructureProgress.LowPowerChanceFactor(st)) * 100f);
-                AddRow(ss, null, "-" + pct + "% Low Power chance", buffColor);
+                AddRow(ss, "-" + pct + "% Low Power chance");
             }
 
             float sMult = StructureProgress.MultBonus(st);
-            if (sMult > 0f) AddRow(ss, null, "+" + sMult.ToString("0.##") + " " + StructureProgress.CardName(st) + " Set Mult", buffColor);
+            if (sMult > 0f) AddRow(ss, "+" + sMult.ToString("0.##") + " " + StructureProgress.CardName(st) + " Set Mult");
         }
 
         // Trinkets: only the stat values they give. A trinket without stats adds nothing.
@@ -501,11 +462,9 @@ public class ActiveBuffsSidebar : MonoBehaviour
 
         // Advantage Hit
         if (AdvantageHit.IsActive)
-            AddRow(advantageSection, null, "-" + Mathf.RoundToInt(AdvantageHit.Reduction * 100f) + "% Score", advantageColor);
+            AddRow(advantageSection, "-" + Mathf.RoundToInt(AdvantageHit.Reduction * 100f) + "% Score");
 
-        for (int i = 0; i < all.Length; i++) RefreshIcon(all[i]);
-
-        tooltipDirty = true;
+        RefreshTexts();
     }
 
     private static string Signed(float value)
@@ -513,34 +472,88 @@ public class ActiveBuffsSidebar : MonoBehaviour
         return (value > 0f ? "+" : "") + value.ToString("0.##");
     }
 
-    private void AddRow(Section s, Sprite icon, string text, Color color)
+    private void AddRow(Section s, string text)
     {
         if (s == null) return;
-        s.data.Add(new RowData { icon = icon, text = text, color = color });
+        s.data.Add(text);
     }
 
-    // Dim the icon while empty, show a letter while it has no sprite
-    private void RefreshIcon(Section s)
-    {
-        if (s == null) return;
-        bool has = s.data.Count > 0;
-        bool hasSprite = s.icon != null && s.icon.sprite != null;
+    // -------------------------------------------------------------------
+    // Writing the card's lines
+    // -------------------------------------------------------------------
 
-        if (s.icon != null)
+    private static string Prefix(Section s)
+    {
+        return "<b>" + s.title + ":</b>  ";
+    }
+
+    private void RefreshTexts()
+    {
+        SetLine(moodSection);
+        SetLine(boonsSection);
+        SetLine(structureSection);
+        SetLine(advantageSection);
+        SetTrinketLines();
+    }
+
+    private void SetLine(Section s)
+    {
+        if (s == null || s.text == null) return;
+        string body = s.data.Count == 0 ? emptyText : string.Join(", ", s.data.ToArray());
+        s.text.text = Prefix(s) + body;
+    }
+
+    // Trinkets can be many: they are packed onto the first line and then the extra ruled lines
+    private void SetTrinketLines()
+    {
+        Section s = trinketsSection;
+        if (s == null || s.text == null) return;
+
+        List<TMP_Text> slots = new List<TMP_Text>();
+        slots.Add(s.text);
+        if (s.moreLines != null)
+            for (int i = 0; i < s.moreLines.Length; i++)
+                if (s.moreLines[i] != null) slots.Add(s.moreLines[i]);
+
+        List<string> lines = new List<string>();
+        if (s.data.Count == 0)
         {
-            s.icon.enabled = hasSprite;
-            s.icon.color = has ? iconActiveColor : iconEmptyColor;
+            lines.Add(Prefix(s) + emptyText);
         }
-        if (s.fallbackLabel != null)
+        else
         {
-            s.fallbackLabel.gameObject.SetActive(!hasSprite);
-            if (!hasSprite)
+            float maxWidth = s.text.rectTransform.rect.width;
+            if (maxWidth <= 1f) maxWidth = 1000f;
+
+            string current = Prefix(s);
+            bool lineEmpty = true;
+            for (int i = 0; i < s.data.Count; i++)
             {
-                s.fallbackLabel.text = string.IsNullOrEmpty(s.title) ? "?" : s.title.Substring(0, 1);
-                Color c = has ? iconActiveColor : iconEmptyColor;
-                s.fallbackLabel.color = c;
+                string item = s.data[i];
+                string trial = lineEmpty ? current + item : current + ", " + item;
+                if (!lineEmpty && s.text.GetPreferredValues(trial).x > maxWidth)
+                {
+                    lines.Add(current + ",");
+                    current = item;
+                }
+                else
+                {
+                    current = trial;
+                }
+                lineEmpty = false;
             }
+            lines.Add(current);
         }
+
+        // more than fits: cut the last visible line short
+        if (lines.Count > slots.Count)
+        {
+            lines.RemoveRange(slots.Count, lines.Count - slots.Count);
+            lines[slots.Count - 1] = lines[slots.Count - 1].TrimEnd(',') + "...";
+        }
+
+        for (int i = 0; i < slots.Count; i++)
+            slots[i].text = i < lines.Count ? lines[i] : "";
     }
 
     // -------------------------------------------------------------------
@@ -548,7 +561,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
     // -------------------------------------------------------------------
 
     // Reads every number field on the trinket (except the ones in 'ignoredTrinketFields') and lists the ones that are not 0.
-    // Fields with "sun" / "wind" in the name get the Sun / Wind icon.
+    // Fields with "sun" / "wind" in the name are written as "Sun" / "Wind".
     private void AddTrinketStats(TrinketData t)
     {
         if (trinketFields == null) trinketFields = FindTrinketFields();
@@ -562,18 +575,18 @@ public class ActiveBuffsSidebar : MonoBehaviour
             if (Mathf.Approximately(v, 0f)) continue;
 
             string lower = f.Name.ToLowerInvariant();
-            Sprite icon = null;
-            if (lower.Contains("sun")) icon = sunIcon;
-            else if (lower.Contains("wind")) icon = windIcon;
+            string word;
+            if (lower.Contains("sun")) word = "Sun";
+            else if (lower.Contains("wind")) word = "Wind";
+            else word = Prettify(f.Name);
 
-            string text = Signed(v) + (icon != null ? "" : " " + Prettify(f.Name));
-
+            string text = Signed(v) + " " + word;
             if (showTrinketNames && !nameShown)
             {
-                AddRow(trinketsSection, null, t.trinketName, dimColor);
+                text = t.trinketName + ": " + text;
                 nameShown = true;
             }
-            AddRow(trinketsSection, icon, text, buffColor);
+            AddRow(trinketsSection, text);
         }
     }
 
@@ -616,151 +629,14 @@ public class ActiveBuffsSidebar : MonoBehaviour
     }
 
     // -------------------------------------------------------------------
-    // Hover tooltip
-    // -------------------------------------------------------------------
-
-    private void UpdateHover()
-    {
-        if (tooltip == null) return;
-
-        Section now = null;
-        if (canvas != null && canvas.enabled)
-        {
-            Section[] all = AllSections();
-            for (int i = 0; i < all.Length; i++)
-            {
-                if (all[i] != null && Over(all[i].box)) { now = all[i]; break; }
-            }
-        }
-
-        if (now == null)
-        {
-            if (hovered != null) HideTooltip();
-            return;
-        }
-
-        if (now != hovered || tooltipDirty)
-        {
-            hovered = now;
-            tooltipDirty = false;
-            BuildTooltip(now);
-        }
-
-        PositionTooltip(now);
-    }
-
-    private void BuildTooltip(Section s)
-    {
-        for (int i = 0; i < tooltipRows.Count; i++)
-        {
-            if (tooltipRows[i] == null) continue;
-            tooltipRows[i].SetActive(false); // out of the layout right now, destroyed at the end of the frame
-            Destroy(tooltipRows[i]);
-        }
-        tooltipRows.Clear();
-
-        if (tooltipTitle != null) tooltipTitle.text = s.title;
-
-        if (s.data.Count == 0)
-        {
-            AddTooltipRow(null, emptyText, new Color(1f, 1f, 1f, 0.45f));
-        }
-        else
-        {
-            for (int i = 0; i < s.data.Count; i++)
-                AddTooltipRow(s.data[i].icon, s.data[i].text, s.data[i].color);
-        }
-
-        if (!tooltip.gameObject.activeSelf)
-        {
-            tooltip.gameObject.SetActive(true);
-            tooltip.SetAsLastSibling();
-        }
-        LayoutRebuilder.ForceRebuildLayoutImmediate(tooltip);
-    }
-
-    private void AddTooltipRow(Sprite icon, string text, Color color)
-    {
-        if (rowTemplate == null) return;
-
-        GameObject go = Instantiate(rowTemplate.gameObject, tooltip);
-        go.name = "Row";
-        go.SetActive(true);
-
-        Transform iconTf = go.transform.Find("Icon");
-        if (iconTf != null)
-        {
-            Image img = iconTf.GetComponent<Image>();
-            bool show = icon != null && img != null;
-            iconTf.gameObject.SetActive(show);
-            if (show) img.sprite = icon;
-        }
-
-        TMP_Text label = go.GetComponentInChildren<TMP_Text>(true);
-        if (label != null)
-        {
-            label.text = text;
-            label.color = color;
-        }
-
-        tooltipRows.Add(go);
-    }
-
-    // Right of the hovered icon, vertically centred on it and kept on the screen
-    private void PositionTooltip(Section s)
-    {
-        if (s.box == null) return;
-
-        s.box.GetWorldCorners(corners);
-        Vector3 anchor = (corners[2] + corners[3]) * 0.5f;
-        float scaleFactor = canvas != null ? canvas.scaleFactor : 1f;
-        anchor.x += tooltipGap * scaleFactor;
-
-        float halfHeight = tooltip.rect.height * tooltip.lossyScale.y * 0.5f;
-        anchor.y = Mathf.Clamp(anchor.y, halfHeight, Mathf.Max(halfHeight, Screen.height - halfHeight));
-
-        tooltip.position = anchor;
-    }
-
-    private void HideTooltip()
-    {
-        hovered = null;
-        if (tooltip != null && tooltip.gameObject.activeSelf) tooltip.gameObject.SetActive(false);
-    }
-
-    // -------------------------------------------------------------------
     // Stats
     // -------------------------------------------------------------------
 
     private void CaptureStat(StatRow row)
     {
         if (row == null || row.valueText == null) return;
-
-        // Make long numbers (3+ digits) shrink to fit the space next to the icon instead of wrapping below it.
-        // Done here so a bar that is already in the scene gets fixed without being rebuilt.
-        TMP_Text txt = row.valueText;
-        txt.enableAutoSizing = true;
-        txt.fontSizeMax = txt.fontSize;
-        txt.fontSizeMin = Mathf.Min(14f, txt.fontSize);
-#pragma warning disable 618
-        txt.enableWordWrapping = false;
-#pragma warning restore 618
-        txt.overflowMode = TextOverflowModes.Overflow;
-
-        LayoutElement tle = txt.GetComponent<LayoutElement>();
-        if (tle == null) tle = txt.gameObject.AddComponent<LayoutElement>();
-        tle.minWidth = 0f;
-        tle.preferredWidth = 0f;
-        tle.flexibleWidth = 1f;
-
-        if (row.icon != null)
-        {
-            LayoutElement ile = row.icon.GetComponent<LayoutElement>();
-            if (ile != null && ile.preferredWidth > 0f) ile.minWidth = ile.preferredWidth; // the icon never shrinks
-        }
-
-        row.baseColor = txt.color;
-        row.baseScale = txt.transform.localScale;
+        row.baseColor = row.valueText.color;
+        row.baseScale = row.valueText.transform.localScale;
     }
 
     // The power cards' current value: base value + boons + mood. Always shown, even with no buff active.
@@ -867,7 +743,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
     private bool PointerInside()
     {
         if (canvas != null && !canvas.enabled) return false;
-        return Over(slideRoot) || Over(ToggleRect);
+        return Over(hitArea != null ? hitArea : slideRoot) || Over(ToggleRect);
     }
 
     private void PlaySFX(AudioClip clip, float pitch = 1f)

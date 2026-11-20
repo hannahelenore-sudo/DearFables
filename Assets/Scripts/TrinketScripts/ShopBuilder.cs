@@ -203,7 +203,8 @@ public static class ShopBuilder
         RectTransform sr = slide.GetComponent<RectTransform>();
         sr.anchorMin = sr.anchorMax = new Vector2(1f, 0.5f);
         sr.pivot = new Vector2(1f, 0.5f);
-        sr.sizeDelta = new Vector2(190f, 960f);
+        // Already short: the Sun / Wind / Speed stats live in the Active Buffs bar, so no room is left for them here
+        sr.sizeDelta = new Vector2(190f, 696f);
         sr.anchoredPosition = Vector2.zero;
         sr.localScale = new Vector3(0.75f, 0.75f, 1f); // matches 'Panel Scale' on the TrinketSidebar
         AddImage(slide, panelColor);
@@ -213,7 +214,7 @@ public static class ShopBuilder
         for (int i = 0; i < frames.Length; i++)
         {
             GameObject f = NewUI("Frame" + i, slide.transform);
-            SetRect(f, new Vector2(0f, 400f - 134f * i), new Vector2(160f, 120f));
+            SetRect(f, new Vector2(0f, 268f - 134f * i), new Vector2(160f, 120f));
             Image fi = AddImage(f, frameColor);
             fi.raycastTarget = false;
             frames[i] = f.GetComponent<RectTransform>();
@@ -248,10 +249,15 @@ public static class ShopBuilder
         tplView.selectedOutline = outline;
         tpl.SetActive(false);
 
-        // Stats at the bottom: Sun Power, Wind Power, Movement Speed (assign your icon sprites to the Icon images)
-        TrinketSidebar.StatRow sun = NewStatRow(slide.transform, "SunPower", new Vector2(0f, -270f), new Color(1f, 0.75f, 0.1f));
-        TrinketSidebar.StatRow wind = NewStatRow(slide.transform, "WindPower", new Vector2(0f, -340f), new Color(0.3f, 0.85f, 0.95f));
-        TrinketSidebar.StatRow speed = NewStatRow(slide.transform, "MoveSpeed", new Vector2(0f, -410f), new Color(0.55f, 0.33f, 0.15f));
+        // Stats: Sun Power, Wind Power, Movement Speed. They are shown in the Active Buffs bar, so this holder is
+        // created HIDDEN (the icons here are only the source the Active Buffs builder copies from).
+        // Assign your stat icon sprites on the Icon images inside "Stats (hidden)".
+        GameObject statsHolder = NewUI("Stats (hidden)", slide.transform);
+        SetRect(statsHolder, Vector2.zero, new Vector2(190f, 240f));
+        TrinketSidebar.StatRow sun = NewStatRow(statsHolder.transform, "SunPower", new Vector2(0f, 70f), new Color(1f, 0.75f, 0.1f));
+        TrinketSidebar.StatRow wind = NewStatRow(statsHolder.transform, "WindPower", new Vector2(0f, 0f), new Color(0.3f, 0.85f, 0.95f));
+        TrinketSidebar.StatRow speed = NewStatRow(statsHolder.transform, "MoveSpeed", new Vector2(0f, -70f), new Color(0.55f, 0.33f, 0.15f));
+        statsHolder.SetActive(false);
 
         // Open / close tab on the left edge of the bar
         GameObject tab = NewUI("ToggleTab", slide.transform);
@@ -295,6 +301,8 @@ public static class ShopBuilder
         bar.sellButton = sell;
 
         Selection.activeObject = canvasGO;
+        bar.statsLiveInBuffBar = true; // stats are hidden and the bar is short already (baked in)
+
         Debug.Log("Trinket Sidebar created. It is shown open in the editor so you can style it; in play mode it starts closed, opens with the shop, and follows you into the card scene. Assign the stat icons, slot sprites and sounds on the TrinketSidebar component.");
     }
 

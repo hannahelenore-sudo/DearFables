@@ -5,16 +5,37 @@ using UnityEngine.UI;
 using TMPro;
 
 // Must live in a folder named "Editor".
-// Builds the compact Active Buffs bar (left side of the screen): one icon button per section, with a hover tooltip.
-// It copies the scale, canvas settings, font and stat icons from your Trinket bar when there is one in the scene,
-// so the two match. Then just swap the section icon sprites / font.
+// Builds the Active Buffs bar (left side of the screen) as the hand-drawn ruled card (b_gg.png),
+// laid out like the Stats page of the GameMenu. Everything is placed in the PNG's own pixel coordinates.
+//
+// BEFORE YOU RUN IT: put b_gg.png in your project (Assets/Resources/MenuUI/ is a good place, next to the menu art)
+// and set its Texture Type to "Sprite (2D and UI)". Delete the old Active Buffs bar from the scene first.
 public static class ActiveBuffsBuilder
 {
-    // Compact sizes (reference pixels, before the panel scale)
-    private const float PanelWidth = 124f;
-    private const float PanelHeight = 700f;
-    private const float SectionSize = 92f;
-    private const float StatsHeight = 180f;
+    private const string CardSpriteName = "b_gg";
+
+    // The PNG is 1920 x 1080, but the drawn card only covers this part of it
+    private const float PngW = 1920f, PngH = 1080f;
+    private const float CardLeft = 301f, CardRight = 1591f, CardTop = 48f, CardBottom = 992f;
+
+    // On-screen size of the card (1 = the PNG at full size)
+    private const float DefaultScale = 0.5f;
+
+    private static readonly Color Navy = new Color(47f / 255f, 51f / 255f, 105f / 255f, 1f);
+    private static readonly Color BoxFill = new Color(0.95f, 0.99f, 1f, 1f);
+    private static readonly Color CardBlue = new Color(0.74f, 0.83f, 0.93f, 1f); // only used if the PNG is missing
+
+    // The ruled lines of the card: text sits in the gap between two lines (centre of each gap, y down from the PNG's top)
+    private const float RowMood = 384f;       // gap 355-419   (the portrait is on the right: keep these two narrow)
+    private const float RowBoons = 449f;      // gap 419-486
+    private const float RowBlueprint = 517f;  // gap 486-553
+    private const float RowTrinkets1 = 587f;  // gap 553-626
+    private const float RowTrinkets2 = 655f;  // gap 626-691
+    private const float RowTrinkets3 = 717f;  // gap 691-750
+    private const float RowAdvantage = 779f;  // gap 750-815 (the little star is bottom right: keep it narrow)
+
+    private const float TextX = 382f;
+    private const float RowSize = 44f;
 
     private static TMP_FontAsset font;
 
@@ -25,25 +46,25 @@ public static class ActiveBuffsBuilder
         if (existing != null)
         {
             Selection.activeObject = existing.gameObject;
-            Debug.LogWarning("There is already an Active Buffs bar in this scene.");
+            Debug.LogWarning("There is already an Active Buffs bar in this scene. Delete it first, then run this again.");
             return;
         }
 
         // ---- Copy what we can from the Trinket bar ----
         TrinketSidebar trinket = Object.FindAnyObjectByType<TrinketSidebar>();
-        float scale = 0.75f;
         int order = 45;
-        font = null;
+        font = FindAsset<TMP_FontAsset>("MenuFont"); // the menu's own font, so the two match
 
         if (trinket != null)
         {
-            scale = trinket.panelScale;
             Canvas tc = trinket.GetComponent<Canvas>();
             if (tc != null) order = tc.sortingOrder;
-            if (trinket.infoName != null) font = trinket.infoName.font;
+            if (font == null && trinket.infoName != null) font = trinket.infoName.font;
         }
 
-        Sprite panelSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        Sprite cardSprite = FindSprite(CardSpriteName);
+        if (cardSprite == null)
+            Debug.LogWarning("Active Buffs: no sprite called \"" + CardSpriteName + "\" found. Import b_gg.png (Texture Type: Sprite (2D and UI)) and run this again. A plain blue card is used for now.");
 
         // ---- Canvas ----
         GameObject canvasGO = new GameObject("ActiveBuffsCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -71,243 +92,218 @@ public static class ActiveBuffsBuilder
         }
 
         ActiveBuffsSidebar bar = canvasGO.AddComponent<ActiveBuffsSidebar>();
-        bar.panelScale = scale;
+        bar.panelScale = DefaultScale;
+        bar.cardLeft = CardLeft;
+        bar.cardRight = CardRight;
 
-        // ---- Panel (left edge, vertically centred; slides left to hide) ----
+        // ---- The card: a PNG-sized block, vertically centred on the left edge. It slides left to hide. ----
         GameObject root = NewUI("SlideRoot", canvasGO.transform);
         RectTransform rr = root.GetComponent<RectTransform>();
         rr.anchorMin = rr.anchorMax = new Vector2(0f, 0.5f);
         rr.pivot = new Vector2(0f, 0.5f);
-        rr.sizeDelta = new Vector2(PanelWidth, PanelHeight);
-        rr.anchoredPosition = new Vector2(0f, -50f * scale); // 5 squares: keep the top where it was
-        Image bg = AddImage(root, new Color(0.33f, 0.33f, 0.33f), panelSprite, true);
-        bg.raycastTarget = true; // clicks on the bar must not throw cards / start walking
+        rr.sizeDelta = new Vector2(PngW, PngH);
+        rr.localScale = new Vector3(DefaultScale, DefaultScale, 1f);
+        // the drawn card is a little lower than the PNG's middle: nudge so it is centred on screen
+        float centreShift = (PngH * 0.5f - (CardTop + CardBottom) * 0.5f) * DefaultScale;
+        rr.anchoredPosition = new Vector2(-CardRight * DefaultScale, centreShift); // starts closed
         bar.slideRoot = rr;
 
-        // ---- Section icons ----
-        GameObject content = NewUI("Sections", root.transform);
-        RectTransform cr = content.GetComponent<RectTransform>();
-        cr.anchorMin = Vector2.zero;
-        cr.anchorMax = Vector2.one;
-        cr.offsetMin = new Vector2(8f, StatsHeight + 8f);
-        cr.offsetMax = new Vector2(-8f, -8f);
-        VerticalLayoutGroup v = content.AddComponent<VerticalLayoutGroup>();
-        v.spacing = 8f;
-        v.childAlignment = TextAnchor.UpperCenter;
-        v.childControlWidth = true;
-        v.childControlHeight = true;
-        v.childForceExpandWidth = true;
-        v.childForceExpandHeight = false;
-        bar.layoutRoot = cr;
+        GameObject cardGO = NewUI("Card", root.transform);
+        Stretch(cardGO);
+        Image cardImg = cardGO.AddComponent<Image>();
+        cardImg.raycastTarget = false;
+        if (cardSprite != null) { cardImg.sprite = cardSprite; cardImg.color = Color.white; }
+        else cardImg.color = CardBlue;
 
-        bar.moodSection = MakeSection(content.transform, "Mood", "Mood", panelSprite);
-        bar.boonsSection = MakeSection(content.transform, "Boons", "Boons", panelSprite);
-        bar.trinketsSection = MakeSection(content.transform, "Trinkets", "Trinkets", panelSprite);
-        bar.advantageSection = MakeSection(content.transform, "AdvantageHit", "Advantage Hit", panelSprite);
-        bar.structureSection = MakeSection(content.transform, "Blueprint", "Blueprint", panelSprite);
+        // invisible rectangle over the drawn card: blocks clicks to the world and tells the script where the mouse is
+        GameObject hit = NewUI("HitArea", root.transform);
+        RectTransform hr = hit.GetComponent<RectTransform>();
+        Place(hr, new Vector2(CardLeft, CardTop), new Vector2(CardRight - CardLeft, CardBottom - CardTop), new Vector2(0f, 1f));
+        Image hitImg = hit.AddComponent<Image>();
+        hitImg.color = new Color(0f, 0f, 0f, 0f);
+        hitImg.raycastTarget = true;
+        bar.hitArea = hr;
 
-        // ---- Row template (cloned for every tooltip line) ----
-        bar.rowTemplate = MakeRowTemplate(root.transform);
+        // ---- Sun / Wind / Speed across the top (left of the portrait) ----
+        const float statY = 205f;
+        bar.sunPower = MakeStat(root.transform, "SunPower", "SUN", new Vector2(640f, statY), new Vector2(690f, statY), new Vector2(120f, 90f));
+        bar.windPower = MakeStat(root.transform, "WindPower", "WIND", new Vector2(860f, statY), new Vector2(910f, statY), new Vector2(120f, 90f));
+        bar.moveSpeed = MakeStat(root.transform, "MoveSpeed", "SPD", new Vector2(1080f, statY), new Vector2(1130f, statY), new Vector2(105f, 90f));
 
-        // ---- Stats ----
-        GameObject stats = NewUI("Stats", root.transform);
-        RectTransform sr = stats.GetComponent<RectTransform>();
-        sr.anchorMin = new Vector2(0f, 0f);
-        sr.anchorMax = new Vector2(1f, 0f);
-        sr.pivot = new Vector2(0.5f, 0f);
-        sr.sizeDelta = new Vector2(0f, StatsHeight);
-        sr.anchoredPosition = new Vector2(0f, 6f);
-        VerticalLayoutGroup sv = stats.AddComponent<VerticalLayoutGroup>();
-        sv.spacing = 4f;
-        sv.padding = new RectOffset(6, 6, 4, 4);
-        sv.childAlignment = TextAnchor.MiddleCenter;
-        sv.childControlWidth = true;
-        sv.childControlHeight = true;
-        sv.childForceExpandWidth = true;
-        sv.childForceExpandHeight = true;
+        // ---- The written rows, each on its own ruled line ----
+        bar.moodSection = MakeLine(root.transform, "Moods", "Moods", RowMood, 850f);
+        bar.boonsSection = MakeLine(root.transform, "Boons", "Boons", RowBoons, 850f);
+        bar.structureSection = MakeLine(root.transform, "Blueprints", "Blueprints", RowBlueprint, 1190f);
 
-        bar.sunPower = MakeStatRow(stats.transform, "SunPower");
-        bar.windPower = MakeStatRow(stats.transform, "WindPower");
-        bar.moveSpeed = MakeStatRow(stats.transform, "MoveSpeed");
+        // Trinkets can be many: three ruled lines, the text continues on the next one when a line is full
+        bar.trinketsSection = MakeLine(root.transform, "Trinkets", "Trinkets", RowTrinkets1, 1190f);
+        bar.trinketsSection.moreLines = new TMP_Text[]
+        {
+            MakeRowText(root.transform, "Trinkets2", "", RowTrinkets2, 1190f, false),
+            MakeRowText(root.transform, "Trinkets3", "", RowTrinkets3, 1190f, false)
+        };
+        bar.trinketsSection.text.enableAutoSizing = false; // these lines wrap by themselves instead of shrinking
 
-        // ---- Tab (sticks out of the right edge so it stays visible when the bar is closed) ----
+        bar.advantageSection = MakeLine(root.transform, "AdvantageHit", "Advantage hit", RowAdvantage, 980f);
+
+        // ---- Toggle tab (sticks out of the card's right edge so it stays visible when the card is hidden) ----
         GameObject tab = NewUI("Tab", root.transform);
         RectTransform tr = tab.GetComponent<RectTransform>();
-        tr.anchorMin = tr.anchorMax = new Vector2(1f, 0.5f);
-        tr.pivot = new Vector2(0f, 0.5f);
-        tr.sizeDelta = new Vector2(56f, 104f);
-        tr.anchoredPosition = Vector2.zero;
-        Image tabImg = AddImage(tab, new Color(0.33f, 0.33f, 0.33f), panelSprite, true);
+        Place(tr, new Vector2(CardRight - 6f, 520f), new Vector2(96f, 156f), new Vector2(0f, 0.5f));
+        Image tabImg = tab.AddComponent<Image>();
+        tabImg.color = BoxFill;
+        Outline o = tab.AddComponent<Outline>();
+        o.effectColor = Navy;
+        o.effectDistance = new Vector2(5f, -5f);
+        o.useGraphicAlpha = false;
         Button button = tab.AddComponent<Button>();
         button.targetGraphic = tabImg;
+        ColorBlock cb = button.colors;
+        cb.normalColor = Color.white;
+        cb.highlightedColor = new Color(0.80f, 0.92f, 1f, 1f);
+        cb.pressedColor = new Color(0.62f, 0.82f, 1f, 1f);
+        cb.selectedColor = Color.white;
+        cb.fadeDuration = 0.05f;
+        button.colors = cb;
         bar.toggleButton = button;
-        TextMeshProUGUI arrow = AddText(tab.transform, "Arrow", "<", 50f, new Color(0.65f, 0.65f, 0.65f), FontStyles.Bold, TextAlignmentOptions.Center);
+        TextMeshProUGUI arrow = AddText(tab.transform, "Arrow", ">", 90f, Navy, FontStyles.Bold, TextAlignmentOptions.Center);
         Stretch(arrow.gameObject);
         bar.toggleArrow = arrow;
 
-        // ---- Hover tooltip (a child of the canvas so it is not scaled / moved with the bar) ----
-        MakeTooltip(canvasGO.transform, bar, panelSprite);
-
-        // ---- Icons, from the Trinket bar's old stat row ----
-        if (trinket != null)
-        {
-            Copy(bar.sunPower, trinket.sunPower);
-            Copy(bar.windPower, trinket.windPower);
-            Copy(bar.moveSpeed, trinket.moveSpeed);
-            if (trinket.sunPower.icon != null) bar.sunIcon = trinket.sunPower.icon.sprite;
-            if (trinket.windPower.icon != null) bar.windIcon = trinket.windPower.icon.sprite;
-        }
+        // ---- Icons: the menu's own Sun / Wind / Speed icons if they exist, otherwise the Trinket bar's ----
+        FillIcon(bar.sunPower, "Sun_Icon", trinket != null ? trinket.sunPower : null);
+        FillIcon(bar.windPower, "Wind_Icon", trinket != null ? trinket.windPower : null);
+        FillIcon(bar.moveSpeed, "Speed_Icon", trinket != null ? trinket.moveSpeed : null);
 
         // ---- Power cards (their current value is the Sun / Wind stat) ----
-        bar.sunCard = FindAsset<SolarCard>();
-        bar.windCard = FindAsset<WindCard>();
+        bar.sunCard = FindAsset<SolarCard>(null);
+        bar.windCard = FindAsset<WindCard>(null);
 
         Selection.activeObject = canvasGO;
-        Debug.Log("Active Buffs bar created (left side, compact). " +
-                  (trinket != null ? "Scale and stat icons were copied from your Trinket bar. " : "No Trinket bar found in this scene, so default scale / no stat icons: set the Sun / Wind / Speed icons yourself. ") +
-                  "Set each section's icon: select Sections > (Mood / Boons / Trinkets / AdvantageHit / Blueprint) > Icon and assign a sprite. " +
+        Debug.Log("Active Buffs card created (left side). " +
+                  (cardSprite != null ? "" : "b_gg sprite NOT FOUND: assign it on SlideRoot > Card > Image. ") +
                   "Sun card: " + (bar.sunCard != null ? bar.sunCard.name : "NOT FOUND (drag it into 'Sun Card')") + ", Wind card: " +
-                  (bar.windCard != null ? bar.windCard.name : "NOT FOUND (drag it into 'Wind Card')") + ".");
+                  (bar.windCard != null ? bar.windCard.name : "NOT FOUND (drag it into 'Wind Card')") + ". " +
+                  "Size: change 'Panel Scale' on the bar. Text positions are the children of SlideRoot, in the PNG's pixels.");
     }
 
     // ------------------------------------------------------------------
     // Pieces
     // ------------------------------------------------------------------
 
-    // One square icon button. The Icon image gets its sprite from you; until then a letter is shown.
-    private static ActiveBuffsSidebar.Section MakeSection(Transform parent, string name, string title, Sprite sprite)
+    // One row of text on a ruled line. The title is written in bold in front of it by the script.
+    private static ActiveBuffsSidebar.Section MakeLine(Transform parent, string name, string title, float y, float width)
     {
-        GameObject box = NewUI(name, parent);
-        AddImage(box, new Color(0.65f, 0.65f, 0.65f), sprite, true).raycastTarget = false;
-
-        LayoutElement le = box.AddComponent<LayoutElement>();
-        le.preferredHeight = SectionSize;
-        le.minHeight = SectionSize;
-
-        GameObject iconGO = NewUI("Icon", box.transform);
-        Stretch(iconGO);
-        RectTransform ir = iconGO.GetComponent<RectTransform>();
-        ir.offsetMin = new Vector2(10f, 10f);
-        ir.offsetMax = new Vector2(-10f, -10f);
-        Image icon = iconGO.AddComponent<Image>();
-        icon.preserveAspect = true;
-        icon.raycastTarget = false;
-        icon.enabled = false; // no sprite yet
-
-        TextMeshProUGUI letter = AddText(box.transform, "Letter", title.Substring(0, 1), 52f, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
-        Stretch(letter.gameObject);
-
-        ActiveBuffsSidebar.Section section = new ActiveBuffsSidebar.Section();
-        section.title = title;
-        section.box = box.GetComponent<RectTransform>();
-        section.icon = icon;
-        section.fallbackLabel = letter;
-        return section;
+        ActiveBuffsSidebar.Section s = new ActiveBuffsSidebar.Section();
+        s.title = title;
+        s.text = MakeRowText(parent, name, "<b>" + title + ":</b>  None", y, width, true);
+        return s;
     }
 
-    private static void MakeTooltip(Transform canvasRoot, ActiveBuffsSidebar bar, Sprite sprite)
+    private static TMP_Text MakeRowText(Transform parent, string name, string text, float y, float width, bool fit)
     {
-        GameObject tip = NewUI("Tooltip", canvasRoot);
-        RectTransform tr = tip.GetComponent<RectTransform>();
-        tr.anchorMin = tr.anchorMax = new Vector2(0.5f, 0.5f);
-        tr.pivot = new Vector2(0f, 0.5f);
-
-        Image bg = AddImage(tip, new Color(0.2f, 0.2f, 0.2f, 0.95f), sprite, true);
-        bg.raycastTarget = false; // must never block the icons underneath
-
-        VerticalLayoutGroup v = tip.AddComponent<VerticalLayoutGroup>();
-        v.padding = new RectOffset(14, 14, 10, 10);
-        v.spacing = 4f;
-        v.childAlignment = TextAnchor.UpperLeft;
-        v.childControlWidth = true;
-        v.childControlHeight = true;
-        v.childForceExpandWidth = true;
-        v.childForceExpandHeight = false;
-
-        ContentSizeFitter fit = tip.AddComponent<ContentSizeFitter>();
-        fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        tip.AddComponent<LayoutElement>().minWidth = 160f;
-
-        TextMeshProUGUI title = AddText(tip.transform, "Title", "Mood", 34f, Color.white, FontStyles.Bold, TextAlignmentOptions.Left);
-        title.gameObject.AddComponent<LayoutElement>().preferredHeight = 42f;
-
-        bar.tooltip = tr;
-        bar.tooltipTitle = title;
-        tip.SetActive(false);
+        TextMeshProUGUI t = AddText(parent, name, text, RowSize, Navy, FontStyles.Normal, TextAlignmentOptions.Left);
+        t.richText = true;
+        Place(t.rectTransform, new Vector2(TextX, y), new Vector2(width, 64f), new Vector2(0f, 0.5f));
+#pragma warning disable 618
+        t.enableWordWrapping = false;
+#pragma warning restore 618
+        t.overflowMode = TextOverflowModes.Ellipsis;
+        if (fit)
+        {
+            // a long line shrinks (down to half size) instead of running off the card
+            t.enableAutoSizing = true;
+            t.fontSizeMax = RowSize;
+            t.fontSizeMin = RowSize * 0.5f;
+        }
+        return t;
     }
 
-    private static RectTransform MakeRowTemplate(Transform parent)
+    // icon + number (+ a small text label that is only shown while the icon has no sprite)
+    private static ActiveBuffsSidebar.StatRow MakeStat(Transform parent, string name, string fallback, Vector2 iconCentre, Vector2 textPos, Vector2 textBox)
     {
-        GameObject row = NewUI("RowTemplate", parent);
-        HorizontalLayoutGroup h = row.AddComponent<HorizontalLayoutGroup>();
-        h.spacing = 8f;
-        h.childAlignment = TextAnchor.MiddleLeft;
-        h.childControlWidth = true;
-        h.childControlHeight = true;
-        h.childForceExpandWidth = false;
-        h.childForceExpandHeight = false;
-        row.AddComponent<LayoutElement>().preferredHeight = 42f;
-
-        GameObject icon = NewUI("Icon", row.transform);
-        Image img = icon.AddComponent<Image>();
-        img.preserveAspect = true;
-        img.raycastTarget = false;
-        LayoutElement ile = icon.AddComponent<LayoutElement>();
-        ile.preferredWidth = 38f;
-        ile.preferredHeight = 38f;
-
-        TextMeshProUGUI label = AddText(row.transform, "Label", "+50", 32f, Color.white, FontStyles.Bold, TextAlignmentOptions.Left);
-        label.gameObject.AddComponent<LayoutElement>().preferredHeight = 40f;
-
-        row.SetActive(false);
-        return row.GetComponent<RectTransform>();
-    }
-
-    private static ActiveBuffsSidebar.StatRow MakeStatRow(Transform parent, string name)
-    {
-        GameObject row = NewUI(name, parent);
-        HorizontalLayoutGroup h = row.AddComponent<HorizontalLayoutGroup>();
-        h.spacing = 8f;
-        h.childAlignment = TextAnchor.MiddleCenter;
-        h.childControlWidth = true;
-        h.childControlHeight = true;
-        h.childForceExpandWidth = false;
-        h.childForceExpandHeight = false;
-
-        GameObject icon = NewUI("Icon", row.transform);
+        GameObject icon = NewUI(name + "Icon", parent);
+        Place(icon.GetComponent<RectTransform>(), iconCentre, new Vector2(78f, 78f), new Vector2(0.5f, 0.5f));
         Image img = icon.AddComponent<Image>();
         img.color = Color.white;
         img.preserveAspect = true;
         img.raycastTarget = false;
-        LayoutElement ile = icon.AddComponent<LayoutElement>();
-        ile.preferredWidth = 46f;
-        ile.preferredHeight = 46f;
 
-        TextMeshProUGUI value = AddText(row.transform, "Value", "0", 36f, Color.white, FontStyles.Bold, TextAlignmentOptions.Left);
-        LayoutElement vle = value.gameObject.AddComponent<LayoutElement>();
-        vle.minWidth = 0f;
-        vle.preferredWidth = 0f;
-        vle.flexibleWidth = 1f; // takes the space next to the icon; long numbers shrink to fit (set at runtime)
-        vle.preferredHeight = 46f;
+        TextMeshProUGUI label = AddText(parent, name + "Label", fallback, 30f, Navy, FontStyles.Bold | FontStyles.Italic, TextAlignmentOptions.Center);
+        Place(label.rectTransform, iconCentre, new Vector2(90f, 60f), new Vector2(0.5f, 0.5f));
+        label.gameObject.SetActive(false);
+
+        TextMeshProUGUI value = AddText(parent, name + "Value", "0", 62f, Navy, FontStyles.Bold, TextAlignmentOptions.Left);
+        Place(value.rectTransform, textPos, textBox, new Vector2(0f, 0.5f));
+        value.enableAutoSizing = true; // long numbers shrink instead of wrapping
+        value.fontSizeMax = 62f;
+        value.fontSizeMin = 24f;
+#pragma warning disable 618
+        value.enableWordWrapping = false;
+#pragma warning restore 618
+        value.overflowMode = TextOverflowModes.Overflow;
 
         ActiveBuffsSidebar.StatRow stat = new ActiveBuffsSidebar.StatRow();
         stat.icon = img;
         stat.valueText = value;
+        stat.fallbackLabel = label;
         return stat;
     }
 
-    private static void Copy(ActiveBuffsSidebar.StatRow mine, TrinketSidebar.StatRow theirs)
+    private static void FillIcon(ActiveBuffsSidebar.StatRow mine, string menuSpriteName, TrinketSidebar.StatRow theirs)
     {
-        if (mine == null || theirs == null || mine.icon == null || theirs.icon == null) return;
-        mine.icon.sprite = theirs.icon.sprite;
-        mine.icon.color = theirs.icon.color;
+        Sprite s = FindSprite(menuSpriteName);
+        if (s != null) { mine.icon.sprite = s; return; }
+        if (theirs != null && theirs.icon != null && theirs.icon.sprite != null)
+        {
+            mine.icon.sprite = theirs.icon.sprite;
+            mine.icon.color = theirs.icon.color;
+        }
     }
 
-    private static T FindAsset<T>() where T : Object
+    // ------------------------------------------------------------------
+    // Finding assets
+    // ------------------------------------------------------------------
+
+    // "Sun_Icon", "Sun Icon" and "sun-icon" all count as the same name
+    private static string Norm(string s)
     {
-        string[] guids = AssetDatabase.FindAssets("t:" + typeof(T).Name);
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        for (int i = 0; i < s.Length; i++)
+            if (char.IsLetterOrDigit(s[i])) sb.Append(char.ToLowerInvariant(s[i]));
+        return sb.ToString();
+    }
+
+    // Finds a sprite by its file name (spaces / underscores / case ignored). Also works when the PNG's Sprite Mode is
+    // "Multiple" (sprites are then called b_gg_0 ...): the first sprite of that file is used.
+    private static Sprite FindSprite(string name)
+    {
+        string want = Norm(name);
+        string[] guids = AssetDatabase.FindAssets("t:Sprite");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            if (Norm(System.IO.Path.GetFileNameWithoutExtension(path)) != want) continue;
+
+            Sprite first = null;
+            Object[] all = AssetDatabase.LoadAllAssetsAtPath(path);
+            for (int k = 0; k < all.Length; k++)
+            {
+                Sprite sp = all[k] as Sprite;
+                if (sp == null) continue;
+                if (Norm(sp.name) == want) return sp;
+                if (first == null) first = sp;
+            }
+            if (first != null) return first;
+        }
+        return null;
+    }
+
+    // by type (and, when a name is given, by name)
+    private static T FindAsset<T>(string name) where T : Object
+    {
+        string filter = "t:" + typeof(T).Name + (string.IsNullOrEmpty(name) ? "" : " " + name);
+        string[] guids = AssetDatabase.FindAssets(filter);
         if (guids.Length == 0) return null;
         return AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(guids[0]));
     }
@@ -315,6 +311,15 @@ public static class ActiveBuffsBuilder
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    // Position in the PNG's pixels: from the top-left corner, y going DOWN. 'pivot' says which point of the object sits there.
+    private static void Place(RectTransform r, Vector2 pos, Vector2 size, Vector2 pivot)
+    {
+        r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
+        r.pivot = pivot;
+        r.sizeDelta = size;
+        r.anchoredPosition = new Vector2(pos.x, -pos.y);
+    }
 
     private static GameObject NewUI(string name, Transform parent)
     {
@@ -330,18 +335,6 @@ public static class ActiveBuffsBuilder
         r.anchorMax = Vector2.one;
         r.offsetMin = Vector2.zero;
         r.offsetMax = Vector2.zero;
-    }
-
-    private static Image AddImage(GameObject go, Color color, Sprite sprite, bool sliced)
-    {
-        Image img = go.AddComponent<Image>();
-        img.color = color;
-        if (sprite != null)
-        {
-            img.sprite = sprite;
-            img.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
-        }
-        return img;
     }
 
     private static TextMeshProUGUI AddText(Transform parent, string name, string text, float size, Color color,
