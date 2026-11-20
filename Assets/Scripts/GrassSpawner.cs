@@ -96,9 +96,26 @@ public class GrassSpawner : MonoBehaviour
     [Tooltip("How fast gusts travel across the field.")]
     public float gustSpeed = 0.35f;
 
+    // ------------------------------------------------------------------
+    [Header("Distance Culling (less lag)")]
+    [Tooltip("ON: grass far away from the player is switched off, and switched back on when the player comes close.")]
+    public bool cullByDistance = true;
+    [Tooltip("The player. Empty = finds the object tagged 'Player', or falls back to the main camera.")]
+    public Transform player;
+    [Tooltip("Grass closer than this to the player (world units) is visible.")]
+    public string playerTag = "Player";
+    public float activeDistance = 30f;
+    [Tooltip("Extra distance before an active piece switches off, so pieces at the edge don't flicker on and off.")]
+    public float cullBuffer = 2f;
+    [Tooltip("How often (seconds) the distances are checked. 0.25 is plenty.")]
+    public float cullCheckInterval = 0.25f;
+
+    private float nextCullCheck;
+
     // Remembers every spawned piece so its size can be re-applied when you change a value in play mode
     private class SpawnedPiece
     {
+        public bool active = true; // false while culled (far from the player)
         public Transform transform;
         public SpriteRenderer sprite;
         public bool isDefault;
@@ -419,15 +436,68 @@ public class GrassSpawner : MonoBehaviour
     // Sway
     // ------------------------------------------------------------------
 
+    void UpdateCulling()
+    {
+        if (player == null)
+        {
+            GameObject found = GameObject.FindGameObjectWithTag(playerTag);
+            if (found != null) player = found.transform;
+            else if (Camera.main != null) player = Camera.main.transform;
+            if (player == null) return;
+        }
+
+        Vector3 pp = player.position;
+        float onSqr = activeDistance * activeDistance;
+        float offDist = activeDistance + Mathf.Max(0f, cullBuffer);
+        float offSqr = offDist * offDist;
+
+        for (int i = 0; i < spawnedPieces.Count; i++)
+        {
+            SpawnedPiece p = spawnedPieces[i];
+            if (p.transform == null) continue;
+
+            // flat distance (the field lies on the X/Z plane)
+            float dx = p.basePos.x - pp.x;
+            float dz = p.basePos.z - pp.z;
+            float sqr = dx * dx + dz * dz;
+
+            bool shouldBeActive = p.active ? sqr <= offSqr : sqr <= onSqr;
+            if (shouldBeActive != p.active)
+            {
+                p.active = shouldBeActive;
+                p.transform.gameObject.SetActive(shouldBeActive);
+            }
+        }
+    }
+
     void Update()
     {
         if (spawnedPieces.Count == 0) return;
+
+        if (cullByDistance && Time.time >= nextCullCheck)
+        {
+            nextCullCheck = Time.time + cullCheckInterval;
+            UpdateCulling();
+        }
+        else if (!cullByDistance)
+        {
+            // culling switched off while playing: bring everything back
+            for (int i = 0; i < spawnedPieces.Count; i++)
+            {
+                SpawnedPiece q = spawnedPieces[i];
+                if (q.transform != null && !q.active)
+                {
+                    q.active = true;
+                    q.transform.gameObject.SetActive(true);
+                }
+            }
+        }
 
         float time = Time.time;
         for (int i = 0; i < spawnedPieces.Count; i++)
         {
             SpawnedPiece p = spawnedPieces[i];
-            if (p.transform == null) continue;
+            if (p.transform == null || !p.active) continue;
 
             bool sways = (p.isDefault ? swayDefaults : swayVariants) && swayAngle > 0.001f;
             if (!sways)

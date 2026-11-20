@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Put this on a UI Button. Each click cycles the game speed: 1x -> 2x -> 4x -> back to 1x.
-/// Optional: drag a TMP label in to show the current speed, and set a hotkey (default: Tab).
+/// Optional: drag a TMP label in to show the current speed, and set a hotkey (default: Q).
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class FastForwardButton : MonoBehaviour
@@ -20,7 +20,7 @@ public class FastForwardButton : MonoBehaviour
     [Tooltip("Tint applied to the button graphic while fast-forwarding.")]
     public Color activeTint = new Color(1f, 0.85f, 0.3f, 1f);
     public bool useHotkey = true;
-    public Key hotkey = Key.Tab;
+    public Key hotkey = Key.Q;
     public AudioClip clickSound;
     [Range(0f, 1f)] public float clickVolume = 1f;
 
@@ -50,6 +50,13 @@ public class FastForwardButton : MonoBehaviour
     {
         if (useHotkey && Keyboard.current != null && Keyboard.current[hotkey].wasPressedThisFrame)
             Cycle();
+    }
+
+    /// <summary>Changes the idle color of the button (used by FastForwardOverlay for live tweaking).</summary>
+    public void SetNormalColor(Color color)
+    {
+        normalColor = color;
+        Refresh();
     }
 
     public void Cycle()

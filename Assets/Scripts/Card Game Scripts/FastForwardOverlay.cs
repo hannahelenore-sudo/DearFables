@@ -1,22 +1,52 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 /// <summary>
-/// Builds its own always-on-top Canvas with a fast-forward button, so the button works everywhere
-/// in the card game (opening sequence, hand, roll screens, score tally...) no matter which other
-/// canvases get switched on or off. Add this to ONE empty GameObject in the CardGame scene. Nothing else to set up.
+/// Builds an always-on-top Canvas with a fast-forward button, so the button works everywhere
+/// in the card game no matter which other canvases get switched on or off.
+/// Add this to ONE empty GameObject in the CardGame scene.
+///
+/// To SEE and tune it without pressing Play: right-click this component's header
+/// > "Build Preview In Editor". The button then shows in the Scene/Game view and every
+/// value below updates live, both in edit mode and while the game is running.
+/// "Remove Preview" deletes it again (it is rebuilt automatically at runtime).
 /// </summary>
 public class FastForwardOverlay : MonoBehaviour
 {
-    [Header("Layout")]
+    private const string CanvasName = "FastForwardCanvas";
+    private const string ButtonName = "FastForwardButton";
+
+    [Header("Size & Position (all live)")]
+    [Tooltip("Base size of the button in canvas units (canvas is 1920x1080).")]
     public Vector2 size = new Vector2(110f, 60f);
-    [Tooltip("Distance from the top-right corner of the screen.")]
+    [Tooltip("Multiplies the button size and the text size. Drag this to scale everything at once. 1 = normal.")]
+    [Range(0.1f, 5f)] public float sizeMultiplier = 1f;
+    [Tooltip("Which corner the button sticks to. (1,1) = top-right, (0,1) = top-left, (1,0) = bottom-right, (0,0) = bottom-left. Values in between work too.")]
+    public Vector2 anchor = new Vector2(1f, 1f);
+    [Tooltip("Distance from that corner. Positive moves the button further INTO the screen.")]
     public Vector2 margin = new Vector2(30f, 30f);
     [Tooltip("Higher than every other canvas in the scene so it is always visible and clickable.")]
     public int sortingOrder = 999;
 
+    [Header("Container Sprite")]
+    [Tooltip("Optional. Your own picture for the button container. Empty = plain colored box.")]
+    public Sprite containerSprite;
+    [Tooltip("ON (and a sprite is set): the button takes the sprite's own pixel size instead of 'Size' above.")]
+    public bool matchSpriteSize = false;
+    [Tooltip("Keep the sprite's proportions instead of stretching it to the button size.")]
+    public bool preserveAspect = true;
+
+    [Header("Hotkey")]
+    public bool useHotkey = true;
+    public Key hotkey = Key.Q;
+
     [Header("Look")]
+    [Tooltip("Tint of the plain box. When a Container Sprite is set, the sprite is shown in its normal colors instead.")]
     public Color backgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.75f);
     public Color activeTint = new Color(1f, 0.85f, 0.3f, 1f);
     public float fontSize = 32f;
@@ -26,15 +56,74 @@ public class FastForwardOverlay : MonoBehaviour
     public AudioClip clickSound;
     [Range(0f, 1f)] public float clickVolume = 1f;
 
+    [Header("Testing")]
+    [Tooltip("ON: values above are re-applied every frame while playing, so you can tweak them live.")]
+    public bool liveAdjust = true;
+
+    private Canvas canvas;
+    private RectTransform rt;
+    private Image img;
+    private TextMeshProUGUI label;
+    private FastForwardButton ff;
+    private Color appliedNormal = new Color(-1f, -1f, -1f, -1f);
+
+    // ------------------------------------------------------------------
+
     private void Awake()
     {
+        // Reuse a preview built in the editor, otherwise build fresh
+        if (!FindExisting()) Build();
+        Apply();
+    }
+
+    private void Update()
+    {
+        if (liveAdjust) Apply();
+    }
+
+    private void OnValidate()
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            // delayed: editing other objects directly inside OnValidate gives Unity warnings
+            EditorApplication.delayCall += () =>
+            {
+                if (this != null && FindExisting()) Apply();
+            };
+            return;
+        }
+#endif
+        if (rt != null) Apply();
+    }
+
+    // ------------------------------------------------------------------
+
+    private bool FindExisting()
+    {
+        Transform c = transform.Find(CanvasName);
+        if (c == null) return false;
+        Transform b = c.Find(ButtonName);
+        if (b == null) return false;
+
+        canvas = c.GetComponent<Canvas>();
+        rt = b as RectTransform;
+        img = b.GetComponent<Image>();
+        ff = b.GetComponent<FastForwardButton>();
+        label = b.GetComponentInChildren<TextMeshProUGUI>();
+        return canvas != null && rt != null && img != null && label != null && ff != null;
+    }
+
+    private void Build()
+    {
+        RemoveExisting();
+
         // Canvas
-        GameObject canvasGO = new GameObject("FastForwardCanvas");
+        GameObject canvasGO = new GameObject(CanvasName);
         canvasGO.transform.SetParent(transform, false);
-        Canvas canvas = canvasGO.AddComponent<Canvas>();
+        canvas = canvasGO.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
-        canvas.sortingOrder = sortingOrder;
         CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -42,16 +131,12 @@ public class FastForwardOverlay : MonoBehaviour
         canvasGO.AddComponent<GraphicRaycaster>();
 
         // Button (created inactive so the label can be assigned before FastForwardButton starts)
-        GameObject btnGO = new GameObject("FastForwardButton", typeof(RectTransform));
+        GameObject btnGO = new GameObject(ButtonName, typeof(RectTransform));
         btnGO.SetActive(false);
         btnGO.transform.SetParent(canvasGO.transform, false);
-        RectTransform rt = (RectTransform)btnGO.transform;
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
-        rt.sizeDelta = size;
-        rt.anchoredPosition = new Vector2(-margin.x, -margin.y);
+        rt = (RectTransform)btnGO.transform;
 
-        Image img = btnGO.AddComponent<Image>();
-        img.color = backgroundColor;
+        img = btnGO.AddComponent<Image>();
         Button btn = btnGO.AddComponent<Button>();
         btn.targetGraphic = img;
 
@@ -62,20 +147,109 @@ public class FastForwardOverlay : MonoBehaviour
         trt.anchorMin = Vector2.zero;
         trt.anchorMax = Vector2.one;
         trt.offsetMin = trt.offsetMax = Vector2.zero;
-        TextMeshProUGUI label = textGO.AddComponent<TextMeshProUGUI>();
+        label = textGO.AddComponent<TextMeshProUGUI>();
         label.alignment = TextAlignmentOptions.Center;
-        label.fontSize = fontSize;
         label.color = Color.white;
         label.raycastTarget = false;
+        label.text = ">>";
 
         btnGO.AddComponent<InteractiveUIButton>().enableWiggleOnUnsupportedClick = false;
 
-        FastForwardButton ff = btnGO.AddComponent<FastForwardButton>();
+        ff = btnGO.AddComponent<FastForwardButton>();
         ff.label = label;
-        ff.speeds = speeds;
-        ff.activeTint = activeTint;
-        ff.clickSound = clickSound;
-        ff.clickVolume = clickVolume;
         btnGO.SetActive(true);
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            Undo.RegisterCreatedObjectUndo(canvasGO, "Build Fast Forward Preview");
+#endif
+    }
+
+    private void RemoveExisting()
+    {
+        Transform old = transform.Find(CanvasName);
+        if (old == null) return;
+        if (Application.isPlaying) Destroy(old.gameObject);
+        else DestroyImmediate(old.gameObject);
+    }
+
+    // ------------------------------------------------------------------
+
+    private void Apply()
+    {
+        if (canvas == null || rt == null || img == null || label == null) return;
+
+        canvas.sortingOrder = sortingOrder;
+
+        // Position + size
+        Vector2 a = new Vector2(Mathf.Clamp01(anchor.x), Mathf.Clamp01(anchor.y));
+        rt.anchorMin = rt.anchorMax = rt.pivot = a;
+        rt.anchoredPosition = new Vector2(a.x >= 0.5f ? -margin.x : margin.x,
+                                          a.y >= 0.5f ? -margin.y : margin.y);
+
+        bool hasSprite = containerSprite != null;
+        Vector2 baseSize = (hasSprite && matchSpriteSize) ? containerSprite.rect.size : size;
+        rt.sizeDelta = baseSize * sizeMultiplier;
+        label.fontSize = fontSize * sizeMultiplier;
+
+        // Container sprite
+        if (img.sprite != containerSprite) img.sprite = containerSprite;
+        img.preserveAspect = preserveAspect;
+        img.type = (hasSprite && containerSprite.border != Vector4.zero) ? Image.Type.Sliced : Image.Type.Simple;
+
+        // Colors
+        Color normal = hasSprite ? Color.white : backgroundColor;
+        if (Application.isPlaying && ff != null)
+        {
+            if (normal != appliedNormal)
+            {
+                appliedNormal = normal;
+                ff.SetNormalColor(normal);
+            }
+        }
+        else
+        {
+            img.color = normal;
+            if (!Application.isPlaying) label.text = ">>";
+        }
+
+        // Button behaviour
+        if (ff != null)
+        {
+            ff.speeds = speeds;
+            ff.activeTint = activeTint;
+            ff.useHotkey = useHotkey;
+            ff.hotkey = hotkey;
+            ff.clickSound = clickSound;
+            ff.clickVolume = clickVolume;
+        }
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            EditorUtility.SetDirty(canvas);
+            EditorUtility.SetDirty(rt);
+            EditorUtility.SetDirty(img);
+            EditorUtility.SetDirty(label);
+        }
+#endif
+    }
+
+    // ------------------------------------------------------------------
+
+    [ContextMenu("Build Preview In Editor")]
+    private void BuildPreview()
+    {
+        if (Application.isPlaying) return;
+        Build();
+        Apply();
+    }
+
+    [ContextMenu("Remove Preview")]
+    private void RemovePreview()
+    {
+        if (Application.isPlaying) return;
+        RemoveExisting();
+        canvas = null; rt = null; img = null; label = null; ff = null;
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -6,6 +7,9 @@ using UnityEngine.Rendering;
 /// Added automatically by ContactShadowSpawner, or put it on any sprite by hand.
 /// The shadow is a separate object (not a child), so it never inherits your sprite's
 /// tiny scale or rotation. It shrinks and fades when the sprite is in the air (jump).
+///
+/// FloorBG and Picnic are hard-coded as never getting a contact shadow: if this component
+/// ends up on one of them (by any script, prefab or by hand) it removes itself.
 /// </summary>
 [DisallowMultipleComponent]
 public class ContactShadow : MonoBehaviour
@@ -39,6 +43,17 @@ public class ContactShadow : MonoBehaviour
     float fallbackGroundY;
     float width;
 
+    public const string BlobName = "ContactShadowBlob";
+
+    // Objects whose name contains any of these never get a contact shadow.
+    static readonly string[] NeverShadow = { "FloorBG", "Picnic" };
+
+    // last values we drew with, so a sprite that hasn't moved costs almost nothing
+    Vector3 _lastCenter, _lastSize;
+    float _lastZ;
+    int _lastOrder;
+    bool _hasLast;
+
     static Sprite blobSprite;
     static Transform container;
     static readonly RaycastHit[] hits = new RaycastHit[8];
@@ -50,8 +65,22 @@ public class ContactShadow : MonoBehaviour
         container = null;
     }
 
+    static bool IsNeverShadow(string objectName)
+    {
+        foreach (var part in NeverShadow)
+            if (objectName.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        return false;
+    }
+
     void Start()
     {
+        // Hard exclusion: remove ourselves before creating any blob.
+        if (IsNeverShadow(gameObject.name))
+        {
+            Destroy(this);
+            return;
+        }
+
         target = GetComponent<SpriteRenderer>();
         if (target == null) target = GetComponentInChildren<SpriteRenderer>();
         if (target == null || target.sprite == null)
@@ -63,7 +92,7 @@ public class ContactShadow : MonoBehaviour
         if (container == null)
             container = new GameObject("Contact Shadows").transform;
 
-        var go = new GameObject("ContactShadowBlob");
+        var go = new GameObject(BlobName);
         shadowT = go.transform;
         shadowT.SetParent(container, false);
         shadowT.rotation = Quaternion.Euler(90f, 0f, 0f); // lie flat, facing up
@@ -101,9 +130,19 @@ public class ContactShadow : MonoBehaviour
             shadow.enabled = false;
             return;
         }
-        shadow.enabled = true;
+        if (!shadow.enabled) shadow.enabled = true;
 
         Bounds b = target.bounds;
+        float zPos = transform.position.z;
+
+        // Nothing moved and the width has settled: the shadow is already correct
+        // (this skips the per-frame raycast for static things like trees).
+        if (_hasLast && b.center == _lastCenter && b.size == _lastSize && zPos == _lastZ
+            && target.sortingOrder == _lastOrder
+            && Mathf.Abs(width - b.size.x * widthScale) < 0.0001f)
+            return;
+        _hasLast = true; _lastCenter = b.center; _lastSize = b.size; _lastZ = zPos; _lastOrder = target.sortingOrder;
+
         float feetY = b.min.y;
         Vector3 origin = new Vector3(b.center.x, feetY + 0.3f, transform.position.z);
 

@@ -39,7 +39,10 @@ public class OutsideHaze : MonoBehaviour
     public float strongHazeRamp = 0.5f;
 
     [Header("Which sprites")]
-    public string[] excludeNameContains = { "Shadow", "Cloud", "Fog", "Icon", "Arrow", "Card" };
+    [Tooltip("Drag objects here to exclude them from the haze. Their children are excluded too.")]
+    public GameObject[] excludeObjects;
+    [Tooltip("Any sprite whose name contains one of these is skipped (case-insensitive).")]
+    public string[] excludeNameContains = { "Shadow", "Cloud", "Fog", "Icon", "Arrow", "Card", "FloorBG", "Picnic" };
     public bool skipNonUpright = true;
     [Tooltip("Seconds between rescans for newly spawned sprites. 0 = once at start.")]
     public float rescanInterval = 1f;
@@ -219,6 +222,15 @@ public class OutsideHaze : MonoBehaviour
 
     void Scan()
     {
+        // drop anything that has become excluded since the last scan (restores its colour)
+        dead.Clear();
+        foreach (var kv in entries)
+        {
+            if (kv.Key == null) { dead.Add(kv.Key); continue; }
+            if (IsExcluded(kv.Key)) { Restore(kv.Value); dead.Add(kv.Key); }
+        }
+        foreach (var key in dead) entries.Remove(key);
+
         var all = FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None);
         foreach (var r in all)
         {
@@ -226,18 +238,33 @@ public class OutsideHaze : MonoBehaviour
             if (entries.ContainsKey(r)) continue;
             if (r.GetComponentInParent<Canvas>() != null) continue;
             if (skipNonUpright && r.transform.up.y < 0.9f) continue;
-            if (IsExcluded(r.gameObject.name)) continue;
+            if (IsExcluded(r)) continue;
 
             entries[r] = new Entry { r = r, baseColor = r.color, applied = r.color, strong = MatchesStrong(r.gameObject.name) };
         }
     }
 
-    bool IsExcluded(string objectName)
+    bool IsExcluded(SpriteRenderer r)
     {
-        foreach (var part in excludeNameContains)
+        // dragged-in objects (and everything under them)
+        if (excludeObjects != null)
         {
-            if (string.IsNullOrEmpty(part)) continue;
-            if (objectName.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            foreach (var go in excludeObjects)
+            {
+                if (go == null) continue;
+                if (r.transform == go.transform || r.transform.IsChildOf(go.transform)) return true;
+            }
+        }
+
+        // names
+        string objectName = r.gameObject.name;
+        if (excludeNameContains != null)
+        {
+            foreach (var part in excludeNameContains)
+            {
+                if (string.IsNullOrEmpty(part)) continue;
+                if (objectName.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            }
         }
         return false;
     }
@@ -309,6 +336,15 @@ public class OutsideHaze : MonoBehaviour
             e.r.color = c;
             e.applied = c;
         }
+    }
+
+    void Restore(Entry e)
+    {
+        if (e.r == null) return;
+        if (tintSpriteColor) e.r.color = e.baseColor;
+        e.r.GetPropertyBlock(mpb);
+        mpb.SetFloat(HazeAmountId, 0f);
+        e.r.SetPropertyBlock(mpb);
     }
 
     void ResetAll()

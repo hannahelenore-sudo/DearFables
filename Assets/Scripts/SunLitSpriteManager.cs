@@ -1,135 +1,147 @@
-#if UNITY_EDITOR
-using System.IO;
-using UnityEditor;
-using UnityEditor.SceneManagement;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// Put in Assets/Editor/SpriteSunLitTools.cs
-/// Tools > Sprite Sun Lighting > ...
-/// Swaps the default sprite material for the sun-lit one on every SpriteRenderer
-/// and turns on shadow casting/receiving. Sprites that already use a custom
-/// material (e.g. your glowing thrown card) are left alone.
+/// Put this on an empty GameObject in your scene (e.g. "SunLitManager") and drag
+/// the SpriteSunLit material into the Material slot.
+/// Periodically makes sure that:
+///  - every SpriteRenderer uses the sun-lit material (including things spawned after Play starts)
+///  - every TilemapRenderer uses a ground version of it (no rim outline on tile borders)
+///  - sprites/tilemaps/meshes receive shadows; sprites cast them
+/// Anything with a custom material (e.g. your glowing card) keeps its material.
+///
+/// Optimised: each renderer is processed ONCE (tracked by instance id), shader checks are
+/// cached instead of reading shader.name (which allocates a string) for every renderer on
+/// every scan, and the flat ContactShadow blobs no longer cast shadows.
 /// </summary>
-public static class SpriteSunLitTools
+public class SunLitSpriteManager : MonoBehaviour
 {
-    const string ShaderName = "Sprites/Sun Lit (2.5D)";
-    const string MaterialPath = "Assets/Materials/SpriteSunLit.mat";
-    const string GroundMaterialPath = "Assets/Materials/SpriteSunLitGround.mat";
+    public Material sunLitMaterial;
+    [Tooltip("Optional. Leave empty to auto-create one from the sun-lit material with the rim light off.")]
+    public Material tilemapMaterial;
+    [Tooltip("Safety-net scan for newly spawned renderers. Already-processed ones are skipped, so this is cheap.")]
+    [Min(0.1f)] public float scanInterval = 2f;
+    public bool spritesCastShadows = true;
+    [Tooltip("Leave OFF for a ground tilemap (casting onto itself causes stripes). Turn on for tilemaps that are walls/props.")]
+    public bool tilemapsCastShadows = false;
+    public bool meshesCastAndReceiveShadows = true;
 
-    static Material GetOrCreateMaterial()
+    const string SunLitShaderName = "Sprites/Sun Lit (2.5D)";
+    static SunLitSpriteManager _instance;
+    float _timer;
+    bool _dirty;
+
+    readonly HashSet<int> _done = new HashSet<int>();
+    readonly Dictionary<Shader, bool> _isReplaceable = new Dictionary<Shader, bool>();
+    readonly Dictionary<Shader, bool> _isSunLit = new Dictionary<Shader, bool>();
+
+    /// <summary>Optional: call this right after spawning lots of objects to process them immediately.</summary>
+    public static void RequestScan() { if (_instance != null) _instance._dirty = true; }
+
+    void Awake()
     {
-        var mat = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
-        if (mat != null) return mat;
+        if (_instance != null && _instance != this) { Destroy(gameObject); return; }
+        _instance = this;
+        if (transform.parent == null) DontDestroyOnLoad(gameObject);
 
-        var shader = Shader.Find(ShaderName);
-        if (shader == null)
+        if (tilemapMaterial == null && sunLitMaterial != null)
         {
-            Debug.LogError($"Shader '{ShaderName}' not found. Is SpriteSunLit.shader in your project and compiling?");
-            return null;
+            tilemapMaterial = new Material(sunLitMaterial) { name = "SpriteSunLitGround (runtime)" };
+            tilemapMaterial.SetFloat("_RimStrength", 0f);
         }
-        Directory.CreateDirectory(Path.GetDirectoryName(MaterialPath));
-        mat = new Material(shader) { name = "SpriteSunLit" };
-        AssetDatabase.CreateAsset(mat, MaterialPath);
-        AssetDatabase.SaveAssets();
-        return mat;
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    // Same shader, but with the rim light off so tile borders don't get outlined.
-    static Material GetOrCreateGroundMaterial(Material baseMat)
+    void OnDestroy()
     {
-        var mat = AssetDatabase.LoadAssetAtPath<Material>(GroundMaterialPath);
-        if (mat != null) return mat;
-        mat = new Material(baseMat) { name = "SpriteSunLitGround" };
-        mat.SetFloat("_RimStrength", 0f);
-        AssetDatabase.CreateAsset(mat, GroundMaterialPath);
-        AssetDatabase.SaveAssets();
-        return mat;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (_instance == this) _instance = null;
     }
 
-    // Only replace the stock sprite materials, never a custom one.
-    static bool IsReplaceable(Material m)
+    void OnSceneLoaded(Scene s, LoadSceneMode m)
+    {
+        _done.Clear();
+        Scan();
+    }
+
+    void Start() => Scan();
+
+    void Update()
+    {
+        _timer += Time.unscaledDeltaTime;
+        if (_dirty || _timer >= scanInterval) { _timer = 0f; _dirty = false; Scan(); }
+    }
+
+    void Scan()
+    {
+        if (sunLitMaterial == null) return;
+
+        foreach (var sr in FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (!_done.Add(sr.GetInstanceID())) continue;
+            // the flat ground blobs from ContactShadow must not cast shadows themselves
+            bool cast = spritesCastShadows && sr.gameObject.name != ContactShadow.BlobName;
+            Fix(sr, sunLitMaterial, cast);
+        }
+
+        foreach (var tr in FindObjectsByType<TilemapRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (!_done.Add(tr.GetInstanceID())) continue;
+            Fix(tr, tilemapMaterial != null ? tilemapMaterial : sunLitMaterial, tilemapsCastShadows);
+        }
+
+        if (meshesCastAndReceiveShadows)
+        {
+            foreach (var mr in FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (!_done.Add(mr.GetInstanceID())) continue;
+                if (mr.shadowCastingMode != ShadowCastingMode.On) mr.shadowCastingMode = ShadowCastingMode.On;
+                if (!mr.receiveShadows) mr.receiveShadows = true;
+            }
+        }
+    }
+
+    void Fix(Renderer r, Material target, bool cast)
+    {
+        // leave shadow-only renderers (e.g. CloudShadows clouds) alone
+        if (r.shadowCastingMode == ShadowCastingMode.ShadowsOnly) return;
+
+        var m = r.sharedMaterial;
+        if (Replaceable(m)) { r.sharedMaterial = target; m = target; }
+
+        // only touch shadow flags on renderers that use our shader
+        if (m != null && IsSunLit(m.shader))
+        {
+            var mode = cast ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            if (r.shadowCastingMode != mode) r.shadowCastingMode = mode;
+            if (!r.receiveShadows) r.receiveShadows = true;
+        }
+    }
+
+    bool IsSunLit(Shader s)
+    {
+        if (s == null) return false;
+        if (!_isSunLit.TryGetValue(s, out bool v)) { v = s.name == SunLitShaderName; _isSunLit[s] = v; }
+        return v;
+    }
+
+    // missing material, broken (magenta) shader, or one of the stock sprite shaders
+    bool Replaceable(Material m)
     {
         if (m == null || m.shader == null) return true;
-        string n = m.shader.name;
-        return n == "Hidden/InternalErrorShader"
-            || n == "Universal Render Pipeline/2D/Sprite-Lit-Default"
-            || n == "Universal Render Pipeline/2D/Sprite-Unlit-Default"
-            || n == "Sprites/Default";
-    }
-
-    static int Apply(Renderer sr, Material mat, bool castShadows)
-    {
-        if (!IsReplaceable(sr.sharedMaterial)) return 0;
-        Undo.RecordObject(sr, "Apply Sun Lit Sprite");
-        sr.sharedMaterial = mat;
-        sr.shadowCastingMode = castShadows ? UnityEngine.Rendering.ShadowCastingMode.On
-                                           : UnityEngine.Rendering.ShadowCastingMode.Off;
-        sr.receiveShadows = true;
-        EditorUtility.SetDirty(sr);
-        return 1;
-    }
-
-    [MenuItem("Tools/Sprite Sun Lighting/Apply To Open Scene")]
-    public static void ApplyToScene()
-    {
-        var mat = GetOrCreateMaterial();
-        if (mat == null) return;
-
-        var groundMat = GetOrCreateGroundMaterial(mat);
-        int changed = 0, skipped = 0;
-        foreach (var sr in Object.FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include))
+        var s = m.shader;
+        if (!_isReplaceable.TryGetValue(s, out bool v))
         {
-            if (Apply(sr, mat, true) == 1) changed++; else skipped++;
+            string n = s.name;
+            v = n == "Hidden/InternalErrorShader"
+             || n == "Universal Render Pipeline/2D/Sprite-Lit-Default"
+             || n == "Universal Render Pipeline/2D/Sprite-Unlit-Default"
+             || n == "Sprites/Default";
+            _isReplaceable[s] = v;
         }
-        foreach (var tr in Object.FindObjectsByType<TilemapRenderer>(FindObjectsInactive.Include))
-        {
-            if (Apply(tr, groundMat, false) == 1) changed++; else skipped++;
-        }
-        foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include))
-        {
-            Undo.RecordObject(mr, "Enable Shadows");
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-            mr.receiveShadows = true;
-            EditorUtility.SetDirty(mr);
-        }
-        EditorSceneManager.MarkAllScenesDirty();
-        Debug.Log($"Sprite Sun Lighting: {changed} sprites updated, {skipped} skipped (custom material).");
-    }
-
-    [MenuItem("Tools/Sprite Sun Lighting/Apply To All Prefabs In Assets")]
-    public static void ApplyToPrefabs()
-    {
-        var mat = GetOrCreateMaterial();
-        if (mat == null) return;
-
-        var groundMat = GetOrCreateGroundMaterial(mat);
-        int changed = 0, skipped = 0, prefabs = 0;
-        foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" }))
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            var root = PrefabUtility.LoadPrefabContents(path);
-            bool dirty = false;
-            foreach (var sr in root.GetComponentsInChildren<SpriteRenderer>(true))
-            {
-                if (Apply(sr, mat, true) == 1) { changed++; dirty = true; } else skipped++;
-            }
-            foreach (var tr in root.GetComponentsInChildren<TilemapRenderer>(true))
-            {
-                if (Apply(tr, groundMat, false) == 1) { changed++; dirty = true; } else skipped++;
-            }
-            foreach (var mr in root.GetComponentsInChildren<MeshRenderer>(true))
-            {
-                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                mr.receiveShadows = true;
-                dirty = true;
-            }
-            if (dirty) { PrefabUtility.SaveAsPrefabAsset(root, path); prefabs++; }
-            PrefabUtility.UnloadPrefabContents(root);
-        }
-        AssetDatabase.SaveAssets();
-        Debug.Log($"Sprite Sun Lighting: {changed} sprites updated in {prefabs} prefabs, {skipped} skipped (custom material).");
+        return v;
     }
 }
-#endif

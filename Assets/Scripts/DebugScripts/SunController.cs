@@ -17,6 +17,8 @@ public class SunController : MonoBehaviour
 
     [Header("Shadows")]
     [Range(0f, 1f)] public float shadowStrength = 1f;
+    [Tooltip("Hard shadows are much cheaper than Soft. This was hard-coded to Soft before.")]
+    public LightShadows shadowType = LightShadows.Hard;
 
     [Header("Day / Night Cycle")]
     public bool autoCycle = true;
@@ -32,7 +34,7 @@ public class SunController : MonoBehaviour
     {
         _light = GetComponent<Light>();
         _light.type = LightType.Directional;
-        _light.shadows = LightShadows.Soft;
+        _light.shadows = shadowType;
         EnsureCurves();
         Apply();
     }
