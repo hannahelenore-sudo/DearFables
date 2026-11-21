@@ -96,7 +96,9 @@ public class ActiveBuffsSidebar : MonoBehaviour
     [Header("Behaviour")]
     public bool persistAcrossScenes = true;
     public bool startOpen = false;
-    [Tooltip("Scene names where the bar is hidden completely. The Trinket bar's list is used too.")]
+    [Tooltip("The bar is ONLY shown in these scenes and hidden everywhere else (main menu, intro...). Leave the list empty to show it in every scene.")]
+    public string[] showOnlyInScenes = { "GameScene", "CardGame" };
+    [Tooltip("Scene names where the bar is hidden completely, even if they are in the list above. The Trinket bar's rules are used too.")]
     public string[] hideInScenes;
 
     [Header("Animation")]
@@ -229,10 +231,11 @@ public class ActiveBuffsSidebar : MonoBehaviour
     {
         if (canvas == null) return;
 
-        bool hide = false;
         string current = SceneManager.GetActiveScene().name;
-        hide |= Contains(hideInScenes, current);
-        if (TrinketSidebar.Instance != null) hide |= Contains(TrinketSidebar.Instance.hideInScenes, current);
+
+        bool hide = Contains(hideInScenes, current);
+        if (!hide && showOnlyInScenes != null && showOnlyInScenes.Length > 0 && !Contains(showOnlyInScenes, current)) hide = true;
+        if (!hide && TrinketSidebar.Instance != null && !TrinketSidebar.Instance.IsVisibleIn(current)) hide = true;
         canvas.enabled = !hide;
     }
 

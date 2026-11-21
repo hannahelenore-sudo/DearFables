@@ -82,7 +82,9 @@ public class TrinketSidebar : MonoBehaviour
     public bool closeWhenShopCloses = true;
     [Tooltip("Slide open while a hand is being scored, so you can watch the trinkets trigger.")]
     public bool openWhileScoring = true;
-    [Tooltip("Scene names where the bar is hidden completely (main menu, intro...).")]
+    [Tooltip("The bar is ONLY shown in these scenes and hidden everywhere else (main menu, intro...). Leave the list empty to show it in every scene.")]
+    public string[] showOnlyInScenes = { "GameScene", "CardGame" };
+    [Tooltip("Scene names where the bar is hidden completely, even if they are in the list above.")]
     public string[] hideInScenes;
 
     [Header("Animation")]
@@ -297,12 +299,23 @@ public class TrinketSidebar : MonoBehaviour
     private void ApplySceneVisibility()
     {
         if (canvas == null) return;
-        bool hide = false;
-        string current = SceneManager.GetActiveScene().name;
+        canvas.enabled = IsVisibleIn(SceneManager.GetActiveScene().name);
+    }
+
+    /// <summary>True if the bar should be shown in the scene with this name. Also used by the Active Buffs bar.</summary>
+    public bool IsVisibleIn(string sceneName)
+    {
         if (hideInScenes != null)
             for (int i = 0; i < hideInScenes.Length; i++)
-                if (hideInScenes[i] == current) hide = true;
-        canvas.enabled = !hide;
+                if (hideInScenes[i] == sceneName) return false;
+
+        if (showOnlyInScenes != null && showOnlyInScenes.Length > 0)
+        {
+            for (int i = 0; i < showOnlyInScenes.Length; i++)
+                if (showOnlyInScenes[i] == sceneName) return true;
+            return false;
+        }
+        return true;
     }
 
     // The bar needs an EventSystem for clicking and dragging

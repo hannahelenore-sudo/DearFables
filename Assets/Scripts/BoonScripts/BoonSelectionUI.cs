@@ -26,7 +26,7 @@ public class BoonSelectionUI : MonoBehaviour
     [Header("Boon Pool")]
     [Tooltip("Boons that can be offered. If there are more than cards, a random selection is shown.")]
     public List<BoonData> boonPool = new List<BoonData>();
-    [Tooltip("If the pool is empty, offer the 3 default boons (+1 hand per round, +1 hand size, +50 Wind Power).")]
+    [Tooltip("If the pool is empty, offer the 3 default boons (+1 hand per round, +1 hand size, +10 Wind Power).")]
     public bool useDefaultBoonsIfEmpty = true;
 
     [Header("Animation")]
@@ -262,7 +262,7 @@ public class BoonSelectionUI : MonoBehaviour
         {
             BoonData.CreateRuntime("Extra Hand", "Permanently gain +1 hand per round", BoonType.ExtraHandPerRound, 1),
             BoonData.CreateRuntime("Bigger Hand", "+1 Hand Size", BoonType.HandSize, 1),
-            BoonData.CreateRuntime("Wind Power", "+50 Wind Power", BoonType.WindPower, 50)
+            BoonData.CreateRuntime("Wind Power", "+10 Wind Power", BoonType.WindPower, 10)
         };
     }
 

@@ -129,21 +129,23 @@ public class MainMenu : MonoBehaviour
             preload.allowSceneActivation = false;
         }
 
-        // Find a canvas to put the video on
-        Canvas canvas = menuPanel != null ? menuPanel.GetComponentInParent<Canvas>() : null;
-        if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            Debug.LogError("MainMenu: no Canvas found in the scene, skipping the video.");
-            GoToGame();
-            yield break;
-        }
-        canvas = canvas.rootCanvas;
+        // The video gets its OWN canvas, on top of everything. Looking for "some canvas in the scene" is not safe:
+        // the scene's own Canvas may be switched off, and the canvases that survive from the game scene
+        // (Trinket bar, Buffs bar, GameMenu) are hidden or switched off on the title screen, so the video would be invisible.
+        GameObject canvasObj = new GameObject("IntroVideoCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = canvasObj.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 32000;
+        CanvasScaler scaler = canvasObj.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
 
         // ---- Build a black panel with the video inside it (starts invisible) ----
         GameObject panelObj = new GameObject("IntroVideoPanel", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
         panelObj.transform.SetParent(canvas.transform, false);
-        panelObj.transform.SetAsLastSibling(); // on top of the menu
+        panelObj.transform.SetAsLastSibling();
         Stretch(panelObj.GetComponent<RectTransform>());
 
         panelObj.GetComponent<Image>().color = Color.black;
