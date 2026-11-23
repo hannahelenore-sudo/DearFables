@@ -51,6 +51,8 @@ public class BoonMeterUI : MonoBehaviour
     public Behaviour playerMovement;
     [Tooltip("Make sure the mouse is usable while the boon screen is open.")]
     public bool unlockCursorDuringSelection = true;
+    [Tooltip("ON: the whole game is paused while the boon screen is open (player, enemies, thrown cards, animations). The boon screen itself keeps working.")]
+    public bool pauseGameDuringSelection = true;
 
     [Header("Sounds")]
     [Range(0f, 1f)] public float sfxVolume = 1f;
@@ -74,6 +76,11 @@ public class BoonMeterUI : MonoBehaviour
     private bool originalMovementEnabled;
     private CursorLockMode originalLock;
     private bool originalCursorVisible;
+    private bool frozen;
+    private float originalTimeScale = 1f;
+    private bool originalInputLocked;
+    private CardShooter cardShooter;
+    private bool originalShooterEnabled;
     private Color liquidBaseColor = Color.white;
     private Vector3 containerBaseScale = Vector3.one;
     private RectTransform pulseTarget;
@@ -122,6 +129,9 @@ public class BoonMeterUI : MonoBehaviour
     private void OnDisable()
     {
         running = false;
+
+        // Never leave the game paused if this object is switched off or the scene closes mid-selection
+        if (frozen) FreezePlayer(false);
     }
 
     private void OnDestroy()
@@ -384,18 +394,41 @@ public class BoonMeterUI : MonoBehaviour
     {
         if (freeze)
         {
+            if (frozen) return;
+            frozen = true;
+
             FindPlayerMovement();
+
+            // Locks walking, running, dragging, jumping and dashing. Enemies check this too and stand still while it is on.
+            PlayerMovement pm = playerMovement as PlayerMovement;
+            if (pm != null)
+            {
+                originalInputLocked = pm.InputLocked;
+                pm.InputLocked = true;
+            }
 
             if (playerMovement != null)
             {
-                originalMovementEnabled = playerMovement.enabled;
-                playerMovement.enabled = false;
-
                 Rigidbody rb = playerMovement.GetComponent<Rigidbody>();
                 if (rb != null) rb.linearVelocity = Vector3.zero;
 
                 Rigidbody2D rb2d = playerMovement.GetComponent<Rigidbody2D>();
                 if (rb2d != null) rb2d.linearVelocity = Vector2.zero;
+            }
+
+            // Clicking a boon card must not also throw a card into the world
+            if (cardShooter == null) cardShooter = FindAnyObjectByType<CardShooter>();
+            if (cardShooter != null)
+            {
+                originalShooterEnabled = cardShooter.enabled;
+                cardShooter.enabled = false;
+            }
+
+            // Freezes everything else: enemies, thrown cards, animations, particles
+            if (pauseGameDuringSelection)
+            {
+                originalTimeScale = Time.timeScale;
+                Time.timeScale = 0f;
             }
 
             if (unlockCursorDuringSelection)
@@ -408,8 +441,16 @@ public class BoonMeterUI : MonoBehaviour
         }
         else
         {
-            if (playerMovement != null)
-                playerMovement.enabled = originalMovementEnabled;
+            if (!frozen) return;
+            frozen = false;
+
+            if (pauseGameDuringSelection)
+                Time.timeScale = originalTimeScale > 0f ? originalTimeScale : 1f;
+
+            PlayerMovement pm = playerMovement as PlayerMovement;
+            if (pm != null) pm.InputLocked = originalInputLocked;
+
+            if (cardShooter != null) cardShooter.enabled = originalShooterEnabled;
 
             if (unlockCursorDuringSelection)
             {

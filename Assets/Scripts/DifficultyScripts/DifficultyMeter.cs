@@ -78,6 +78,12 @@ public class DifficultyMeter : MonoBehaviour
         lastShown = -1f;
     }
 
+    /// <summary>Call from "New Game" so the meter starts empty instead of draining from the old level.</summary>
+    public static void ResetShown()
+    {
+        lastShown = -1f;
+    }
+
     // Called by Unity when the component is first added: a sensible size so it is visible straight away
     private void Reset()
     {

@@ -68,9 +68,8 @@ public class MainMenu : MonoBehaviour
 
         PlaySound(startClickSound);
 
-        // New game: stars back to 0 and all enemies come back
-        PlayerProgress.ResetAll();
-        EnemyChase.ResetCaughtEnemies();
+        // New game: wipe EVERYTHING (stars, enemies, difficulty, card pickup, tutorial, boons, trinkets...)
+        GameReset.NewGame();
 
         if (introVideo == null)
         {

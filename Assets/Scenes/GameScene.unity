@@ -311,6 +311,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -3215,6 +3216,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -4851,6 +4853,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -5827,6 +5830,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -6975,6 +6979,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -10994,6 +10999,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -11539,7 +11545,7 @@ MonoBehaviour:
   starGlowMinAlpha: 0.35
   starGlowMaxAlpha: 0.85
   starGlowPulseSpeed: 3
-  countsForDifficulty: 1
+  countsForDifficulty: 0
   waitForCardUnlock: 0
   customBattlePicture: 1
   battleFlip: 1
@@ -11575,6 +11581,7 @@ MonoBehaviour:
   hitSound: {fileID: 0}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 1
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -12879,6 +12886,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -16123,6 +16131,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -16697,6 +16706,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -22892,6 +22902,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -24416,6 +24427,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
@@ -24762,7 +24774,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1629987059
 RectTransform:
   m_ObjectHideFlags: 0
@@ -25547,6 +25559,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 84291a6743f09704d8db9fce3f2cd2e2, type: 3}
   hitVolume: 1
   hitPitchVariation: 0
+  startsTutorial: 0
   enemyId: 
   lockYAxis: 1
   returnToStartWhenLost: 1
