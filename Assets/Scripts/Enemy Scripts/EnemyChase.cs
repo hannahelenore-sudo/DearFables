@@ -128,6 +128,10 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("Small random pitch change so the sound doesn't feel identical every time. 0 = no variation.")]
     [Range(0f, 0.3f)] public float hitPitchVariation = 0f;
 
+    [Header("Card Game Tutorial")]
+    [Tooltip("ON: when a battle starts with this enemy (hit by a card or touched), the card game tutorial plays. The StarQuest NPC always counts, even with this OFF. The tutorial only ever plays once per game.")]
+    public bool startsTutorial = false;
+
     [Header("Persistence")]
     [Tooltip("Unique name used to remember this enemy was caught. Leave empty to use the object's name (so give each enemy a different name).")]
     public string enemyId = "";
@@ -574,6 +578,10 @@ public class EnemyChase : MonoBehaviour
 
         if (byCard && cardHitGivesAdvantage) AdvantageHit.Arm(scoreReduction);
         else AdvantageHit.Disarm();
+
+        // Tag the next card game as the tutorial fight. This is exact: no hit detection or timing window involved.
+        if (startsTutorial || GetComponent<StarQuestNPC>() != null)
+            CardGameTutorialGate.MarkFromStarQuest();
 
         Debug.Log("EnemyChase: '" + name + "' started a battle.");
 

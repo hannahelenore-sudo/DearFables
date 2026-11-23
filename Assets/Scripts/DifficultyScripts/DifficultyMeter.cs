@@ -60,6 +60,12 @@ public class DifficultyMeter : MonoBehaviour
         lastShown = -1f;
     }
 
+    /// <summary>Call from "New Game" so the meter starts empty instead of draining from the old level.</summary>
+    public static void ResetShown()
+    {
+        lastShown = -1f;
+    }
+
     private void Reset()
     {
         RectTransform rt = transform as RectTransform;

@@ -60,6 +60,7 @@ public class MainMenu : MonoBehaviour
 
         PlaySound(startClickSound);
 
+        // New game: stars back to 0 and all enemies come back
         PlayerProgress.ResetAll();
         EnemyChase.ResetCaughtEnemies();
 

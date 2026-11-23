@@ -54,6 +54,17 @@ public static class CardGameTutorialGate
 
     public static void ResetCompleted() { Completed = false; tutorialUsed = false; }
 
+    /// <summary>Call from "New Game": back to a fresh, never-played state (clears every flag).</summary>
+    public static void ResetAll()
+    {
+        Pending = false;
+        Completed = false;
+        activeTutorial = false;
+        tutorialUsed = false;
+        forcedInEditor = false;
+        lastNpcEngageTime = -999f;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Hook()
     {
