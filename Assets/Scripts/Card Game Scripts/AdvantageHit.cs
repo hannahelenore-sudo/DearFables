@@ -14,6 +14,11 @@ public static class AdvantageHit
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetOnLaunch()
     {
+        ResetAll();
+    }
+
+    public static void ResetAll()
+    {
         pending = false;
         pendingReduction = DefaultReduction;
         IsActive = false;

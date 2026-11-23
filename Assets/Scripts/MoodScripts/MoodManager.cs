@@ -35,6 +35,12 @@ public static class MoodManager
         candiesGathered = 0;
     }
 
+    public static void ResetAll()
+    {
+        candiesGathered = 0;
+        Clear();
+    }
+
     private static MoodData Load(string key)
     {
         MoodData asset = Resources.Load<MoodData>("Moods/" + key);

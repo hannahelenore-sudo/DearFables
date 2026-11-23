@@ -32,6 +32,13 @@ public static class StructureProgress
         Array.Clear(levels, 0, levels.Length);
     }
 
+    public static void ResetAll()
+    {
+        current = StructureType.None;
+        Array.Clear(levels, 0, levels.Length);
+        Fire();
+    }
+
     public static bool Build(StructureType type)
     {
         if (type == StructureType.None || IsBuilt) return false;

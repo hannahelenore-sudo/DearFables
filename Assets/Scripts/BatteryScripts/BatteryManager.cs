@@ -27,8 +27,14 @@ public static class BatteryManager
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetOnLaunch()
     {
+        ResetAll();
+    }
+
+    public static void ResetAll()
+    {
         count = StartingBatteries;
         pendingDrop = 0;
+        lastPlayerPosition = Vector3.zero;
         hasLastPlayerPosition = false;
     }
 

@@ -230,6 +230,13 @@ public class NumberSpinnerUI : MonoBehaviour
             tsinelasTimerCircle.fillAmount = 1f;
         }
 
+        Canvas popCanvas = tsinelasPopup.GetComponent<Canvas>();
+        if (popCanvas == null) popCanvas = tsinelasPopup.AddComponent<Canvas>();
+        popCanvas.overrideSorting = true;
+        popCanvas.sortingOrder = InputLock.SortingOrder + 1;
+        if (tsinelasPopup.GetComponent<GraphicRaycaster>() == null)
+            tsinelasPopup.AddComponent<GraphicRaycaster>();
+
         Transform popT = tsinelasPopup.transform;
         Vector3 baseScale = popT.localScale;
         tsinelasPopup.SetActive(true);

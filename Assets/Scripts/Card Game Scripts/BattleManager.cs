@@ -126,6 +126,7 @@ public class BattleManager : MonoBehaviour
     private bool isTutorialFight;
     private const string RoundIntroLockKey = "BattleManager.RoundIntro";
     private const string EndingLockKey = "BattleManager.Ending";
+    private const string OpeningLockKey = "BattleManager.Opening";
     private bool starDroppedThisFight = true;
 
     private void Awake()
@@ -255,6 +256,7 @@ public class BattleManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        InputLock.Pop(OpeningLockKey);
         InputLock.Pop(RoundIntroLockKey);
         InputLock.Pop(EndingLockKey);
         AdvantageHit.EndBattle();
@@ -693,6 +695,7 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator RunBattleOpeningSequence()
     {
+        InputLock.Push(OpeningLockKey);
         isOpeningSequenceActive = true;
         SetBattleUIInteractable(false);
 
@@ -771,6 +774,7 @@ public class BattleManager : MonoBehaviour
         SetCameraState(battleViewActive: true);
         SetPersistentUITextsActive(true);
         SetBattleUIInteractable(true);
+        InputLock.Pop(OpeningLockKey);
     }
 
     private int OnTsinelasUsed()

@@ -203,6 +203,7 @@ public class CardGameTutorial : MonoBehaviour
     float startTime, prevTimeScale = 1f;
     bool paused;
     bool tutorialRun;
+    bool holding;
     static Sprite whiteSprite;
 
     void Awake()
@@ -269,8 +270,42 @@ public class CardGameTutorial : MonoBehaviour
 #endif
     }
 
-    void OnDisable() { Resume(); InputLock.Pop(this); }
-    void OnDestroy() { Resume(); InputLock.Pop(this); }
+    void OnDisable() { Resume(); holding = false; InputLock.Pop(this); }
+    void OnDestroy() { Resume(); holding = false; InputLock.Pop(this); }
+
+    void SetHold(bool on)
+    {
+        if (on == holding) return;
+        holding = on;
+        if (on) InputLock.Push(this); else InputLock.Pop(this);
+    }
+
+    void RefreshHold()
+    {
+        if (skipRequested || sections == null) { SetHold(false); return; }
+
+        bool openingDone = AllOpeningSectionsDone();
+        bool hold = false;
+        foreach (var s in sections)
+        {
+            if (s == null || s.done || s.steps == null || s.steps.Length == 0) continue;
+            if (s.trigger == TriggerMode.AfterOpeningSequence) { hold = true; break; }
+            if (s.readySince >= 0f) { hold = true; break; }
+            if (openingDone && IsApproaching(s)) { hold = true; break; }
+        }
+        SetHold(hold);
+    }
+
+    // Target is showing or fading in, but the section is not "ready" yet.
+    static bool IsApproaching(Section s)
+    {
+        if (s.visibleTarget == null || !s.visibleTarget.activeInHierarchy) return false;
+        var canvas = s.visibleTarget.GetComponent<Canvas>();
+        if (canvas != null && !canvas.enabled) return false;
+        if (s.visibleGroup != null &&
+            (!s.visibleGroup.gameObject.activeInHierarchy || s.visibleGroup.alpha < 0.05f)) return false;
+        return true;
+    }
 
     IEnumerator Run()
     {
@@ -284,12 +319,13 @@ public class CardGameTutorial : MonoBehaviour
                 if (IsReady(s)) { next = s; break; }
             }
 
-            if (next == null) { yield return null; continue; }
+            if (next == null) { RefreshHold(); yield return null; continue; }
             yield return PlaySection(next);
             next.done = true;
         }
 
         if (overlayRoot != null) overlayRoot.SetActive(false);
+        SetHold(false);
         Resume();
         enabled = false;
     }
@@ -347,6 +383,7 @@ public class CardGameTutorial : MonoBehaviour
     {
         overlayRoot.SetActive(true);
         Pause();
+        holding = true;
         InputLock.Push(this);
 
         for (int i = 0; i < s.steps.Length && !skipRequested; i++)
@@ -385,8 +422,9 @@ public class CardGameTutorial : MonoBehaviour
 
         overlayRoot.SetActive(false);
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
-        InputLock.Pop(this);
+        s.done = true;
         Resume();
+        RefreshHold();
     }
 
     void KeepNextSelected()

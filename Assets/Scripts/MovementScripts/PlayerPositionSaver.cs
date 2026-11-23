@@ -14,6 +14,22 @@ public class PlayerPositionSaver : MonoBehaviour
     private static string savedSceneName;
     private static bool savedFromZone;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetOnLaunch()
+    {
+        ResetAll();
+    }
+
+    public static void ResetAll()
+    {
+        hasSavedPosition = false;
+        savedPosition = Vector3.zero;
+        savedRotation = Quaternion.identity;
+        savedSceneName = null;
+        savedFromZone = false;
+        BlockReentry = false;
+    }
+
     private void Start()
     {
         if (hasSavedPosition && savedSceneName == SceneManager.GetActiveScene().name)

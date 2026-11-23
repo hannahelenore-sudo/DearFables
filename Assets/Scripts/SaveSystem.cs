@@ -147,7 +147,7 @@ public static class SaveSystem
         SaveFile f = Read(slot);
         if (f == null || string.IsNullOrEmpty(f.scene)) return false;
 
-        ResetProgress();
+        GameReset.NewGame();
         ApplyEntries(f);
         QuestLog.ReplaceAll(f.quests);
 

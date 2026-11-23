@@ -486,6 +486,7 @@ public class GameMenu : MonoBehaviour
 
         bool wantTitle = scene.name == mainMenuScene;
         if (wantTitle) sceneAllowed = true;
+        if (wantTitle) GameReset.NewGame();
         SetMode(wantTitle);
         if (titleMode) Open();
     }
@@ -1455,7 +1456,7 @@ public class GameMenu : MonoBehaviour
     {
         if (entry == Entry.NewGame)
         {
-            SaveSystem.ResetProgress();
+            GameReset.NewGame();
 
             isOpen = false;
             openT = 0f;
