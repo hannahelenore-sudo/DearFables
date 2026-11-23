@@ -1,12 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Background music for ONE scene. Put it on an empty GameObject in each scene that needs music.
-/// - Fades in when the scene starts.
-/// - Loops smoothly by crossfading the end of the track into the start.
-/// - Fades out (instead of cutting off) when the player leaves the scene, then removes itself.
-/// </summary>
 public class BackgroundMusic : MonoBehaviour
 {
     [Header("Music")]
@@ -33,10 +27,9 @@ public class BackgroundMusic : MonoBehaviour
 
     void Awake()
     {
-        // Remember which scene we belong to, then survive the scene change just long enough to fade out
         homeSceneHandle = gameObject.scene.handle;
 
-        transform.SetParent(null); // DontDestroyOnLoad only works on top-level objects
+        transform.SetParent(null);
         DontDestroyOnLoad(gameObject);
 
         SceneManager.sceneUnloaded += OnSceneUnloaded;
@@ -47,10 +40,6 @@ public class BackgroundMusic : MonoBehaviour
         SceneManager.sceneUnloaded -= OnSceneUnloaded;
     }
 
-    /// <summary>
-    /// Fades the music out now and removes this object. Call it from other scripts,
-    /// for example when a video starts playing.
-    /// </summary>
     public void FadeOut()
     {
         leavingScene = true;
@@ -58,7 +47,6 @@ public class BackgroundMusic : MonoBehaviour
 
     private void OnSceneUnloaded(Scene scene)
     {
-        // Our scene is gone -> start fading out
         if (scene.handle == homeSceneHandle)
             leavingScene = true;
     }
@@ -75,7 +63,6 @@ public class BackgroundMusic : MonoBehaviour
         active = CreateSource();
         other = CreateSource();
 
-        // Plain loop mode: a single source that loops by itself
         if (crossfadeDuration <= 0f)
             active.loop = true;
 
@@ -85,11 +72,9 @@ public class BackgroundMusic : MonoBehaviour
 
     void Update()
     {
-        // Fade-in multiplier (0 -> 1)
         fadeInTimer += Time.unscaledDeltaTime;
         float fadeIn = startFadeIn > 0f ? Mathf.Clamp01(fadeInTimer / startFadeIn) : 1f;
 
-        // Fade-out multiplier (1 -> 0) once the scene has been left
         float fadeOut = 1f;
         if (leavingScene)
         {
@@ -105,21 +90,18 @@ public class BackgroundMusic : MonoBehaviour
 
         float master = volume * fadeIn * fadeOut;
 
-        // Plain loop
         if (crossfadeDuration <= 0f)
         {
             active.volume = master;
             return;
         }
 
-        // Never overlap for more than ~40% of the track
         float overlap = Mathf.Min(crossfadeDuration, music.length * 0.4f);
 
         if (!crossfading)
         {
             active.volume = master;
 
-            // Close to the end of the track: start the next loop underneath
             if (active.isPlaying && music.length - active.time <= overlap)
             {
                 other.time = 0f;
@@ -135,7 +117,6 @@ public class BackgroundMusic : MonoBehaviour
             fadeTimer += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(fadeTimer / overlap);
 
-            // Equal-power crossfade keeps the loudness steady (no dip in the middle)
             active.volume = master * Mathf.Cos(t * Mathf.PI * 0.5f);
             other.volume = master * Mathf.Sin(t * Mathf.PI * 0.5f);
 
@@ -143,7 +124,6 @@ public class BackgroundMusic : MonoBehaviour
             {
                 active.Stop();
 
-                // Swap roles
                 AudioSource temp = active;
                 active = other;
                 other = temp;
@@ -159,7 +139,7 @@ public class BackgroundMusic : MonoBehaviour
         source.clip = music;
         source.playOnAwake = false;
         source.loop = false;
-        source.spatialBlend = 0f; // 2D sound, same volume everywhere
+        source.spatialBlend = 0f;
         return source;
     }
 }

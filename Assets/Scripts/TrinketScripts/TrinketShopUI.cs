@@ -5,11 +5,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// The shop screen (the back of the car): shows 3 trinkets and a Reshuffle button.
-/// Everything is free for now: clicking a trinket takes it. Open it with Open() (ShopInteractable does this).
-/// Needs an EventSystem in the scene. Tip: build the whole UI with  Tools > Shop > Create Shop UI.
-/// </summary>
 public class TrinketShopUI : ShopPanelBase
 {
     [Serializable]
@@ -61,11 +56,6 @@ public class TrinketShopUI : ShopPanelBase
     [Tooltip("Played when you can't afford something.")]
     public AudioClip cantAffordSound;
 
-    /// <summary>True while any shop is open. Handy to stop player movement: if (TrinketShopUI.IsAnyShopOpen) return;</summary>
-    // IsAnyShopOpen now lives in ShopPanelBase (TrinketShopUI.IsAnyShopOpen still works)
-    // IsOpen now lives in ShopPanelBase
-
-    /// <summary>The shop that is open right now (null if none). The sidebar uses it to react when you sell.</summary>
     public static TrinketShopUI OpenShop { get; private set; }
 
     private CanvasGroup panelGroup;
@@ -116,10 +106,6 @@ public class TrinketShopUI : ShopPanelBase
         if (IsOpen && Input.GetKeyDown(KeyCode.Escape)) Close();
     }
 
-    // -------------------------------------------------------------------
-    // Open / close
-    // -------------------------------------------------------------------
-
     public override void Open()
     {
         if (IsOpen) return;
@@ -134,14 +120,13 @@ public class TrinketShopUI : ShopPanelBase
         IsAnyShopOpen = true;
         OpenShop = this;
 
-        rerollsThisVisit = 0; // Balatro: the reroll price starts over in every shop
+        rerollsThisVisit = 0;
         UpdateRerollLabel();
 
         PlaySFX(openSound);
         panelRoot.SetActive(true);
         StartCoroutine(PopIn());
 
-        // The stock stays the same between visits until you press Reshuffle
         if (!hasStock) RollStock();
 
         if (shopkeeper != null) shopkeeper.SayGreeting();
@@ -181,11 +166,6 @@ public class TrinketShopUI : ShopPanelBase
         panelRoot.transform.localScale = baseScale;
     }
 
-    // -------------------------------------------------------------------
-    // Stock
-    // -------------------------------------------------------------------
-
-    /// <summary>Balatro: the first reshuffle costs 5 batteries, every one after costs 1 more.</summary>
     public int CurrentRerollCost
     {
         get { return BatteryManager.RerollBaseCost + rerollsThisVisit * BatteryManager.RerollCostIncrease; }
@@ -239,7 +219,6 @@ public class TrinketShopUI : ShopPanelBase
             source.AddRange(defaultPool);
         }
 
-        // Shuffle, then deal one distinct trinket to each slot
         for (int i = source.Count - 1; i > 0; i--)
         {
             int j = UnityEngine.Random.Range(0, i + 1);
@@ -289,7 +268,6 @@ public class TrinketShopUI : ShopPanelBase
         Slot slot = slots[index];
         if (slot == null || slot.trinket == null || slot.taken) return;
 
-        // Max 5 trinkets: sell one in the sidebar to make room
         if (TrinketInventory.IsFull)
         {
             PlaySFX(fullSound);
@@ -298,7 +276,6 @@ public class TrinketShopUI : ShopPanelBase
             return;
         }
 
-        // Pay with batteries
         if (!BatteryManager.TrySpend(slot.trinket.price))
         {
             CantAfford();
@@ -311,7 +288,6 @@ public class TrinketShopUI : ShopPanelBase
 
         PlaySFX(buySound);
 
-        // Gathering enough candies starts the Sugar Rush mood
         bool sugarRush = slot.trinket.type == TrinketType.Candy && MoodManager.AddCandy();
 
         if (shopkeeper != null)
@@ -322,13 +298,11 @@ public class TrinketShopUI : ShopPanelBase
         Debug.Log("Bought trinket: " + slot.trinket.trinketName + " for " + slot.trinket.price + " batteries");
     }
 
-    /// <summary>Called by the sidebar after the player sells a trinket.</summary>
     public void NotifySold(TrinketData sold)
     {
         if (shopkeeper != null) shopkeeper.SaySold(sold != null ? sold.trinketName : "");
     }
 
-    // Little "pop" when a slot is dealt
     private IEnumerator PopSlot(Transform target, float delay)
     {
         target.localScale = Vector3.zero;
@@ -340,7 +314,6 @@ public class TrinketShopUI : ShopPanelBase
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / slotPopDuration);
 
-            // ease out back (slight overshoot)
             const float c1 = 1.70158f;
             const float c3 = c1 + 1f;
             float eased = 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);

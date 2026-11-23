@@ -5,11 +5,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// The "Choose Your Boon" screen: a big container with a title and (up to) 3 clickable boon cards.
-/// Call Open(callback) and it pops in, lets the player click a card, then closes and returns the pick.
-/// Needs an EventSystem in the scene (a normal UI Canvas setup already has one).
-/// </summary>
 public class BoonSelectionUI : MonoBehaviour
 {
     [Header("UI")]
@@ -90,10 +85,6 @@ public class BoonSelectionUI : MonoBehaviour
         StartCoroutine(OpenRoutine());
     }
 
-    // -------------------------------------------------------------------
-    // Open / choose / close
-    // -------------------------------------------------------------------
-
     private IEnumerator OpenRoutine()
     {
         IsOpen = true;
@@ -103,7 +94,6 @@ public class BoonSelectionUI : MonoBehaviour
 
         if (titleText != null) titleText.text = title;
 
-        // Fill the cards, hide the unused ones
         for (int i = 0; i < cards.Length; i++)
         {
             BoonCardUI card = cards[i];
@@ -127,7 +117,6 @@ public class BoonSelectionUI : MonoBehaviour
         if (dimOverlay != null) dimOverlay.gameObject.SetActive(true);
         panelRoot.SetActive(true);
 
-        // Panel pops in
         float elapsed = 0f;
         while (elapsed < panelPopDuration)
         {
@@ -145,7 +134,6 @@ public class BoonSelectionUI : MonoBehaviour
         panelRoot.transform.localScale = panelBaseScale;
         if (dimOverlay != null) SetDimAlpha(dimAlpha);
 
-        // Cards pop in one after another
         for (int i = 0; i < activeChoices.Count; i++)
         {
             PlaySFX(cardAppearSound, 1f + i * 0.12f);
@@ -155,7 +143,6 @@ public class BoonSelectionUI : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(cardAppearDuration);
 
-        // Now the player may click
         for (int i = 0; i < activeChoices.Count; i++)
             cards[i].SetInteractable(true);
     }
@@ -186,7 +173,6 @@ public class BoonSelectionUI : MonoBehaviour
         else
             PlaySFX(selectSound);
 
-        // Shrink the other cards away, pulse the chosen one
         for (int i = 0; i < activeChoices.Count; i++)
         {
             if (cards[i] != chosenCard)
@@ -196,7 +182,6 @@ public class BoonSelectionUI : MonoBehaviour
         yield return StartCoroutine(chosenCard.PlayChosen());
         yield return new WaitForSecondsRealtime(chosenHoldTime);
 
-        // Close
         PlaySFX(closeSound);
 
         float elapsed = 0f;
@@ -223,10 +208,6 @@ public class BoonSelectionUI : MonoBehaviour
         callback?.Invoke(boon);
     }
 
-    // -------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------
-
     private void BuildChoices()
     {
         List<BoonData> source = new List<BoonData>();
@@ -238,7 +219,6 @@ public class BoonSelectionUI : MonoBehaviour
         if (source.Count == 0 && useDefaultBoonsIfEmpty)
             source = BuildDefaultBoons();
 
-        // Only shuffle when there are more boons than cards
         if (source.Count > cards.Length)
         {
             for (int i = source.Count - 1; i > 0; i--)

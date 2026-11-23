@@ -1,10 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Shows the CURRENTLY SELECTED item as one small icon above the player's head.
-/// It pops in when you switch items or use one, stays for 'showTime' seconds, then fades out.
-/// Added automatically by CardShooter.
-/// </summary>
 public class HeldItemIcons : MonoBehaviour
 {
     [Tooltip("Height of the icon as a fraction of the character's height.")]
@@ -34,7 +29,6 @@ public class HeldItemIcons : MonoBehaviour
     {
         if (root != null) return;
 
-        // Not parented to the player, so the player's scale/rotation can't distort the icon
         root = new GameObject("HeldItemIcon").transform;
         icon = root.gameObject.AddComponent<SpriteRenderer>();
         icon.enabled = false;
@@ -46,7 +40,6 @@ public class HeldItemIcons : MonoBehaviour
         else icon.sortingOrder = 10;
     }
 
-    /// <summary>Shows this sprite for 'showTime' seconds. pop = bounce (use when switching items).</summary>
     public void Show(Sprite sprite, bool pop)
     {
         EnsureIcon();
@@ -89,10 +82,10 @@ public class HeldItemIcons : MonoBehaviour
 
         float pop = popTime > 0f ? 1f + popStrength * Mathf.Sin((1f - popTimer / popTime) * Mathf.PI) : 1f;
         float spriteH = Mathf.Max(0.0001f, icon.sprite.bounds.size.y);
-        float appear = Mathf.Lerp(0.6f, 1f, alpha); // grows slightly as it fades in
+        float appear = Mathf.Lerp(0.6f, 1f, alpha);
 
         root.position = head;
-        root.rotation = cam.transform.rotation; // always faces the camera
+        root.rotation = cam.transform.rotation;
         root.localScale = Vector3.one * (size / spriteH * pop * appear);
 
         Color c = icon.color;

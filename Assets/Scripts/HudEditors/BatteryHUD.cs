@@ -2,10 +2,6 @@ using System.Collections;
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// Battery icon + how many batteries you have. The number counts up/down and the icon bounces.
-/// Build it with  Tools > HUD > Create Player HUD  and then just swap the icon sprite.
-/// </summary>
 public class BatteryHUD : MonoBehaviour
 {
     public TMP_Text countText;
@@ -64,7 +60,6 @@ public class BatteryHUD : MonoBehaviour
         if (delta > 0) Punch();
     }
 
-    /// <summary>Flashes the number red and shakes the icon (the shop calls this when you can't afford something).</summary>
     public static void FlashCantAfford()
     {
         if (instance == null) return;

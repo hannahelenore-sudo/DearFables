@@ -1,18 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Draws a block of liquid that fills SIDEWAYS: from the left edge of its rectangle
-/// (or the right edge if fillFromRight is on) up to "level" (0-1), with a wavy leading edge.
-/// Maskable, so a parent Mask clips it to the container sprite.
-/// </summary>
 public class SidewaysLiquidGraphic : MaskableGraphic
 {
     public float level;
     public float amplitude = 6f;
     public float wavelength = 90f;
     public float phase;
-    public float bottomShade = 0.7f; // how dark the liquid is at its back (the filled-from side)
+    public float bottomShade = 0.7f;
     public bool fillFromRight = false;
 
     protected override void OnPopulateMesh(VertexHelper vh)
@@ -26,7 +21,6 @@ public class SidewaysLiquidGraphic : MaskableGraphic
         float backX = fillFromRight ? r.xMax : r.xMin;
         float edgeX = backX + dir * r.width * level;
 
-        // No waves when empty or full, so nothing pokes out at the extremes
         float envelope = Mathf.Clamp01(Mathf.Min(level, 1f - level) * 10f);
         float amp = amplitude * envelope;
 

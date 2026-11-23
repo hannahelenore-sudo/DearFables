@@ -1,10 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// The player's health cards. The only way to lose one is to lose the card game.
-/// Static, survives scene loads, wiped when the game closes.
-/// </summary>
 public static class PlayerHealth
 {
     public const int DefaultMax = 4;
@@ -14,14 +10,12 @@ public static class PlayerHealth
     private static int displayed = DefaultMax;
 
     public static event Action Changed;
-    /// <summary>Fires once when health reaches 0.</summary>
     public static event Action Died;
 
     public static int Max { get { return max; } }
     public static int Current { get { return current; } }
     public static bool IsDead { get { return current <= 0; } }
 
-    /// <summary>What the health HUD last showed. Lets it play the "lose a card" animation after the scene changes.</summary>
     public static int DisplayedHealth
     {
         get { return Mathf.Clamp(displayed, 0, max); }
@@ -47,7 +41,7 @@ public static class PlayerHealth
         if (amount <= 0 || current <= 0) return;
 
         current = Mathf.Max(0, current - amount);
-        if (current == 1) MoodManager.Set(MoodManager.Angry); // one card left: the player gets angry
+        if (current == 1) MoodManager.Set(MoodManager.Angry);
         if (Changed != null) Changed();
         if (current <= 0 && Died != null) Died();
     }
@@ -59,7 +53,6 @@ public static class PlayerHealth
         if (Changed != null) Changed();
     }
 
-    /// <summary>Sets health to an exact value (debug / scripted events). Setting 1 makes the player Angry, setting 0 ends the game.</summary>
     public static void SetCurrent(int value)
     {
         int before = current;

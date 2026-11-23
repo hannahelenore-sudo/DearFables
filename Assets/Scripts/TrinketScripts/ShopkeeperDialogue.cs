@@ -2,11 +2,6 @@ using System.Collections;
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// The shopkeeper's dialogue box: a name plus a line of text that types out with talking ticks
-/// (like the intro cutscene, but with no character sprites, fades or button presses).
-/// TrinketShopUI calls SayGreeting / SayBought / SayReshuffle. You can also call Say("...") yourself.
-/// </summary>
 public class ShopkeeperDialogue : MonoBehaviour
 {
     [Header("Dialogue UI")]
@@ -95,10 +90,6 @@ public class ShopkeeperDialogue : MonoBehaviour
         if (dialogueBox != null) dialogueBox.SetActive(false);
     }
 
-    // -------------------------------------------------------------------
-    // Ready-made reactions
-    // -------------------------------------------------------------------
-
     public void SayGreeting() { SayRandom(greetingLines, null); }
     public void SayBought(string itemName) { SayRandom(boughtLines, itemName); }
     public void SayReshuffle() { SayRandom(reshuffleLines, null); }
@@ -107,15 +98,10 @@ public class ShopkeeperDialogue : MonoBehaviour
     public void SayBroke() { SayRandom(brokeLines, null); }
     public void SaySugarRush() { SayRandom(sugarRushLines, null); }
 
-    // -------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------
-
     public void SayRandom(string[] pool, string itemName)
     {
         if (pool == null || pool.Length == 0) return;
 
-        // Pick a random line, but not the same one twice in a row
         string line = pool[Random.Range(0, pool.Length)];
         for (int tries = 0; tries < 5 && pool.Length > 1 && line == lastLine; tries++)
             line = pool[Random.Range(0, pool.Length)];
@@ -136,7 +122,6 @@ public class ShopkeeperDialogue : MonoBehaviour
         typewriter = StartCoroutine(TypeLine(text));
     }
 
-    /// <summary>Stops talking and hides the box (called when the shop closes).</summary>
     public void Clear()
     {
         if (typewriter != null) StopCoroutine(typewriter);
@@ -146,10 +131,6 @@ public class ShopkeeperDialogue : MonoBehaviour
         if (dialogueText != null) dialogueText.text = "";
         if (dialogueBox != null) dialogueBox.SetActive(false);
     }
-
-    // -------------------------------------------------------------------
-    // Typewriter (same idea as IntroCutscene)
-    // -------------------------------------------------------------------
 
     private IEnumerator TypeLine(string text)
     {
@@ -165,7 +146,7 @@ public class ShopkeeperDialogue : MonoBehaviour
             dialogueText.maxVisibleCharacters = 0;
 
             float elapsed = 0f;
-            float tickTimer = talkTickInterval; // first tick plays right away
+            float tickTimer = talkTickInterval;
             int lastVisible = 0;
 
             while (dialogueText.maxVisibleCharacters < total)

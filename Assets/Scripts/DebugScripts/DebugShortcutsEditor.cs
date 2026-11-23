@@ -2,11 +2,9 @@
 using UnityEditor;
 using UnityEngine;
 
-// Must live in a folder named "Editor".
 [CustomEditor(typeof(DebugShortcuts))]
 public class DebugShortcutsEditor : Editor
 {
-    // Keeps the numbers (batteries, health, stars) live while playing
     public override bool RequiresConstantRepaint() { return Application.isPlaying; }
 
     public override void OnInspectorGUI()

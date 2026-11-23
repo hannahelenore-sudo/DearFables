@@ -2,14 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Vertical stamina bar for thrown items and the Wind Card. Put it on the Player, or let CardShooter add it automatically.
-/// - Each throw uses cards from the bar (1 each by default). Max 4 by default.
-/// - Not fully used: cards come back after a short delay.
-/// - Fully used up: locked until the bar is completely full again.
-/// - The Wind Card drains the bar smoothly while you run.
-/// The bar is built in code, so no prefab or sprite is needed.
-/// </summary>
 public class CardStamina : MonoBehaviour
 {
     [Header("Cards")]
@@ -57,7 +49,6 @@ public class CardStamina : MonoBehaviour
     private float sinceUse = 999f;
     private float flashTimer;
 
-    // Measured from the character's sprites
     private float bodyBottom = 0f;
     private float bodyHeight = 2f;
     private float bodyHalfWidth = 0.5f;
@@ -85,7 +76,6 @@ public class CardStamina : MonoBehaviour
 
     private void Start()
     {
-        // Measure the character so the bar can be placed on the body
         Bounds b = new Bounds(transform.position, Vector3.zero);
         bool any = false;
         foreach (SpriteRenderer sr in GetComponentsInChildren<SpriteRenderer>())
@@ -105,8 +95,6 @@ public class CardStamina : MonoBehaviour
         if (showBar) BuildUI();
     }
 
-    // ---------------- Used by CardShooter / WindBoost ----------------
-
     public bool CanThrow(float cost = 1f)
     {
         return !exhausted && value >= cost - 0.0001f;
@@ -117,14 +105,9 @@ public class CardStamina : MonoBehaviour
         value = Mathf.Max(0f, value - cost);
         sinceUse = 0f;
 
-        // Can't throw another one -> dried up, must refill completely
         if (value < 1f - 0.0001f) exhausted = true;
     }
 
-    /// <summary>
-    /// Smoothly takes stamina (Wind Card). Returns false once the bar is empty,
-    /// which also locks the bar until it's full again, just like running out of cards.
-    /// </summary>
     public bool Drain(float amount)
     {
         if (exhausted || value <= 0f) return false;
@@ -141,13 +124,10 @@ public class CardStamina : MonoBehaviour
         return true;
     }
 
-    /// <summary>Call when the player tries to throw but can't (bar shakes).</summary>
     public void NotifyDenied()
     {
         flashTimer = 0.25f;
     }
-
-    // ---------------- Logic ----------------
 
     private void Update()
     {
@@ -170,8 +150,6 @@ public class CardStamina : MonoBehaviour
         displayValue = Mathf.Lerp(displayValue, value, 1f - Mathf.Exp(-15f * Time.deltaTime));
     }
 
-    // ---------------- UI ----------------
-
     private void LateUpdate()
     {
         if (!showBar || barRoot == null) return;
@@ -185,7 +163,6 @@ public class CardStamina : MonoBehaviour
         float scale = canvas.scaleFactor;
         barRoot.position = new Vector2(sp.x, sp.y) + screenOffset * scale;
 
-        // Colours (live, so you can tweak them while playing)
         borderImage.color = borderColor;
         bgImage.color = backgroundColor;
         foreach (Image d in dividers) d.color = dividerColor;
@@ -201,11 +178,9 @@ public class CardStamina : MonoBehaviour
             fillImage.color = normalColor;
         }
 
-        // Little punch when you try to throw with no cards
         float punch = flashTimer > 0f ? 1f + 0.25f * (flashTimer / 0.25f) : 1f;
         barRoot.localScale = Vector3.one * punch;
 
-        // Fade out while full
         bool full = value >= maxCards - 0.0001f && displayValue >= maxCards - 0.01f;
         float target = (hideWhenFull && full && flashTimer <= 0f) || !inFront ? 0f : 1f;
         group.alpha = Mathf.MoveTowards(group.alpha, target, fadeSpeed * Time.deltaTime);
@@ -215,7 +190,6 @@ public class CardStamina : MonoBehaviour
     {
         if (barAnchor != null) return barAnchor.position;
 
-        // Left/right follows the screen, so "right" always looks right
         Vector3 right = cam.transform.right;
         right.y = 0f;
         right = right.sqrMagnitude < 0.0001f ? Vector3.right : right.normalized;
@@ -226,7 +200,6 @@ public class CardStamina : MonoBehaviour
                + right * (bodyHalfWidth * barSide);
     }
 
-    /// <summary>Right-click the component header > Rebuild Bar after changing Bar Width/Height or Max Cards.</summary>
     [ContextMenu("Rebuild Bar")]
     public void RebuildBar()
     {
@@ -260,19 +233,16 @@ public class CardStamina : MonoBehaviour
 
         Sprite white = GetWhiteSprite();
 
-        // Dark outline (a bit bigger than the bar)
         borderImage = CreateImage("Border", barRoot, white);
         borderImage.color = borderColor;
         Stretch(borderImage.rectTransform);
         borderImage.rectTransform.offsetMin = new Vector2(-borderSize, -borderSize);
         borderImage.rectTransform.offsetMax = new Vector2(borderSize, borderSize);
 
-        // Dark background
         bgImage = CreateImage("Background", barRoot, white);
         bgImage.color = backgroundColor;
         Stretch(bgImage.rectTransform);
 
-        // The coloured fill, grows from the bottom up
         fillImage = CreateImage("Fill", barRoot, white);
         fillImage.type = Image.Type.Filled;
         fillImage.fillMethod = Image.FillMethod.Vertical;
@@ -281,7 +251,6 @@ public class CardStamina : MonoBehaviour
         fillImage.color = normalColor;
         Stretch(fillImage.rectTransform);
 
-        // Small dividers so you can see the separate cards
         for (int i = 1; i < maxCards; i++)
         {
             Image div = CreateImage("Divider" + i, barRoot, white);

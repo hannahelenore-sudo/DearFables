@@ -1,12 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// A UI graphic that draws real animated liquid: two layered waves, a shiny surface line and rising bubbles.
-/// - It fills up smoothly to a level (0-1) and can drain away again.
-/// - The surface stays level when the card tilts, and sloshes a little as it catches up.
-/// Needs no sprites, materials or shaders. CardUI creates and drives it for Low Power cards.
-/// </summary>
 [RequireComponent(typeof(CanvasRenderer))]
 public class LowPowerLiquid : MaskableGraphic
 {
@@ -31,7 +25,6 @@ public class LowPowerLiquid : MaskableGraphic
     public float sloshDamping = 7f;
     public float maxTilt = 22f;
 
-    // current state
     private float fill;
     private float targetFill;
     private bool draining;
@@ -43,11 +36,6 @@ public class LowPowerLiquid : MaskableGraphic
 
     public float CurrentFill { get { return fill; } }
 
-    // ------------------------------------------------------------------
-    // Control
-    // ------------------------------------------------------------------
-
-    /// <summary>Rises (or lowers) the liquid to this level, 0 = empty, 1 = full.</summary>
     public void FillTo(float level)
     {
         draining = false;
@@ -56,28 +44,21 @@ public class LowPowerLiquid : MaskableGraphic
             transform.parent.gameObject.SetActive(true);
     }
 
-    /// <summary>Drains the liquid away, then hides it.</summary>
     public void Drain()
     {
         targetFill = 0f;
         draining = true;
     }
 
-    /// <summary>Call every frame with the card's rotation (degrees) so the surface stays level.</summary>
     public void SetCardRotation(float rotZ)
     {
         targetTilt = -rotZ;
     }
 
-    /// <summary>Gives the surface a kick so it sloshes (hover, pick up...).</summary>
     public void Slosh(float impulse)
     {
         tiltVel += impulse;
     }
-
-    // ------------------------------------------------------------------
-    // Animation
-    // ------------------------------------------------------------------
 
     protected override void OnEnable()
     {
@@ -113,7 +94,6 @@ public class LowPowerLiquid : MaskableGraphic
         fill = Mathf.Lerp(fill, targetFill, 1f - Mathf.Exp(-fillEase * dt));
         if (Mathf.Abs(fill - targetFill) < 0.002f) fill = targetFill;
 
-        // the surface chases the level line with a little overshoot
         float accel = (targetTilt - tiltAngle) * sloshStiffness - tiltVel * sloshDamping;
         tiltVel += accel * dt;
         tiltAngle = Mathf.Clamp(tiltAngle + tiltVel * dt, -maxTilt * 1.5f, maxTilt * 1.5f);
@@ -138,10 +118,6 @@ public class LowPowerLiquid : MaskableGraphic
         SetVerticesDirty();
     }
 
-    // ------------------------------------------------------------------
-    // Mesh
-    // ------------------------------------------------------------------
-
     protected override void OnPopulateMesh(VertexHelper vh)
     {
         vh.Clear();
@@ -163,12 +139,10 @@ public class LowPowerLiquid : MaskableGraphic
         Color shine = new Color(1f, 1f, 1f, 0.45f);
         Color shineFade = new Color(1f, 1f, 1f, 0f);
 
-        // back wave, front wave, shiny surface line
         AddStrip(vh, r, baseY, slope, waveHeight * 1.15f, 1.7f, 0.8f, t, 0f, backTop, backBottom);
         AddStrip(vh, r, baseY - 3f, slope, waveHeight, 0f, 1f, t, 0f, frontTop, frontBottom);
         AddStrip(vh, r, baseY - 3f, slope, waveHeight, 0f, 1f, t, 5f, shine, shineFade);
 
-        // bubbles
         if (r.height * fill > 24f)
         {
             for (int i = 0; i < bProgress.Length; i++)
@@ -192,7 +166,6 @@ public class LowPowerLiquid : MaskableGraphic
         return Mathf.Clamp(y, r.yMin, r.yMax);
     }
 
-    // A ribbon that follows the wave. thickness 0 = reaches down to the bottom of the card.
     private void AddStrip(VertexHelper vh, Rect r, float baseY, float slope, float amp, float phase, float speedMul,
         float t, float thickness, Color topColor, Color bottomColor)
     {

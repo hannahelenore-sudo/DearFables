@@ -4,14 +4,6 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
 
-/// <summary>
-/// Spawns two separate groups of grass inside the Spawn Area:
-///   1. Default Prefabs  - the main grass. Own amount, own size. Can sway in the wind.
-///   2. Variants         - the extra / rarer pieces. Own amount, per-entry size and spawn weight.
-///
-/// Optionally spawns ONLY OUTSIDE the ground tilemap (so it fills the hazy background
-/// and never grows on the playable ground).
-/// </summary>
 public class GrassSpawner : MonoBehaviour
 {
     [Serializable]
@@ -35,7 +27,6 @@ public class GrassSpawner : MonoBehaviour
     [Header("Spawn Area")]
     public BoxCollider spawnArea;
 
-    // ------------------------------------------------------------------
     [Header("Default Prefabs (the main grass, its own group)")]
     [Tooltip("Add as many as you like. Each piece picks one of them at random. These do not use the Variants list.")]
     public GameObject[] defaultPrefabs;
@@ -45,7 +36,6 @@ public class GrassSpawner : MonoBehaviour
     public float defaultMinScale = 0.8f;
     public float defaultMaxScale = 1.2f;
 
-    // ------------------------------------------------------------------
     [Header("Variants (extra pieces, a separate group)")]
     [Tooltip("Optional. One prefab used by every variant (e.g. a plain sprite object). Empty = variants are made as simple sprite objects, no prefab needed.")]
     public GameObject variantPrefab;
@@ -57,7 +47,6 @@ public class GrassSpawner : MonoBehaviour
     public float minScale = 0.8f;
     public float maxScale = 1.2f;
 
-    // ------------------------------------------------------------------
     [Header("Where it may spawn")]
     [Tooltip("ON: nothing spawns on the ground tilemap, only outside it (the hazy background).")]
     public bool onlyOutsideTilemap = true;
@@ -68,7 +57,6 @@ public class GrassSpawner : MonoBehaviour
     [Tooltip("How many random spots to try per piece before giving up on it.")]
     public int maxPlacementTries = 40;
 
-    // ------------------------------------------------------------------
     [Header("Height")]
     [Tooltip("Raises or lowers all spawned sprites. Positive = up, negative = down.")]
     public float heightOffset = 0f;
@@ -79,7 +67,6 @@ public class GrassSpawner : MonoBehaviour
     [Tooltip("Multiplies the size of EVERYTHING spawned (defaults and variants). Drag it during play to see how big things are. 1 = normal.")]
     [Range(0.05f, 5f)] public float sizeMultiplier = 1f;
 
-    // ------------------------------------------------------------------
     [Header("Sway (live)")]
     [Tooltip("The default grass sways in the wind, bending around its base.")]
     public bool swayDefaults = true;
@@ -96,7 +83,6 @@ public class GrassSpawner : MonoBehaviour
     [Tooltip("How fast gusts travel across the field.")]
     public float gustSpeed = 0.35f;
 
-    // ------------------------------------------------------------------
     [Header("Distance Culling (less lag)")]
     [Tooltip("ON: grass far away from the player is switched off, and switched back on when the player comes close.")]
     public bool cullByDistance = true;
@@ -112,24 +98,21 @@ public class GrassSpawner : MonoBehaviour
 
     private float nextCullCheck;
 
-    // Remembers every spawned piece so its size can be re-applied when you change a value in play mode
     private class SpawnedPiece
     {
-        public bool active = true; // false while culled (far from the player)
+        public bool active = true;
         public Transform transform;
         public SpriteRenderer sprite;
         public bool isDefault;
         public int variantIndex;
-        public float sizeRoll;   // 0..1: where in the min..max range this piece landed
-        public Vector3 basePos;  // where it was planted
-        public Vector3 feet;     // offset from the object's centre down to the base of the sprite
-        public float phase;      // so blades don't all move in step
+        public float sizeRoll;
+        public Vector3 basePos;
+        public Vector3 feet;
+        public float phase;
     }
 
     private readonly List<SpawnedPiece> spawnedPieces = new List<SpawnedPiece>();
     private Tilemap[] groundMaps;
-
-    // ------------------------------------------------------------------
 
     void Start()
     {
@@ -149,7 +132,6 @@ public class GrassSpawner : MonoBehaviour
 
         int defaults = 0, extras = 0, skipped = 0;
 
-        // Group 1: defaults
         if (CountDefaults() == 0)
         {
             Debug.LogWarning("GrassSpawner: no Default Prefabs set, so no default grass spawned.", this);
@@ -162,30 +144,24 @@ public class GrassSpawner : MonoBehaviour
             }
         }
 
-        // Group 2: variants
-        if (variants == null || variants.Length == 0)
+        if (variants != null && variants.Length > 0)
         {
-            // no variants is fine, they are optional
-        }
-        else if (TotalVariantWeight() <= 0f)
-        {
-            Debug.LogWarning("GrassSpawner: no variants spawned. Each entry needs a Sprite and a Spawn Weight above 0.", this);
-        }
-        else
-        {
-            for (int i = 0; i < variantAmount; i++)
+            if (TotalVariantWeight() <= 0f)
             {
-                if (SpawnVariant()) extras++; else skipped++;
+                Debug.LogWarning("GrassSpawner: no variants spawned. Each entry needs a Sprite and a Spawn Weight above 0.", this);
+            }
+            else
+            {
+                for (int i = 0; i < variantAmount; i++)
+                {
+                    if (SpawnVariant()) extras++; else skipped++;
+                }
             }
         }
 
         Debug.Log("GrassSpawner: spawned " + defaults + " default and " + extras + " variant piece(s)."
                   + (skipped > 0 ? " " + skipped + " skipped (no free spot outside the tilemap, try a bigger Spawn Area or a smaller Distance From Ground)." : ""), this);
     }
-
-    // ------------------------------------------------------------------
-    // Ground check (so grass only appears outside the tilemap)
-    // ------------------------------------------------------------------
 
     void FindGroundMaps()
     {
@@ -217,7 +193,6 @@ public class GrassSpawner : MonoBehaviour
 
         if (distanceFromGround > 0.001f)
         {
-            // Check rings at half and full distance so a margin around the ground stays empty
             for (int k = 1; k <= 2; k++)
             {
                 float r = distanceFromGround * k * 0.5f;
@@ -230,10 +205,6 @@ public class GrassSpawner : MonoBehaviour
         }
         return false;
     }
-
-    // ------------------------------------------------------------------
-    // Spawning
-    // ------------------------------------------------------------------
 
     bool SpawnDefault()
     {
@@ -254,7 +225,6 @@ public class GrassSpawner : MonoBehaviour
         GrassVariant variant = PickVariant();
         if (variant == null) return false;
 
-        // Prefab order: this entry's own prefab > the shared Variant Prefab > (none) a plain sprite object is created
         GameObject prefab = variant.prefab != null ? variant.prefab : variantPrefab;
 
         GameObject grass = Place(prefab);
@@ -300,7 +270,6 @@ public class GrassSpawner : MonoBehaviour
         }
         else
         {
-            // No prefab at all: make a plain object that just shows the variant's sprite
             grass = new GameObject("GrassVariant");
             grass.transform.SetParent(transform, false);
             grass.transform.position = position;
@@ -327,10 +296,6 @@ public class GrassSpawner : MonoBehaviour
         };
     }
 
-    // ------------------------------------------------------------------
-    // Picking
-    // ------------------------------------------------------------------
-
     int CountDefaults()
     {
         int count = 0;
@@ -356,7 +321,7 @@ public class GrassSpawner : MonoBehaviour
     float WeightOf(GrassVariant v)
     {
         if (v == null) return 0f;
-        if (v.sprite == null && v.prefab == null && variantPrefab == null) return 0f; // nothing to show
+        if (v.sprite == null && v.prefab == null && variantPrefab == null) return 0f;
         return v.spawnWeight;
     }
 
@@ -382,12 +347,8 @@ public class GrassSpawner : MonoBehaviour
             roll -= w;
             if (roll <= 0f) return v;
         }
-        return last; // floating point leftovers
+        return last;
     }
-
-    // ------------------------------------------------------------------
-    // Live sizing
-    // ------------------------------------------------------------------
 
     float ScaleFor(SpawnedPiece piece)
     {
@@ -416,7 +377,6 @@ public class GrassSpawner : MonoBehaviour
         float scale = ScaleFor(piece);
         piece.transform.localScale = new Vector3(scale, scale, scale);
 
-        // Where the base of the sprite is, so swaying bends around the bottom instead of the middle
         if (piece.sprite != null && piece.sprite.sprite != null)
             piece.feet = new Vector3(0f, piece.sprite.sprite.bounds.min.y * piece.transform.lossyScale.y, 0f);
         else
@@ -431,10 +391,6 @@ public class GrassSpawner : MonoBehaviour
             ApplyScale(spawnedPieces[i]);
         }
     }
-
-    // ------------------------------------------------------------------
-    // Sway
-    // ------------------------------------------------------------------
 
     void UpdateCulling()
     {
@@ -456,7 +412,6 @@ public class GrassSpawner : MonoBehaviour
             SpawnedPiece p = spawnedPieces[i];
             if (p.transform == null) continue;
 
-            // flat distance (the field lies on the X/Z plane)
             float dx = p.basePos.x - pp.x;
             float dz = p.basePos.z - pp.z;
             float sqr = dx * dx + dz * dz;
@@ -481,7 +436,6 @@ public class GrassSpawner : MonoBehaviour
         }
         else if (!cullByDistance)
         {
-            // culling switched off while playing: bring everything back
             for (int i = 0; i < spawnedPieces.Count; i++)
             {
                 SpawnedPiece q = spawnedPieces[i];
@@ -502,7 +456,6 @@ public class GrassSpawner : MonoBehaviour
             bool sways = (p.isDefault ? swayDefaults : swayVariants) && swayAngle > 0.001f;
             if (!sways)
             {
-                // settle back upright if sway was switched off while playing
                 if (p.transform.rotation != Quaternion.identity)
                 {
                     p.transform.rotation = Quaternion.identity;
@@ -511,25 +464,21 @@ public class GrassSpawner : MonoBehaviour
                 continue;
             }
 
-            // own rocking + a wind gust that travels across the field
             float own = Mathf.Sin(time * swaySpeed + p.phase);
             float wind = Mathf.PerlinNoise(p.basePos.x * gustScale + time * gustSpeed, p.basePos.z * gustScale) * 2f - 1f;
             float angle = swayAngle * Mathf.Lerp(own, wind, gust);
 
             Quaternion rot = Quaternion.Euler(0f, 0f, angle);
             p.transform.rotation = rot;
-            // rotate around the base of the sprite, not its centre
             p.transform.position = p.basePos + p.feet - rot * p.feet;
         }
     }
 
-    // Called by Unity whenever a value changes in the inspector (also while the game is running)
     void OnValidate()
     {
         if (Application.isPlaying && spawnedPieces.Count > 0) ApplyAllScales();
     }
 
-    /// <summary>Right-click the component header > "Respawn" to re-roll everything while playing.</summary>
     [ContextMenu("Respawn")]
     public void Respawn()
     {

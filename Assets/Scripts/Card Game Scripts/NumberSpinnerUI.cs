@@ -80,15 +80,13 @@ public class NumberSpinnerUI : MonoBehaviour
         maxNumber = Mathf.Max(min, max);
     }
 
-    /// <param name="keepCurrentAlpha">True when the caller is fading this screen in itself (cross-fade): the spin starts without forcing the alpha to 1.</param>
-    /// <param name="onTsinelasUsed">Pass this only when the player owns Tsinelas. The spinner pauses after the roll and shows the popup; if tapped, the spinner number is rolled again. The callback is only used to tell the spinner that Tsinelas is owned.</param>
     public void StartSequence(System.Action<int> onComplete, bool keepCurrentAlpha = false, System.Func<int> onTsinelasUsed = null)
     {
         if (sequenceRoutine != null) StopCoroutine(sequenceRoutine);
         gameObject.SetActive(true);
 
         tsinelasOffer = onTsinelasUsed;
-        if (tsinelasOffer != null) EnsureTsinelasPopup(); // builds the popup by itself if you didn't assign one
+        if (tsinelasOffer != null) EnsureTsinelasPopup();
         if (tsinelasPopup != null) tsinelasPopup.SetActive(false);
 
         if (canvasGroup != null && !keepCurrentAlpha) canvasGroup.alpha = 1f;
@@ -142,14 +140,13 @@ public class NumberSpinnerUI : MonoBehaviour
             yield return StartCoroutine(PopAndWiggleRoutine());
             yield return new GameSpeedWait(postSpinPauseDuration);
 
-            // Tsinelas: pause here (before the minimizing). If the player taps it, spin the number again.
             if (tsinelasOffer != null && tsinelasPopup != null && rerollsUsed < maxTsinelasRerolls)
             {
                 yield return StartCoroutine(TsinelasOfferRoutine());
                 if (tsinelasClicked)
                 {
                     rerollsUsed++;
-                    continue; // roll the number again
+                    continue;
                 }
             }
             break;
@@ -203,7 +200,6 @@ public class NumberSpinnerUI : MonoBehaviour
         tsinelasClicked = false;
         if (btn != null) btn.onClick.AddListener(OnTsinelasClicked);
 
-        // Show the Tsinelas sprite from the trinket the player owns
         bool foundSprite = false;
         if (tsinelasIcon != null)
         {
@@ -218,11 +214,10 @@ public class NumberSpinnerUI : MonoBehaviour
                 }
             }
         }
-        // No sprite available (e.g. the default runtime trinket): show the word instead
+
         if (tsinelasFallbackLabel != null) tsinelasFallbackLabel.gameObject.SetActive(!foundSprite);
         if (tsinelasHintLabel != null) tsinelasHintLabel.gameObject.SetActive(true);
 
-        // CanvasGroup so the popup can fade away on timeout
         CanvasGroup popGroup = tsinelasPopup.GetComponent<CanvasGroup>();
         if (popGroup == null) popGroup = tsinelasPopup.AddComponent<CanvasGroup>();
         popGroup.alpha = 1f;
@@ -235,7 +230,6 @@ public class NumberSpinnerUI : MonoBehaviour
             tsinelasTimerCircle.fillAmount = 1f;
         }
 
-        // Pop in with a little overshoot
         Transform popT = tsinelasPopup.transform;
         Vector3 baseScale = popT.localScale;
         tsinelasPopup.SetActive(true);
@@ -246,13 +240,12 @@ public class NumberSpinnerUI : MonoBehaviour
         {
             elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / tsinelasPopInDuration);
-            float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f); // easeOutBack
+            float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f);
             popT.localScale = baseScale * overshoot;
             yield return null;
         }
         popT.localScale = baseScale;
 
-        // Wait for a tap or the timer running out
         float timeLeft = tsinelasPopupDuration;
         while (timeLeft > 0f && !tsinelasClicked)
         {
@@ -266,13 +259,11 @@ public class NumberSpinnerUI : MonoBehaviour
 
         if (tsinelasClicked)
         {
-            // Tapped: don't wait for anything. The popup shrinks away in the background so the spin starts right now.
             if (tsinelasHintLabel != null) tsinelasHintLabel.gameObject.SetActive(false);
             StartCoroutine(TsinelasDismissRoutine(popT, popGroup, baseScale, true));
             yield break;
         }
 
-        // Timed out: fade away, then continue with the normal minimizing.
         yield return StartCoroutine(TsinelasDismissRoutine(popT, popGroup, baseScale, false));
     }
 
@@ -299,10 +290,6 @@ public class NumberSpinnerUI : MonoBehaviour
         tsinelasClicked = true;
     }
 
-    // -------------------------------------------------------------------
-    // Auto-built Tsinelas popup (only when you didn't assign your own)
-    // -------------------------------------------------------------------
-
     private void EnsureTsinelasPopup()
     {
         if (tsinelasPopup != null) return;
@@ -310,44 +297,37 @@ public class NumberSpinnerUI : MonoBehaviour
         Sprite circle = GetCircleSprite();
         float size = tsinelasPopupSize;
 
-        // Root: the clickable circle, sibling of the container so it doesn't move with the spinner
         GameObject root = new GameObject("TsinelasPopup", typeof(RectTransform));
         root.transform.SetParent(transform, false);
         RectTransform rootRt = (RectTransform)root.transform;
-        rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f); // center
+        rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
         rootRt.pivot = new Vector2(0.5f, 0.5f);
         rootRt.anchoredPosition = tsinelasPopupPosition;
         rootRt.sizeDelta = new Vector2(size, size);
         root.transform.SetAsLastSibling();
 
-        // Timer ring (drains)
         Image ring = NewImage("TimerRing", rootRt, circle, new Color(1f, 0.85f, 0.29f, 1f));
         Stretch(ring.rectTransform, 0f);
         ring.raycastTarget = false;
 
-        // Dark inner disc (this is also the button's graphic)
         Image disc = NewImage("Disc", rootRt, circle, new Color(0.12f, 0.1f, 0.16f, 0.95f));
         Stretch(disc.rectTransform, size * 0.06f);
 
-        // Tsinelas sprite
         Image icon = NewImage("Icon", rootRt, null, Color.white);
         Stretch(icon.rectTransform, size * 0.2f);
         icon.preserveAspect = true;
         icon.raycastTarget = false;
         icon.enabled = false;
 
-        // Word shown when there's no sprite
         tsinelasFallbackLabel = NewText("Fallback", rootRt, "TSINELAS", size * 0.16f, Color.white);
         Stretch(tsinelasFallbackLabel.rectTransform, size * 0.1f);
 
-        // "Tap to reroll!" above the circle
         tsinelasHintLabel = NewText("Hint", rootRt, "Tap to reroll!", size * 0.13f, new Color(1f, 0.85f, 0.29f, 1f));
         tsinelasHintLabel.rectTransform.anchorMin = tsinelasHintLabel.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         tsinelasHintLabel.rectTransform.pivot = new Vector2(0.5f, 0f);
         tsinelasHintLabel.rectTransform.anchoredPosition = new Vector2(0f, 8f);
         tsinelasHintLabel.rectTransform.sizeDelta = new Vector2(size * 1.6f, size * 0.25f);
 
-        // New enemy defence after a tap
         TextMeshProUGUI result = NewText("Result", rootRt, "", size * 0.13f, Color.white);
         result.rectTransform.anchorMin = result.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         result.rectTransform.pivot = new Vector2(0.5f, 0f);
@@ -416,7 +396,7 @@ public class NumberSpinnerUI : MonoBehaviour
             for (int x = 0; x < size; x++)
             {
                 float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(r, r));
-                float a = Mathf.Clamp01(r - d); // 1px soft edge
+                float a = Mathf.Clamp01(r - d);
                 px[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
             }
         }

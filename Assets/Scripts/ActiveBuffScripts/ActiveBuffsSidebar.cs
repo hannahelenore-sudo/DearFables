@@ -9,15 +9,6 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// The Active Buffs bar on the LEFT side of the screen (the Trinket bar is on the right).
-/// New look: the same hand-drawn ruled card as the Stats page of the GameMenu (b_gg.png).
-///   - Top of the card:  Sun / Wind / Speed numbers.
-///   - On the ruled lines: Moods, Boons, Blueprints, Trinkets, Advantage hit (always visible, no hovering needed).
-/// Click the little tab on the card's right edge to slide it in / out.
-/// Build it with  Tools > HUD > Create Active Buffs Bar  (delete the old bar first).
-/// It survives scene loads. If a scene contains a second copy, the copy deletes itself.
-/// </summary>
 public class ActiveBuffsSidebar : MonoBehaviour
 {
     [Serializable]
@@ -47,7 +38,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         [NonSerialized] public Coroutine flash;
     }
 
-    // ---------------- Setup (filled by the builder) ----------------
 
     [Header("Panel")]
     [Tooltip("The whole card (a 1920 x 1080 block like the PNG). It slides in and out to the left.")]
@@ -91,7 +81,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
     public Color statUpColor = new Color(0.1f, 0.6f, 0.2f);
     public Color statDownColor = new Color(0.8f, 0.15f, 0.15f);
 
-    // ---------------- Behaviour ----------------
 
     [Header("Behaviour")]
     public bool persistAcrossScenes = true;
@@ -109,17 +98,14 @@ public class ActiveBuffsSidebar : MonoBehaviour
     public AudioClip openSound;
     public AudioClip closeSound;
 
-    // ---------------- Static API ----------------
 
     public static ActiveBuffsSidebar Instance { get; private set; }
 
-    /// <summary>True while the mouse is over the card. Used to stop clicks leaking into the world.</summary>
     public static bool IsPointerOver
     {
         get { return Instance != null && Instance.PointerInside(); }
     }
 
-    // ---------------- State ----------------
 
     private Canvas canvas;
     private bool duplicate;
@@ -146,9 +132,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         return new Section[] { moodSection, boonsSection, trinketsSection, advantageSection, structureSection };
     }
 
-    // -------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------
 
     private void Awake()
     {
@@ -222,7 +205,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         player = null;
-        lastSignature = null; // rebuild the lines
+        lastSignature = null; 
         ApplySceneVisibility();
         EnsureEventSystem();
     }
@@ -253,11 +236,7 @@ public class ActiveBuffsSidebar : MonoBehaviour
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
     }
 
-    // -------------------------------------------------------------------
-    // Stat icons
-    // -------------------------------------------------------------------
 
-    // Same icons the GameMenu Stats card uses (Resources/MenuUI: Sun_Icon, Wind_Icon, Speed_Icon), if they exist
     private void FillMenuIcons()
     {
         Sprite[] all = Resources.LoadAll<Sprite>("MenuUI");
@@ -266,7 +245,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         FillIcon(moveSpeed, all, "Speed_Icon");
     }
 
-    // "Sun_Icon", "Sun Icon" and "sun-icon" all count as the same name
     private static string Norm(string s)
     {
         StringBuilder sb = new StringBuilder();
@@ -288,7 +266,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         }
     }
 
-    // Anything still without an icon is taken from the Trinket bar (where the stats used to be)
     private void BorrowIcons()
     {
         if (iconsBorrowed || TrinketSidebar.Instance == null) return;
@@ -306,7 +283,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         if (mine.icon.sprite == null) mine.icon.sprite = theirs.icon.sprite;
     }
 
-    // No sprite: hide the (white) icon box and show the small text label instead
     private static void SyncStatIcon(StatRow row)
     {
         if (row == null) return;
@@ -316,9 +292,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
             row.fallbackLabel.gameObject.SetActive(!has);
     }
 
-    // -------------------------------------------------------------------
-    // Open / close
-    // -------------------------------------------------------------------
 
     public void Toggle()
     {
@@ -338,13 +311,11 @@ public class ActiveBuffsSidebar : MonoBehaviour
         if (toggleArrow != null) toggleArrow.text = open ? "<" : ">";
     }
 
-    // Open: the drawn card's left edge sits on the screen's left edge
     private float OpenX
     {
         get { return slideRoot != null ? -cardLeft * slideRoot.localScale.x : 0f; }
     }
 
-    // Closed: the whole drawn card is off screen, only the tab stays visible
     private float ClosedX
     {
         get { return slideRoot != null ? -cardRight * slideRoot.localScale.x : 0f; }
@@ -368,9 +339,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         slideRoot.anchoredPosition = p;
     }
 
-    // -------------------------------------------------------------------
-    // Buff data
-    // -------------------------------------------------------------------
 
     private void RefreshBuffs()
     {
@@ -380,7 +348,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         RebuildData();
     }
 
-    // Everything the card shows, as one string: the lines are only rebuilt when it changes
     private string BuildSignature()
     {
         StringBuilder sb = new StringBuilder(96);
@@ -410,13 +377,11 @@ public class ActiveBuffsSidebar : MonoBehaviour
         for (int i = 0; i < all.Length; i++)
             if (all[i] != null) all[i].data.Clear();
 
-        // Mood
         if (!MoodManager.IsNeutral)
         {
             int power = MoodManager.PowerBonus;
             if (power != 0)
             {
-                // "+50 Power to all Power types"
                 AddRow(moodSection, Signed(power) + " Sun");
                 AddRow(moodSection, Signed(power) + " Wind");
             }
@@ -430,12 +395,10 @@ public class ActiveBuffsSidebar : MonoBehaviour
             if (left > 0) AddRow(moodSection, left + (left == 1 ? " fight left" : " fights left"));
         }
 
-        // Boons
         if (BoonProgress.BonusWindPower > 0) AddRow(boonsSection, Signed(BoonProgress.BonusWindPower) + " Wind");
         if (BoonProgress.ExtraHands > 0) AddRow(boonsSection, Signed(BoonProgress.ExtraHands) + " Hand");
         if (BoonProgress.ExtraHandSize > 0) AddRow(boonsSection, Signed(BoonProgress.ExtraHandSize) + " Hand Size");
 
-        // Blueprint Shop structure (falls back to the Boons line if there is no Blueprint line on the card)
         if (StructureProgress.IsBuilt)
         {
             StructureType st = StructureProgress.Current;
@@ -458,12 +421,10 @@ public class ActiveBuffsSidebar : MonoBehaviour
             if (sMult > 0f) AddRow(ss, "+" + sMult.ToString("0.##") + " " + StructureProgress.CardName(st) + " Set Mult");
         }
 
-        // Trinkets: only the stat values they give. A trinket without stats adds nothing.
         IReadOnlyList<TrinketData> owned = TrinketInventory.Owned;
         for (int i = 0; i < owned.Count; i++)
             if (owned[i] != null) AddTrinketStats(owned[i]);
 
-        // Advantage Hit
         if (AdvantageHit.IsActive)
             AddRow(advantageSection, "-" + Mathf.RoundToInt(AdvantageHit.Reduction * 100f) + "% Score");
 
@@ -481,9 +442,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         s.data.Add(text);
     }
 
-    // -------------------------------------------------------------------
-    // Writing the card's lines
-    // -------------------------------------------------------------------
 
     private static string Prefix(Section s)
     {
@@ -506,7 +464,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         s.text.text = Prefix(s) + body;
     }
 
-    // Trinkets can be many: they are packed onto the first line and then the extra ruled lines
     private void SetTrinketLines()
     {
         Section s = trinketsSection;
@@ -548,7 +505,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
             lines.Add(current);
         }
 
-        // more than fits: cut the last visible line short
         if (lines.Count > slots.Count)
         {
             lines.RemoveRange(slots.Count, lines.Count - slots.Count);
@@ -559,12 +515,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
             slots[i].text = i < lines.Count ? lines[i] : "";
     }
 
-    // -------------------------------------------------------------------
-    // Trinket stats
-    // -------------------------------------------------------------------
-
-    // Reads every number field on the trinket (except the ones in 'ignoredTrinketFields') and lists the ones that are not 0.
-    // Fields with "sun" / "wind" in the name are written as "Sun" / "Wind".
     private void AddTrinketStats(TrinketData t)
     {
         if (trinketFields == null) trinketFields = FindTrinketFields();
@@ -616,7 +566,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         return false;
     }
 
-    // "bonusWindPower" / "_bonusWindPower" -> "Bonus Wind Power"
     private static string Prettify(string fieldName)
     {
         string n = fieldName.TrimStart('_');
@@ -631,9 +580,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         return sb.ToString();
     }
 
-    // -------------------------------------------------------------------
-    // Stats
-    // -------------------------------------------------------------------
 
     private void CaptureStat(StatRow row)
     {
@@ -642,7 +588,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         row.baseScale = row.valueText.transform.localScale;
     }
 
-    // The power cards' current value: base value + boons + mood. Always shown, even with no buff active.
     private float GetSun()
     {
         if (sunCard == null && Time.unscaledTime >= nextCardSearch)
@@ -677,7 +622,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
             player = UnityEngine.Object.FindAnyObjectByType<PlayerMovement>();
         }
 
-        // In scenes without a player (the card scene) the last known value is kept
         if (player != null)
         {
             bool run = TrinketSidebar.Instance != null && TrinketSidebar.Instance.speedShows == TrinketSidebar.SpeedStat.Run;
@@ -703,7 +647,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         row.last = value;
         row.valueText.text = value.ToString("0.##");
 
-        // Same sounds as the Trinket bar used for stat changes
         TrinketSidebar t = TrinketSidebar.Instance;
         if (t != null)
         {
@@ -733,9 +676,6 @@ public class ActiveBuffsSidebar : MonoBehaviour
         row.flash = null;
     }
 
-    // -------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------
 
     private bool Over(RectTransform r)
     {

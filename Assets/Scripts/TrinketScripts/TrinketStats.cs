@@ -2,29 +2,17 @@ using System;
 using System.Reflection;
 using UnityEngine;
 
-/// <summary>
-/// Where the sidebar reads the Sun Power / Wind Power numbers from.
-/// If your boons store them somewhere else, change the two properties below - nothing else needs touching.
-/// </summary>
 public static class TrinketStats
 {
-    /// <summary>Permanent Wind Power (from the Choose Your Boon screen).</summary>
     public static float WindPower
     {
         get { return BoonProgress.BonusWindPower + CardData.DebugWindPower; }
     }
 
-    /// <summary>
-    /// Permanent Sun Power. I couldn't see a Sun boon in the scripts I was given, so this looks for a
-    /// BoonProgress member called BonusSunPower / BonusSolarPower and shows 0 if there is none.
-    /// Replace this with your real value if it lives elsewhere.
-    /// </summary>
     public static float SunPower
     {
         get { return ReadBoon("BonusSunPower", "BonusSolarPower", "BonusSunnyPower") + CardData.DebugSunPower; }
     }
-
-    // ---------------------------------------------------------------
 
     private static MemberInfo sunMember;
     private static bool searched;

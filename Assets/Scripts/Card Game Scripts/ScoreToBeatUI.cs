@@ -64,7 +64,6 @@ public class ScoreToBeatUI : MonoBehaviour
         if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
     }
 
-    /// <param name="originalScore">If bigger than targetScore, the Advantage Hit animation plays: the score reels up to this number, the screen dims with the -10% text, then the score drops to targetScore.</param>
     public void StartSequence(int targetScore, System.Action onComplete = null, int originalScore = 0)
     {
         if (currentRoutine != null) StopCoroutine(currentRoutine);
@@ -95,11 +94,11 @@ public class ScoreToBeatUI : MonoBehaviour
     private IEnumerator PlaySequenceRoutine(int targetScore, System.Action onComplete, int originalScore)
     {
         bool advantage = originalScore > targetScore;
-        int reelTarget = advantage ? originalScore : targetScore; // with the advantage it reels up to the full score first
+        int reelTarget = advantage ? originalScore : targetScore;
 
         if (canvasGroup != null) canvasGroup.alpha = 1f;
 
-        if (headerText != null) headerText.text = "SCORE TO BEAT"; // Keep the header text during the animation
+        if (headerText != null) headerText.text = "SCORE TO BEAT";
         if (scoreText != null) scoreText.text = "1";
 
         float elapsed = 0f;
@@ -134,8 +133,6 @@ public class ScoreToBeatUI : MonoBehaviour
         onComplete?.Invoke();
     }
 
-    // The screen dims down (blue tint), "ADVANTAGE HIT!  -10%" pops in and holds,
-    // then the dim and the text fade away while the score drops from the full number to the reduced one.
     private IEnumerator AdvantageRoutine(int from, int to)
     {
         yield return new GameSpeedWait(advantageDelay);
@@ -150,7 +147,6 @@ public class ScoreToBeatUI : MonoBehaviour
 
         if (advantageSound != null) GameSFX.Play(advantageSound, advantageVolume, 1f);
 
-        // 1. Dim down with the blue tint
         if (dim != null)
         {
             dim.gameObject.SetActive(true);
@@ -163,14 +159,13 @@ public class ScoreToBeatUI : MonoBehaviour
                 e += GameSpeed.DeltaTime;
                 float s = Smooth(e / dur);
                 SetDimAlpha(dim, dimAmount * s);
-                SetScoreAreaAlpha(headerBase, scoreBase, Mathf.Lerp(1f, scoreDimmedAlpha, s)); // the Score To Beat text dims with the screen
+                SetScoreAreaAlpha(headerBase, scoreBase, Mathf.Lerp(1f, scoreDimmedAlpha, s));
                 yield return null;
             }
             SetDimAlpha(dim, dimAmount);
             SetScoreAreaAlpha(headerBase, scoreBase, scoreDimmedAlpha);
         }
 
-        // 2. "ADVANTAGE HIT!" then the big "-10%" pop in
         if (label != null)
         {
             label.text = "ADVANTAGE HIT!";
@@ -191,7 +186,6 @@ public class ScoreToBeatUI : MonoBehaviour
 
         yield return new GameSpeedWait(advantageHoldDuration);
 
-        // 3. Fade everything away and drop the score at the same time
         RectTransform scoreRect = scoreText != null ? scoreText.rectTransform : null;
 
         float fadeDur = Mathf.Max(0.01f, advantageFadeOutDuration);
@@ -209,15 +203,14 @@ public class ScoreToBeatUI : MonoBehaviour
             FadeLabel(label, advantageColor, fade, 1f + 0.08f * f);
             FadeLabel(percentLabel, advantageColor, fade, 1f + 0.25f * f);
 
-            // the Score To Beat text comes back up (in the green drop colour) as the dim goes away
             SetScoreAreaAlpha(headerBase, reductionColor, Mathf.Lerp(scoreDimmedAlpha, 1f, f));
 
             if (scoreText != null)
             {
                 float p = Mathf.Clamp01(t / countDur);
-                float eased = 1f - (1f - p) * (1f - p) * (1f - p); // fast at first, settles at the end
+                float eased = 1f - (1f - p) * (1f - p) * (1f - p);
                 scoreText.text = Mathf.RoundToInt(Mathf.Lerp(from, to, eased)).ToString();
-                scoreRect.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 60f) * 4f * (1f - p)); // shakes while it drops
+                scoreRect.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 60f) * 4f * (1f - p));
             }
             yield return null;
         }
@@ -234,7 +227,6 @@ public class ScoreToBeatUI : MonoBehaviour
 
             yield return StartCoroutine(PopAndWiggleRoutine());
 
-            // colour settles back to normal instead of snapping
             float c = 0f;
             while (c < 0.25f)
             {
@@ -252,7 +244,6 @@ public class ScoreToBeatUI : MonoBehaviour
         return x * x * (3f - 2f * x);
     }
 
-    // Header and score at a fraction of their normal opacity
     private void SetScoreAreaAlpha(Color headerColor, Color scoreColor, float multiplier)
     {
         if (headerText != null)
@@ -285,7 +276,6 @@ public class ScoreToBeatUI : MonoBehaviour
         label.rectTransform.localScale = Vector3.one * scale;
     }
 
-    // Scales from 0 with a little overshoot
     private IEnumerator PopIn(RectTransform r, float duration)
     {
         r.localScale = Vector3.zero;
@@ -301,21 +291,20 @@ public class ScoreToBeatUI : MonoBehaviour
         r.localScale = Vector3.one;
     }
 
-    // A full-screen tinted image behind the score. Made automatically the first time it is needed.
     private Image GetDimOverlay()
     {
         if (dimOverlay != null) return dimOverlay;
 
         GameObject go = new GameObject("AdvantageDim", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
         go.transform.SetParent(transform, false);
-        go.transform.SetAsFirstSibling(); // behind the score and the texts
+        go.transform.SetAsFirstSibling();
 
         go.GetComponent<LayoutElement>().ignoreLayout = true;
 
         RectTransform r = go.GetComponent<RectTransform>();
         r.anchorMin = r.anchorMax = r.pivot = new Vector2(0.5f, 0.5f);
         r.anchoredPosition = Vector2.zero;
-        r.sizeDelta = new Vector2(8000f, 8000f); // bigger than any screen, so it always covers everything
+        r.sizeDelta = new Vector2(8000f, 8000f);
 
         dimOverlay = go.GetComponent<Image>();
         dimOverlay.raycastTarget = false;
@@ -325,31 +314,26 @@ public class ScoreToBeatUI : MonoBehaviour
         return dimOverlay;
     }
 
-    // Uses the assigned text, or makes one under the score from a copy of the header
     private TextMeshProUGUI GetAdvantageText()
     {
         if (advantageText != null) return advantageText;
         if (headerText == null || scoreText == null) return null;
 
-        // A fresh text (NOT a copy of the header: the header object may have the score as a child)
         float labelSize = headerText.fontSize * 0.9f;
         float percentSize = headerText.fontSize * percentTextScale;
         advantageText = MakeText("AdvantageText", labelSize);
 
-        // centred on the Score To Beat, just above the big "-10%"
         float y = percentSize * 0.5f + labelSize * 0.5f;
         advantageText.rectTransform.localPosition = ScoreCentre(advantageText.rectTransform) + new Vector3(0f, y, 0f);
         return advantageText;
     }
 
-    // Centre of the score, in the local space of the texts' parent
     private Vector3 ScoreCentre(RectTransform r)
     {
         RectTransform s = scoreText.rectTransform;
         return r.parent.InverseTransformPoint(s.TransformPoint(s.rect.center));
     }
 
-    // Same look as the header (font, material, style), but its own object
     private TextMeshProUGUI MakeText(string objectName, float size)
     {
         GameObject go = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
@@ -379,7 +363,6 @@ public class ScoreToBeatUI : MonoBehaviour
         return t;
     }
 
-    // Uses the assigned text, or makes a big one under the "ADVANTAGE HIT!" text
     private TextMeshProUGUI GetPercentText(TextMeshProUGUI label)
     {
         if (advantagePercentText != null) return advantagePercentText;
@@ -387,7 +370,6 @@ public class ScoreToBeatUI : MonoBehaviour
 
         advantagePercentText = MakeText("AdvantagePercentText", headerText.fontSize * percentTextScale);
 
-        // centred on the Score To Beat (the "ADVANTAGE HIT!" text sits just above it)
         advantagePercentText.rectTransform.localPosition = ScoreCentre(advantagePercentText.rectTransform);
         return advantagePercentText;
     }

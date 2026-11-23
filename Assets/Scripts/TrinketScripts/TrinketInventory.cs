@@ -2,11 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Every trinket the player owns (max 5). The ORDER matters: effects trigger from the top (index 0)
-/// to the bottom, like Balatro jokers. Session only (like BoonProgress): it survives scene loads
-/// but is wiped when the game is closed.
-/// </summary>
 public static class TrinketInventory
 {
     public const int MaxTrinkets = 5;
@@ -17,10 +12,9 @@ public static class TrinketInventory
 
     public static bool IsFull => owned.Count >= MaxTrinkets;
 
-    // The sidebar listens to these to animate things
-    public static event Action<int> Added;        // index it was added at
-    public static event Action<int> Removed;      // index it was removed from
-    public static event Action<int, int> Moved;   // from, to
+    public static event Action<int> Added;
+    public static event Action<int> Removed;
+    public static event Action<int, int> Moved;
     public static event Action Cleared;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -29,7 +23,6 @@ public static class TrinketInventory
         owned.Clear();
     }
 
-    /// <summary>Returns false (and adds nothing) when the inventory is full.</summary>
     public static bool Add(TrinketData trinket)
     {
         if (trinket == null || IsFull) return false;
@@ -45,7 +38,6 @@ public static class TrinketInventory
         if (Removed != null) Removed(index);
     }
 
-    /// <summary>Changes the trigger order: takes the trinket at 'from' and puts it at 'to'.</summary>
     public static void Move(int from, int to)
     {
         if (from < 0 || from >= owned.Count) return;

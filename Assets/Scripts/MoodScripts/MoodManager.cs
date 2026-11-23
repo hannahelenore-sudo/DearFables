@@ -1,13 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// The player's current mood. Static, so it survives scene loads; session only (wiped when the game closes).
-/// Mood assets are read from Resources/Moods (Neutral, SugarRush, Angry) so editing the assets changes the game everywhere.
-/// If an asset is missing, built-in defaults are used.
-///
-/// From your own scripts:  MoodManager.Set(MoodManager.Angry);   MoodManager.Clear();
-/// </summary>
 public static class MoodManager
 {
     private static MoodData neutral, sugarRush, angry;
@@ -15,7 +8,6 @@ public static class MoodManager
     private static int fightsLeft;
     private static int candiesGathered;
 
-    /// <summary>Fires whenever the mood or its remaining fights change.</summary>
     public static event Action Changed;
 
     public static MoodData Neutral { get { return neutral != null ? neutral : (neutral = Load("Neutral")); } }
@@ -25,12 +17,10 @@ public static class MoodManager
     public static MoodData Current { get { return current != null ? current : Neutral; } }
     public static bool IsNeutral { get { return Current.isNeutral; } }
 
-    /// <summary>Fights left for the current mood. 0 = no limit (or neutral).</summary>
     public static int FightsLeft { get { return fightsLeft; } }
 
     public static int CandiesGathered { get { return candiesGathered; } }
 
-    // ---- What the current mood does (read by BattleManager / DeckManager / cards) ----
     public static float ScoreMultiplier { get { float m = Current.scoreMultiplier; return m > 0f ? m : 1f; } }
     public static int PowerBonus { get { return Current.powerBonus; } }
     public static int HandsModifier { get { return Current.handsModifier; } }
@@ -76,7 +66,6 @@ public static class MoodManager
         if (had && Changed != null) Changed();
     }
 
-    /// <summary>Call when a fight finishes (win or lose). Counts down timed moods.</summary>
     public static void OnFightEnded()
     {
         if (IsNeutral || fightsLeft <= 0) return;
@@ -86,7 +75,6 @@ public static class MoodManager
         else if (Changed != null) Changed();
     }
 
-    /// <summary>Call when the player gathers a candy. Returns true when it started Sugar Rush.</summary>
     public static bool AddCandy()
     {
         candiesGathered++;

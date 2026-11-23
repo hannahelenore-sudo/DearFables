@@ -3,33 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// A card the player walks into to pick up.
-///
-/// While this object is in the scene and has NOT been picked up:
-///   - the Card Shooter (and anything else you list) is disabled
-///   - the Boon Meter UI (and anything else you list) is hidden
-///   - fights do not fill the boon meter (see the BoonProgress.AddMeter change)
-///
-/// When the player touches it, all of that is switched on and the boon meter is revealed.
-/// The pickup is remembered for the play session (static, like BoonProgress), so after a card
-/// battle the overworld loads with everything already unlocked and this object removes itself.
-/// If you delete this object from the scene, nothing is locked and the game behaves as before.
-///
-/// Setup: put this on an object with a sprite/model and a Collider (a trigger Sphere Collider is
-/// added automatically if there is none). The Player needs the tag "Player" and a Rigidbody or
-/// CharacterController, as usual for trigger events.
-/// </summary>
 public class CardPickup : MonoBehaviour
 {
-    // -------------------------------------------------------------------
-    // Session state (survives scene loads, not saved to disk)
-    // -------------------------------------------------------------------
 
-    /// <summary>True once the player has picked the card up.</summary>
     public static bool Collected { get; private set; }
 
-    /// <summary>True while a pickup exists that has not been collected yet. Boon/shooter stay off.</summary>
     public static bool Locked { get; private set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -38,16 +16,11 @@ public class CardPickup : MonoBehaviour
         ResetAll();
     }
 
-    /// <summary>Call from your "New Game" button (next to BoonProgress.ResetAll()).</summary>
     public static void ResetAll()
     {
         Collected = false;
         Locked = false;
     }
-
-    // -------------------------------------------------------------------
-    // Inspector
-    // -------------------------------------------------------------------
 
     [Header("Boon system (drag it in here)")]
     [Tooltip("Drag in everything that makes up the boon system (the Boon Meter UI, its canvas, the boon stuff in your scene). All of it is switched OFF while the card is still lying there and switched ON when the player picks the card up. Leave empty to auto-find the Boon Meter UI.")]
@@ -117,7 +90,6 @@ public class CardPickup : MonoBehaviour
     private bool taken;
     private float questDoneTimer;
 
-    // highlight runtime
     private GameObject hlRoot;
     private TutorialSpotlightGraphic hlSpot;
     private float hlTimer;
@@ -126,13 +98,8 @@ public class CardPickup : MonoBehaviour
     private readonly List<Rect> hlHoles = new List<Rect>(1);
     private readonly Vector3[] hlCorners = new Vector3[8];
 
-    // -------------------------------------------------------------------
-    // Unity
-    // -------------------------------------------------------------------
-
     private void Awake()
     {
-        // Already picked up earlier in this session (e.g. back from a battle): nothing to lock
         if (Collected)
         {
             Destroy(gameObject);
@@ -143,7 +110,6 @@ public class CardPickup : MonoBehaviour
 
         if (cardShooter == null) cardShooter = FindAnyObjectByType<CardShooter>();
 
-        // Everything dragged into Boon System is locked together with Objects To Hide
         if (boonSystem != null && boonSystem.Length > 0)
         {
             var merged = new List<GameObject>();
@@ -153,8 +119,6 @@ public class CardPickup : MonoBehaviour
             objectsToHide = merged.ToArray();
         }
 
-        // Nothing assigned at all: hide the whole boon meter automatically. The BoonMeterUI script often sits on
-        // a small object next to the Container / Liquid images (not above them), so every visual it points at is collected too.
         if (objectsToHide == null || objectsToHide.Length == 0)
         {
             BoonMeterUI meter = FindAnyObjectByType<BoonMeterUI>();
@@ -219,10 +183,6 @@ public class CardPickup : MonoBehaviour
         StartCoroutine(CollectRoutine());
     }
 
-    // -------------------------------------------------------------------
-    // Collect
-    // -------------------------------------------------------------------
-
     private void CheckQuestUnlock()
     {
         if (string.IsNullOrEmpty(unlockWhenQuestDone) || !StarQuestProgress.IsDone(unlockWhenQuestDone)) return;
@@ -236,7 +196,6 @@ public class CardPickup : MonoBehaviour
         Collect();
     }
 
-    /// <summary>Gives the card to the player right now (used by CardGiverNPC). Does nothing if already collected.</summary>
     public void Collect()
     {
         if (taken) return;
@@ -253,13 +212,11 @@ public class CardPickup : MonoBehaviour
         if (pickupSound != null)
             GameSFX.Play(pickupSound, pickupVolume, 1f);
 
-        // Hide the pickup itself right away
         foreach (Renderer r in GetComponentsInChildren<Renderer>()) r.enabled = false;
         foreach (Collider c in GetComponentsInChildren<Collider>()) c.enabled = false;
 
         SetLocked(false);
 
-        // Pop the revealed objects in (BoonMeterUI also starts its own fill animation when it is enabled)
         if (objectsToHide != null && revealPopDuration > 0f)
         {
             var targets = new System.Collections.Generic.List<Transform>();
@@ -278,7 +235,6 @@ public class CardPickup : MonoBehaviour
                 elapsed += Time.unscaledDeltaTime;
                 float t = Mathf.Clamp01(elapsed / revealPopDuration);
 
-                // ease out back
                 const float c1 = 1.70158f;
                 const float c3 = c1 + 1f;
                 float eased = 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
@@ -293,7 +249,6 @@ public class CardPickup : MonoBehaviour
                 if (targets[i] != null) targets[i].localScale = baseScales[i];
         }
 
-        // Boon UI is now revealed: explain how everything works (only ever started from here)
         if (playTutorial)
         {
             if (tutorial == null) tutorial = FindAnyObjectByType<IntroCutscene>(FindObjectsInactive.Include);
@@ -304,12 +259,10 @@ public class CardPickup : MonoBehaviour
             }
             else
             {
-                // The cutscene object may start disabled (like for the NPC), so make sure it is active
                 if (!tutorial.gameObject.activeSelf) tutorial.gameObject.SetActive(true);
 
                 if (tutorial.TryPlayCutscene(tutorialId))
                 {
-                    // Stay alive (hidden) until it closes
                     while (tutorial != null && tutorial.IsPlaying) yield return null;
                 }
             }
@@ -317,10 +270,6 @@ public class CardPickup : MonoBehaviour
 
         Destroy(gameObject);
     }
-
-    // -------------------------------------------------------------------
-    // Highlight (dim + lit-up cut-out + frame, like CardGameTutorial)
-    // -------------------------------------------------------------------
 
     private void UpdateHighlight()
     {
@@ -332,7 +281,6 @@ public class CardPickup : MonoBehaviour
             return;
         }
 
-        // Don't compete with a cutscene: wait until it is over
         if (!hlLookedForCutscene)
         {
             hlLookedForCutscene = true;
@@ -360,7 +308,7 @@ public class CardPickup : MonoBehaviour
 
         if (!TryGetScreenRect(out Rect rect))
         {
-            SetHighlightVisible(false); // card is off screen / behind the camera
+            SetHighlightVisible(false);
             return;
         }
 
@@ -401,14 +349,12 @@ public class CardPickup : MonoBehaviour
         canvas.overrideSorting = true;
         canvas.sortingOrder = overlaySortingOrder;
 
-        // Same canvas setup as the tutorial overlay so the cut-out lines up the same way
         CanvasScaler scaler = hlRoot.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
 
-        // No GraphicRaycaster and raycastTarget off: the player can keep walking / clicking underneath
         GameObject dimGo = new GameObject("Dim", typeof(RectTransform), typeof(CanvasRenderer));
         dimGo.transform.SetParent(hlRoot.transform, false);
         RectTransform dimRt = dimGo.GetComponent<RectTransform>();
@@ -419,7 +365,6 @@ public class CardPickup : MonoBehaviour
         hlSpot.raycastTarget = false;
     }
 
-    /// <summary>Screen-space box around the card (it bobs and spins, so this is recalculated every frame).</summary>
     private bool TryGetScreenRect(out Rect rect)
     {
         rect = default;
@@ -464,10 +409,6 @@ public class CardPickup : MonoBehaviour
         rect = Rect.MinMaxRect(minX, minY, maxX, maxY);
         return true;
     }
-
-    // -------------------------------------------------------------------
-    // Lock / unlock
-    // -------------------------------------------------------------------
 
     private static void AddUnique(List<GameObject> list, GameObject go)
     {

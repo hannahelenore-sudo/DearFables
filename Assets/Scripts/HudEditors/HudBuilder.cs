@@ -5,26 +5,19 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Must live in a folder named "Editor".
-// Builds the mood circle, the battery counter, the health cards, the mood assets and the battery pickup,
-// so you can "set it down" and just change the sprites / assets.
 public static class HudBuilder
 {
     private const string MoodFolder = "Assets/Resources/Moods";
     private const string PrefabFolder = "Assets/Prefabs";
     private const string PickupPath = "Assets/Prefabs/BatteryPickup.prefab";
 
-    // ------------------------------------------------------------------
-    // Tools > HUD > Create Player HUD
-    // ------------------------------------------------------------------
     [MenuItem("Tools/HUD/Create Player HUD")]
     public static void CreatePlayerHUD()
     {
-        CreateMoodAssets(false); // so the moods can be edited right away
+        CreateMoodAssets(false); 
 
         Sprite knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
 
-        // Canvas
         GameObject canvasGO = new GameObject("PlayerHUDCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
         Undo.RegisterCreatedObjectUndo(canvasGO, "Create Player HUD");
         Canvas canvas = canvasGO.GetComponent<Canvas>();
@@ -36,14 +29,12 @@ public static class HudBuilder
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
 
-        // Everything sits in one block in the top-left corner. Move / scale "PlayerHUD" to place it.
         GameObject hud = NewUI("PlayerHUD", canvasGO.transform);
         RectTransform hr = hud.GetComponent<RectTransform>();
         hr.anchorMin = hr.anchorMax = hr.pivot = new Vector2(0f, 1f);
         hr.sizeDelta = new Vector2(520f, 300f);
         hr.anchoredPosition = new Vector2(30f, -30f);
 
-        // ---------------- Mood circle ----------------
         GameObject mood = NewUI("MoodCircle", hud.transform);
         PlaceTL(mood, new Vector2(0f, 0f), new Vector2(190f, 190f));
         Image ring = AddImage(mood, Color.black);
@@ -88,7 +79,6 @@ public static class HudBuilder
         moodHud.fightsText = badgeText;
         moodHud.popupText = popup;
 
-        // ---------------- Health cards ----------------
         GameObject health = NewUI("HealthCards", hud.transform);
         PlaceTL(health, new Vector2(215f, 0f), new Vector2(330f, 100f));
 
@@ -107,7 +97,6 @@ public static class HudBuilder
         HealthCardsHUD healthHud = health.AddComponent<HealthCardsHUD>();
         healthHud.cards = cards;
 
-        // ---------------- Batteries ----------------
         GameObject battery = NewUI("Batteries", hud.transform);
         PlaceTL(battery, new Vector2(150f, 185f), new Vector2(250f, 80f));
 
@@ -128,7 +117,6 @@ public static class HudBuilder
         batteryHud.countText = count;
         batteryHud.icon = iconGO.GetComponent<RectTransform>();
 
-        // ---------------- Stars + stamina ----------------
         BuildStarCounter(hud.transform);
         BuildStaminaBar(hud.transform);
 
@@ -137,9 +125,6 @@ public static class HudBuilder
                   "Each mood's own face is set on its asset in Assets/Resources/Moods.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > HUD > Create Mood Assets
-    // ------------------------------------------------------------------
     [MenuItem("Tools/HUD/Create Mood Assets")]
     public static void CreateMoodAssetsMenu()
     {
@@ -176,9 +161,6 @@ public static class HudBuilder
         if (created > 0) Debug.Log("Created " + created + " mood asset(s) in " + MoodFolder + ". Click one to change its numbers or give it a portrait.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > Battery > Create Battery Pickup Prefab
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Battery/Create Battery Pickup Prefab")]
     public static void CreatePickupPrefabMenu()
     {
@@ -207,9 +189,6 @@ public static class HudBuilder
         return prefab;
     }
 
-    // ------------------------------------------------------------------
-    // Tools > Battery > Create Battery Drops (Game Scene)
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Battery/Create Battery Drops (Game Scene)")]
     public static void CreateSceneDropper()
     {
@@ -225,9 +204,6 @@ public static class HudBuilder
         Debug.Log("'BatteryDrops' created. Put this in the scene the player returns to after a fight: batteries you win drop where the fight started.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > Battery > Add Dropper To Selected Enemy
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Battery/Add Dropper To Selected Enemy")]
     public static void AddDropperToSelection()
     {
@@ -248,10 +224,6 @@ public static class HudBuilder
         Debug.Log("Added a Battery Dropper. Call GetComponent<BatteryDropper>().Drop() from the enemy's defeat code.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > HUD > Add Star Counter + Stamina Bar To Existing HUD
-    // For a HUD you already built and put sprites on: adds the new parts without rebuilding.
-    // ------------------------------------------------------------------
     [MenuItem("Tools/HUD/Add Star Counter + Stamina Bar To Existing HUD")]
     public static void AddStarAndStaminaToExisting()
     {
@@ -268,7 +240,6 @@ public static class HudBuilder
         if (t.Find("StaminaBar") == null)
             Undo.RegisterCreatedObjectUndo(BuildStaminaBar(t), "Add Stamina Bar");
 
-        // Make room for the star counter: the battery counter slides right of it
         Transform battery = t.Find("Batteries");
         if (battery != null)
         {
@@ -304,9 +275,8 @@ public static class HudBuilder
         StarCounterUI ui = stars.AddComponent<StarCounterUI>();
         ui.starCountText = count;
         ui.starIcon = iconGO.transform;
-        ui.prefix = ""; // just the number, like the mockup
+        ui.prefix = ""; 
 
-        // Let the StarManager update this same text when a star is picked up
         StarManager manager = Object.FindAnyObjectByType<StarManager>();
         if (manager != null && manager.starCounterText == null)
         {
@@ -333,7 +303,6 @@ public static class HudBuilder
         Image backImg = AddImage(back, new Color(0.04f, 0.16f, 0.2f));
         backImg.raycastTarget = false;
 
-        // The fill is shrunk from the right by StaminaBarHUD (anchorMax.x = stamina)
         GameObject fillGO = NewUI("Fill", back.transform);
         Stretch(fillGO);
         Image fillImg = AddImage(fillGO, new Color(0.25f, 0.95f, 1f));
@@ -347,9 +316,6 @@ public static class HudBuilder
         return bar;
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private static void EnsureFolder(string parent, string name)
     {
@@ -373,7 +339,6 @@ public static class HudBuilder
         r.offsetMax = Vector2.zero;
     }
 
-    // Anchored to the middle of its parent
     private static void SetCenter(GameObject go, Vector2 anchoredPos, Vector2 size)
     {
         RectTransform r = go.GetComponent<RectTransform>();
@@ -382,7 +347,6 @@ public static class HudBuilder
         r.anchoredPosition = anchoredPos;
     }
 
-    // Positioned from the top-left corner of its parent (x right, y DOWN)
     private static void PlaceTL(GameObject go, Vector2 posFromTopLeft, Vector2 size)
     {
         RectTransform r = go.GetComponent<RectTransform>();

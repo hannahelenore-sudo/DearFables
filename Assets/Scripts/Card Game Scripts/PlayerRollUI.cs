@@ -276,8 +276,6 @@ public class PlayerRollUI : MonoBehaviour
         int lastDisplay = -1;
         float nextTickTime = 0f;
 
-        // Frame-based timing (no fixed waits) so the spin stays smooth at any frame rate,
-        // and the flips slow down a little toward the end so the number settles instead of snapping.
         while (elapsedTime < spinDuration)
         {
             if (elapsedTime >= nextTickTime)
@@ -318,7 +316,6 @@ public class PlayerRollUI : MonoBehaviour
 
         hasRolledThisRound = true;
 
-        // Stop making new confetti, but let what's already falling (and the spinning shield) fade out with the screen
         if (confettiRoutine != null)
         {
             StopCoroutine(confettiRoutine);
@@ -343,7 +340,7 @@ public class PlayerRollUI : MonoBehaviour
         if (maxRoll <= minRoll || last < minRoll || last > maxRoll)
             return Random.Range(minRoll, maxRoll + 1);
 
-        int v = Random.Range(minRoll, maxRoll); // never the same number twice in a row
+        int v = Random.Range(minRoll, maxRoll);
         if (v >= last) v++;
         return v;
     }
@@ -440,7 +437,7 @@ public class PlayerRollUI : MonoBehaviour
         {
             elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
-            float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f); // easeOutBack
+            float overshoot = 1f + 1.70158f * Mathf.Pow(t - 1f, 3f) + 1.70158f * Mathf.Pow(t - 1f, 2f);
             rt.localScale = initialNotificationScale * overshoot;
             yield return null;
         }
@@ -497,7 +494,7 @@ public class PlayerRollUI : MonoBehaviour
         {
             elapsed += GameSpeed.DeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
-            float fall = Mathf.Lerp(t, t * t, 0.5f); // starts gently, picks up speed like it's falling
+            float fall = Mathf.Lerp(t, t * t, 0.5f);
 
             float currentY = Mathf.Lerp(startY, endY, fall);
             float currentX = startX + Mathf.Sin(t * Mathf.PI * swaySpeed) * swayAmount;
@@ -528,7 +525,7 @@ public class PlayerRollUI : MonoBehaviour
         while (playerShieldImage != null)
         {
             spinTime += GameSpeed.DeltaTime;
-            float ramp = Smooth(spinTime / 0.6f); // speeds up smoothly instead of starting at full speed
+            float ramp = Smooth(spinTime / 0.6f);
             currentShieldZRotation -= 120f * ramp * GameSpeed.DeltaTime;
             playerShieldImage.rectTransform.localRotation = Quaternion.Euler(0, 0, currentShieldZRotation);
 

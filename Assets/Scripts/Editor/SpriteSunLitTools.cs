@@ -2,15 +2,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
-/// <summary>
-/// Put this on an empty GameObject in your scene (e.g. "SunLitManager") and drag
-/// the SpriteSunLit material into the Material slot.
-/// Every half second it makes sure that:
-///  - every SpriteRenderer uses the sun-lit material (including things spawned after Play starts)
-///  - every TilemapRenderer uses a ground version of it (no rim outline on tile borders)
-///  - sprites/tilemaps/meshes receive shadows; sprites cast them
-/// Anything with a custom material (e.g. your glowing card) keeps its material.
-/// </summary>
 public class SunLitSpriteManager : MonoBehaviour
 {
     public Material sunLitMaterial;
@@ -71,13 +62,11 @@ public class SunLitSpriteManager : MonoBehaviour
 
     void Fix(Renderer r, Material target, bool cast)
     {
-        // leave shadow-only renderers (e.g. CloudShadows clouds) alone
         if (r.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) return;
 
         var m = r.sharedMaterial;
         if (Replaceable(m)) { r.sharedMaterial = target; m = target; }
 
-        // only touch shadow flags on renderers that use our shader
         if (m != null && m.shader != null && m.shader.name == SunLitShader)
         {
             var mode = cast ? UnityEngine.Rendering.ShadowCastingMode.On
@@ -87,7 +76,6 @@ public class SunLitSpriteManager : MonoBehaviour
         }
     }
 
-    // missing material, broken (magenta) shader, or one of the stock sprite shaders
     static bool Replaceable(Material m)
     {
         if (m == null || m.shader == null) return true;

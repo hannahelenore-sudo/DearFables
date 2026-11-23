@@ -5,10 +5,6 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// One clickable boon card. Put this on a card object that has a background Image
-/// (a Button is added automatically if missing). BoonSelectionUI drives it.
-/// </summary>
 public class BoonCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("References")]
@@ -88,7 +84,6 @@ public class BoonCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
         if (!value) hovered = false;
     }
 
-    /// <summary>Hides the card (scale 0) so it can pop in.</summary>
     public void PrepareHidden()
     {
         busy = true;
@@ -107,7 +102,6 @@ public class BoonCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
 
-            // ease out back: small overshoot, then settle
             const float c1 = 1.70158f;
             const float c3 = c1 + 1f;
             float eased = 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
@@ -120,7 +114,6 @@ public class BoonCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
         busy = false;
     }
 
-    /// <summary>Played on the card the player picked.</summary>
     public IEnumerator PlayChosen()
     {
         busy = true;
@@ -148,7 +141,6 @@ public class BoonCardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
         transform.localScale = settle;
     }
 
-    /// <summary>Played on the cards that were not picked.</summary>
     public IEnumerator PlayDismissed(float duration)
     {
         busy = true;

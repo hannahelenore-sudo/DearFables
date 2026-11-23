@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Full-screen dim that skips rectangular holes and outlines them.</summary>
 public class TutorialSpotlightGraphic : MaskableGraphic
 {
     readonly List<Rect> holes = new List<Rect>();
@@ -19,7 +18,6 @@ public class TutorialSpotlightGraphic : MaskableGraphic
 
     void Update()
     {
-        // keeps the frame pulsing
         if (holes.Count > 0) SetVerticesDirty();
     }
 
@@ -29,7 +27,6 @@ public class TutorialSpotlightGraphic : MaskableGraphic
         Rect full = rectTransform.rect;
         float k = canvas != null && canvas.scaleFactor > 0f ? 1f / canvas.scaleFactor : 1f;
 
-        // screen px -> local units (pivot is bottom-left)
         var local = new List<Rect>(holes.Count);
         foreach (var h in holes)
             local.Add(Rect.MinMaxRect(h.xMin * k + full.xMin, h.yMin * k + full.yMin,
@@ -64,10 +61,10 @@ public class TutorialSpotlightGraphic : MaskableGraphic
         float t = thickness * k;
         foreach (var h in local)
         {
-            Quad(vh, h.xMin - t, h.yMax, h.xMax + t, h.yMax + t, frameC);   // top
-            Quad(vh, h.xMin - t, h.yMin - t, h.xMax + t, h.yMin, frameC);   // bottom
-            Quad(vh, h.xMin - t, h.yMin, h.xMin, h.yMax, frameC);           // left
-            Quad(vh, h.xMax, h.yMin, h.xMax + t, h.yMax, frameC);           // right
+            Quad(vh, h.xMin - t, h.yMax, h.xMax + t, h.yMax + t, frameC);
+            Quad(vh, h.xMin - t, h.yMin - t, h.xMax + t, h.yMin, frameC);
+            Quad(vh, h.xMin - t, h.yMin, h.xMin, h.yMax, frameC);
+            Quad(vh, h.xMax, h.yMin, h.xMax + t, h.yMax, frameC);
         }
     }
 

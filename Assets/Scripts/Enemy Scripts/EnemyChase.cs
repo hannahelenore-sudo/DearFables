@@ -4,11 +4,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Carries "does the enemy that started this fight drop a star?" from the overworld into the card game scene.
-/// EnemyChase sets it when the battle starts, BattleManager reads it once and clears it.
-/// A fight that wasn't started by an EnemyChase (zones, editor tests) keeps the old behaviour: it gives the star.
-/// </summary>
 public static class BattleStarReward
 {
     private static bool hasValue;
@@ -16,7 +11,6 @@ public static class BattleStarReward
 
     public static void Set(bool value) { dropsStar = value; hasValue = true; }
 
-    /// <summary>Reads the flag and resets it, so the next fight starts from the default (star given).</summary>
     public static bool Take()
     {
         bool result = !hasValue || dropsStar;
@@ -26,19 +20,6 @@ public static class BattleStarReward
     }
 }
 
-/// <summary>
-/// Put this on a GameObject with a SpriteRenderer (your enemy image).
-/// - Player comes within detectionRange  -> enemy starts chasing.
-/// - Player leaves the range for loseSightTime seconds -> enemy stops chasing.
-/// - If the player comes back into range before the timer runs out, the timer resets.
-/// - A card thrown by CardShooter hits the enemy (CardProjectile calls HitByCard) -> battle starts.
-/// - A thrown Tsinelas stuns the enemy (Stun): it spins, sees stars and can't move or catch you for a while.
-/// - A thrown Small Rock clears the player's current Mood (MoodManager.Clear).
-/// - Optionally, the enemy touching the player also starts the battle (Touch Starts Battle).
-/// - If your Wind + Sun power beats this enemy's score to beat: an X shows above it, and a thrown card makes it
-///   EXPLODE (drops stars + batteries, no battle). Touching it still starts a normal battle.
-/// - Battle start = hit sound, Pokemon-style transition, then the card game.
-/// </summary>
 public class EnemyChase : MonoBehaviour
 {
     [Header("Target")]
@@ -128,7 +109,6 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("Batteries the enemy drops when it explodes.")]
     public int batteriesDropped = 5;
 
-
     [Header("Stun (Tsinelas)")]
     [Tooltip("How long the fast spin at the start of the stun lasts.")]
     public float stunSpinTime = 0.7f;
@@ -164,7 +144,7 @@ public class EnemyChase : MonoBehaviour
     [Tooltip("Flip the sprite left/right depending on where the player is. Assumes the image faces right.")]
     public bool flipToFacePlayer = true;
 
-    private static bool battleStarting; // stops two enemies starting a battle at once
+    private static bool battleStarting;
     private bool isChasing;
     private bool battleStarted;
     private float outOfRangeTimer;
@@ -174,28 +154,21 @@ public class EnemyChase : MonoBehaviour
     private SpriteRenderer starGlow;
     private static Sprite starGlowSprite;
 
-    // Stun
     private float stunTimer;
     private float stunDuration;
     private DizzyStars stars;
     private Coroutine flashRoutine;
 
-    // Overpowered
     private GameObject xIcon;
     private float powerCheckTimer;
     private bool overpowered;
 
-    /// <summary>True while a Tsinelas has this enemy stunned.</summary>
     public bool IsStunned => stunTimer > 0f;
 
-    // Remembers which enemies already caught the player. Static = survives scene loads.
     private static readonly HashSet<string> caughtEnemies = new HashSet<string>();
 
-    // Every enemy that has ever shown up in a loaded scene (scene/id). Static = survives scene loads, so the total is
-    // known in the card game scene too, and enemies already beaten (which are destroyed on load) still count.
     private static readonly HashSet<string> knownEnemies = new HashSet<string>();
 
-    /// <summary>How many different EnemyChase enemies exist (in the scenes visited so far). Drives the difficulty.</summary>
     public static int KnownEnemyCount { get { return knownEnemies.Count; } }
 
     private bool countsInDifficulty;
@@ -208,12 +181,10 @@ public class EnemyChase : MonoBehaviour
 
     private void Awake()
     {
-        // The StarQuest NPC is the tutorial enemy: not part of the difficulty
         countsInDifficulty = countsForDifficulty && GetComponent<StarQuestNPC>() == null;
         if (countsInDifficulty) knownEnemies.Add(GetId());
     }
 
-    /// <summary>Call this to bring all enemies back (e.g. from a "New Game" button).</summary>
     public static void ResetCaughtEnemies()
     {
         caughtEnemies.Clear();
@@ -225,20 +196,17 @@ public class EnemyChase : MonoBehaviour
         return SceneManager.GetActiveScene().name + "/" + id;
     }
 
-    /// <summary>True if this enemy already caught the player (or exploded) earlier, so it stays gone.</summary>
     public bool WasCaught { get { return caughtEnemies.Contains(GetId()); } }
 
-    /// <summary>Called by CardProjectile when the thrown card reaches this enemy.</summary>
     public void HitByCard()
     {
-        if (!enabled) return; // switched off (e.g. a StarQuestNPC that has not become an enemy yet)
+        if (!enabled) return;
         if (battleStarted) return;
 
         Debug.Log("EnemyChase '" + name + "': Sun " + DeckPower.Sun + " + Wind " + DeckPower.Wind
                   + " = " + DeckPower.Total + " (x" + powerMultiplier + " = " + GetCombinedPower() + ") vs score to beat " + GetScoreToBeat()
                   + (IsOverpowered() ? " -> EXPLODE" : " -> battle"));
 
-        // Strong enough: the card makes the enemy explode instead of starting a battle
         if (explodeWhenOverpowered && IsOverpowered())
         {
             Explode();
@@ -249,13 +217,12 @@ public class EnemyChase : MonoBehaviour
         StartBattle(true);
     }
 
-    /// <summary>Called by CardProjectile when a thrown Tsinelas reaches this enemy.</summary>
     public void Stun(float duration)
     {
         if (!enabled || battleStarted || duration <= 0f) return;
 
         stunDuration = duration;
-        stunTimer = duration; // hitting it again restarts the spin
+        stunTimer = duration;
 
         if (stars == null && spriteRenderer != null)
         {
@@ -265,39 +232,31 @@ public class EnemyChase : MonoBehaviour
         }
         if (stars != null) stars.SetActive(true);
 
-        Flash(new Color(1f, 0.9f, 0.5f)); // "bonk"
+        Flash(new Color(1f, 0.9f, 0.5f));
     }
 
-    /// <summary>Called by CardProjectile when a thrown Small Rock reaches this enemy.</summary>
     public void RemoveMoods()
     {
         if (battleStarted) return;
 
-        // Moods are the player's (Sugar Rush, Angry...): the rock knocks the current one off
         bool hadMood = !MoodManager.IsNeutral;
         MoodManager.Clear();
 
         if (onMoodsRemoved != null) onMoodsRemoved.Invoke();
 
-        // Cyan flash if a mood was actually removed, a dull grey one if there was nothing to remove
         Flash(hadMood ? new Color(0.6f, 0.95f, 1f) : new Color(0.7f, 0.7f, 0.7f));
     }
 
-    // ---------------- Overpowered: X icon + explosion ----------------
-
-    /// <summary>The score to beat this enemy would have (difficulty scaling only; the random Tsinelas reroll is ignored).</summary>
     public int GetScoreToBeat()
     {
-        return DifficultyProgress.GetEnemyScore(dropsStar); // the blind you are on (star enemies are a bit higher)
+        return DifficultyProgress.GetEnemyScore(dropsStar);
     }
 
-    /// <summary>Your combined Sun + Wind power times 'Power Multiplier'.</summary>
     public float GetCombinedPower()
     {
         return (DeckPower.Sun + DeckPower.Wind) * powerMultiplier;
     }
 
-    /// <summary>True when your combined Wind + Sun power (x Power Multiplier) is greater than the score to beat.</summary>
     public bool IsOverpowered()
     {
         return GetCombinedPower() > GetScoreToBeat();
@@ -307,7 +266,6 @@ public class EnemyChase : MonoBehaviour
     {
         if (!explodeWhenOverpowered) { SetIconVisible(false); return; }
 
-        // No need to recalculate every frame
         powerCheckTimer -= Time.deltaTime;
         if (powerCheckTimer > 0f) return;
         powerCheckTimer = 0.25f;
@@ -331,7 +289,6 @@ public class EnemyChase : MonoBehaviour
 
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = xIconSprite != null ? xIconSprite : GetDefaultXSprite();
-        // Draw on top of the enemy sprite
         if (spriteRenderer != null)
         {
             sr.sortingLayerID = spriteRenderer.sortingLayerID;
@@ -355,7 +312,6 @@ public class EnemyChase : MonoBehaviour
         {
             for (int x = 0; x < size; x++)
             {
-                // Distance to the two diagonals
                 float d = Mathf.Min(Mathf.Abs(x - y), Mathf.Abs(x - (size - 1 - y))) / 1.4142f;
                 bool inside = x > 6 && x < size - 6 && y > 6 && y < size - 6;
                 Color c = Color.clear;
@@ -371,9 +327,9 @@ public class EnemyChase : MonoBehaviour
 
     private void Explode()
     {
-        battleStarted = true; // no fight, no chasing, no more hits
-        caughtEnemies.Add(GetId()); // stays gone when you come back to this scene
-        if (countsInDifficulty) DifficultyProgress.AddDefeat(); // an exploded enemy is a defeated enemy: the next one is the next blind
+        battleStarted = true;
+        caughtEnemies.Add(GetId());
+        if (countsInDifficulty) DifficultyProgress.AddDefeat();
 
         stunTimer = 0f;
         if (stars != null) stars.SetActive(false);
@@ -398,7 +354,7 @@ public class EnemyChase : MonoBehaviour
 
     private void DropStars(Vector3 pos)
     {
-        if (!dropsStar || starsDropped <= 0) return; // not a star enemy: no stars
+        if (!dropsStar || starsDropped <= 0) return;
 
         if (starPickupPrefab != null)
         {
@@ -425,18 +381,16 @@ public class EnemyChase : MonoBehaviour
         BatteryDropper dropper = GetComponent<BatteryDropper>();
         if (dropper == null)
         {
-            // Reuse your prefab setup: prefer a dropper that actually has a pickup prefab assigned
             foreach (BatteryDropper d in Object.FindObjectsByType<BatteryDropper>(FindObjectsSortMode.None))
             {
                 if (dropper == null) dropper = d;
                 if (d.pickupPrefab != null) { dropper = d; break; }
             }
         }
-        if (dropper == null) dropper = gameObject.AddComponent<BatteryDropper>();     // plain yellow dots
+        if (dropper == null) dropper = gameObject.AddComponent<BatteryDropper>();
         dropper.DropAt(pos, batteriesDropped);
     }
 
-    // Quick swell + flash, then gone
     private IEnumerator ExplodeRoutine()
     {
         Vector3 startScale = transform.localScale;
@@ -491,9 +445,8 @@ public class EnemyChase : MonoBehaviour
 
     private void Start()
     {
-        battleStarting = false; // fresh scene -> allow battles again
+        battleStarting = false;
 
-        // This enemy already caught the player earlier -> it's gone
         if (caughtEnemies.Contains(GetId()))
         {
             Destroy(gameObject);
@@ -510,19 +463,15 @@ public class EnemyChase : MonoBehaviour
 
     private void Update()
     {
-        // Only ever uses the player assigned in the Inspector
         if (player == null) return;
         if (battleStarted) return;
 
-        // Card game not unlocked yet (the card is still lying there): stay passive
         if (waitForCardUnlock && CardPickup.Locked) return;
 
         UpdatePowerIcon();
 
-        // Player frozen (e.g. talking to the shopkeeper) -> the enemy freezes too
         if (IsPlayerFrozen()) return;
 
-        // Stunned: can't move, chase or catch the player
         if (stunTimer > 0f)
         {
             stunTimer -= Time.deltaTime;
@@ -536,7 +485,6 @@ public class EnemyChase : MonoBehaviour
 
         float distance = GetDistance(transform.position, player.position);
 
-        // Touched the player (optional) -> start the battle
         if (touchStartsBattle && distance <= touchDistance && Time.timeSinceLevelLoad >= touchGraceTime)
         {
             StartBattle(false);
@@ -545,7 +493,6 @@ public class EnemyChase : MonoBehaviour
 
         if (!isChasing)
         {
-            // Player walked into range -> start chasing
             if (distance <= detectionRange)
             {
                 isChasing = true;
@@ -556,7 +503,6 @@ public class EnemyChase : MonoBehaviour
         {
             if (distance > detectionRange)
             {
-                // Out of range: count up, give up after loseSightTime
                 outOfRangeTimer += Time.deltaTime;
                 if (outOfRangeTimer >= loseSightTime)
                 {
@@ -566,7 +512,6 @@ public class EnemyChase : MonoBehaviour
             }
             else
             {
-                // Back in range: reset the timer
                 outOfRangeTimer = 0f;
             }
         }
@@ -585,7 +530,6 @@ public class EnemyChase : MonoBehaviour
 
     private PlayerMovement playerMovement;
 
-    /// <summary>True while the player's input is locked (PlayerMovement.InputLocked).</summary>
     private bool IsPlayerFrozen()
     {
         if (playerMovement == null && player != null)
@@ -598,14 +542,12 @@ public class EnemyChase : MonoBehaviour
 
     private void StartBattle(bool byCard)
     {
-        // A card that lands while the battle is already starting (the enemy touched you a moment before) still counts
         if (byCard && battleStarted)
         {
             if (cardHitGivesAdvantage) AdvantageHit.Arm(scoreReduction);
             return;
         }
 
-        // Already fighting, or another enemy already started a battle this frame
         if (battleStarted || battleStarting) return;
         if (player == null) return;
 
@@ -619,21 +561,17 @@ public class EnemyChase : MonoBehaviour
 
         battleStarted = true;
         battleStarting = true;
-        caughtEnemies.Add(GetId()); // gone when the player comes back
+        caughtEnemies.Add(GetId());
 
-        // The battle scene shows this enemy's picture (BattleManager reads it)
         BattleEnemy.Set(spriteRenderer != null ? spriteRenderer.sprite : null);
         if (customBattlePicture)
             BattleEnemy.SetStyle(battleFlip, battleScale, battleOffset, battleImageOffset);
 
-        // The battle scene decides from this whether the win gives a star
         BattleStarReward.Set(dropsStar);
 
-        // Stun is over, the fight begins
         stunTimer = 0f;
         if (stars != null) stars.SetActive(false);
 
-        // Hit it with a card first = advantage (smaller score to beat). Touching it = no advantage.
         if (byCard && cardHitGivesAdvantage) AdvantageHit.Arm(scoreReduction);
         else AdvantageHit.Disarm();
 
@@ -643,8 +581,7 @@ public class EnemyChase : MonoBehaviour
 
         if (useBattleTransition)
         {
-            // Flash + bars, then enter the battle once the screen is black
-            BattleTransition.Play(() => saver.EnterBattle(false)); // false = not started from the zone
+            BattleTransition.Play(() => saver.EnterBattle(false));
         }
         else
         {
@@ -660,8 +597,6 @@ public class EnemyChase : MonoBehaviour
         GameSFX.Play(hitSound, hitVolume, pitch);
     }
 
-    // ---------------- Star glow ----------------
-
     private void UpdateStarGlow()
     {
         bool show = dropsStar && glowWhenDropsStar && !battleStarted && spriteRenderer != null && spriteRenderer.sprite != null;
@@ -675,7 +610,6 @@ public class EnemyChase : MonoBehaviour
         if (starGlow == null) starGlow = CreateStarGlow();
         if (!starGlow.gameObject.activeSelf) starGlow.gameObject.SetActive(true);
 
-        // Sits in the middle of the picture (child of the sprite, so it follows flips, spins and sways)
         Bounds b = spriteRenderer.sprite.bounds;
         Vector3 center = b.center;
         if (spriteRenderer.flipX) center.x = -center.x;
@@ -707,7 +641,6 @@ public class EnemyChase : MonoBehaviour
         return sr;
     }
 
-    // Soft round dot: opaque in the middle, fading to nothing at the edge (1 world unit wide)
     private static Sprite GetStarGlowSprite()
     {
         if (starGlowSprite != null) return starGlowSprite;
@@ -740,7 +673,6 @@ public class EnemyChase : MonoBehaviour
 
         if (!faceCamera || Camera.main == null) return;
 
-        // Turn only around the Y axis so the sprite stays upright
         float yaw = Camera.main.transform.eulerAngles.y;
         Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
 
@@ -754,14 +686,12 @@ public class EnemyChase : MonoBehaviour
 
             if (elapsed < spinTime)
             {
-                // Fast cartoon spin that slows down (ends on a full turn, so it lands facing the camera)
                 float t = elapsed / spinTime;
                 float eased = 1f - (1f - t) * (1f - t);
                 spinYaw = eased * 360f * stunSpinTurns;
             }
             else
             {
-                // Dazed sway, easing out at the end of the stun
                 float fadeOut = Mathf.Clamp01(stunTimer / 0.3f);
                 roll = Mathf.Sin(elapsed * 9f) * stunSwayAngle * fadeOut;
             }
@@ -785,7 +715,6 @@ public class EnemyChase : MonoBehaviour
     {
         if (!flipToFacePlayer || spriteRenderer == null || Camera.main == null) return;
 
-        // Is the target to the left or right from the camera's point of view?
         float side = Vector3.Dot(Camera.main.transform.right, target - transform.position);
         if (Mathf.Abs(side) > 0.01f)
             spriteRenderer.flipX = side < 0f;
@@ -801,7 +730,6 @@ public class EnemyChase : MonoBehaviour
         return Vector3.Distance(a, b);
     }
 
-    // Draws the detection range in the Scene view when the enemy is selected
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;

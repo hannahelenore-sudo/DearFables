@@ -207,10 +207,8 @@ public class DeckManager : MonoBehaviour
 
     void Awake()
     {
-        // Permanent boons: +Hand Size (picked from the Choose Your Boon screen)
         maxHandSize += BoonProgress.ExtraHandSize;
 
-        // Mood (Angry): -1 reshuffle (discard)
         maxDiscardsAllowed = Mathf.Max(0, maxDiscardsAllowed + MoodManager.ReshufflesModifier);
 
         if (balatroScoreText != null)
@@ -486,7 +484,6 @@ public class DeckManager : MonoBehaviour
             CardData drawnCard = drawPile[0];
             drawPile.RemoveAt(0);
 
-            // Small chance that this card comes out weak (half score, dimmed). It stays weak for the rest of the battle.
             bool becameLowPower = false;
             if (!drawnCard.isLowPower && Random.value < lowPowerChance * StructureProgress.LowPowerChanceFactorFor(drawnCard))
             {
@@ -497,7 +494,6 @@ public class DeckManager : MonoBehaviour
             hand.Add(drawnCard);
             cardsRemainingInRound--;
 
-            // The new card appears at the deck and glides in while the rest of the hand slides aside
             CreateCardUI(drawnCard, true);
             RebuildLayout();
 
@@ -513,7 +509,6 @@ public class DeckManager : MonoBehaviour
         UpdateSelectedTotal();
     }
 
-    /// <summary>A runtime copy of the card (same type, so Wind/Solar checks still work) that scores half.</summary>
     private static CardData MakeLowPowerCopy(CardData original)
     {
         CardData copy = Instantiate(original);
@@ -524,17 +519,11 @@ public class DeckManager : MonoBehaviour
         return copy;
     }
 
-    // ------------------------------------------------------------------
-    // Debug (called by DebugShortcuts)
-    // ------------------------------------------------------------------
-
-    /// <summary>Debug: turns cards in your hand into Low Power cards. onlySelected = just the selected ones.</summary>
     public int DebugMakeHandLowPower(bool onlySelected)
     {
         return DebugSwapHand(onlySelected, true);
     }
 
-    /// <summary>Debug: turns Low Power cards in your hand back to normal.</summary>
     public int DebugRestoreHand(bool onlySelected)
     {
         return DebugSwapHand(onlySelected, false);
@@ -588,11 +577,9 @@ public class DeckManager : MonoBehaviour
         cardUI.LoadCardData(data);
         spawnedCardUIList.Add(cardUI);
 
-        // Positions are driven by RebuildLayout, not by the layout group
         LayoutElement le = newCardObj.GetComponent<LayoutElement>();
         if (le != null) le.ignoreLayout = true;
 
-        // The hand is positioned from the centre of the container, so make sure the card is anchored there
         RectTransform cardRect = newCardObj.GetComponent<RectTransform>();
         if (cardRect != null)
         {
@@ -601,7 +588,6 @@ public class DeckManager : MonoBehaviour
             cardRect.pivot = new Vector2(0.5f, 0.5f);
         }
 
-        // Lets the player drag the card to another spot in the hand
         CardDragHandler drag = newCardObj.GetComponent<CardDragHandler>();
         if (drag == null) drag = newCardObj.AddComponent<CardDragHandler>();
         drag.manager = this;
@@ -611,7 +597,7 @@ public class DeckManager : MonoBehaviour
         if (fromDeck)
         {
             EnsureDeckVisual();
-            cardUI.SnapTo(GetDeckPosition(), 1f, 0f); // starts exactly on top of the deck
+            cardUI.SnapTo(GetDeckPosition(), 1f, 0f);
         }
 
         return cardUI;
@@ -624,10 +610,6 @@ public class DeckManager : MonoBehaviour
         if (layoutGroup != null) layoutGroup.enabled = false;
     }
 
-    /// <summary>
-    /// Works out where every card in the hand belongs (an evenly spaced, slightly fanned row)
-    /// and tells each card. The cards glide there on their own. instant = true places them with no animation.
-    /// </summary>
     private void RebuildLayout(bool instant = false)
     {
         spawnedCardUIList.RemoveAll(item => item == null);
@@ -642,11 +624,10 @@ public class DeckManager : MonoBehaviour
         RectTransform firstRect = spawnedCardUIList[0].GetComponent<RectTransform>();
         if (firstRect != null) cardWidth = firstRect.rect.width;
 
-        // The hand stays inside its area: more cards = they squeeze together
         float available = handMaxWidth > 0f ? handMaxWidth : handAreaWidth;
         if (handParentContainer is RectTransform handRect && handRect.rect.width >= 100f)
             available = available > 0f ? Mathf.Min(available, handRect.rect.width) : handRect.rect.width;
-        if (available < 100f) available = float.MaxValue; // no usable width: don't squeeze
+        if (available < 100f) available = float.MaxValue;
 
         float spacing = handCardSpacing;
         if (n > 1 && available < float.MaxValue)
@@ -660,9 +641,9 @@ public class DeckManager : MonoBehaviour
             CardUI card = spawnedCardUIList[i];
             if (card == null || card.isAnimatingToLayout) continue;
 
-            float norm = n > 1 ? (i - half) / half : 0f; // -1 (left) .. +1 (right)
+            float norm = n > 1 ? (i - half) / half : 0f;
 
-            card.followSlot = card != draggingCard; // the card in your hand (mouse) is not pulled back to its slot
+            card.followSlot = card != draggingCard;
             card.slotPosition = new Vector2((i - half) * spacing, -(norm * norm) * fanArcHeight);
             card.slotRotation = -norm * fanMaxAngle;
 
@@ -673,7 +654,6 @@ public class DeckManager : MonoBehaviour
             if (instant && card != draggingCard) card.SnapToSlot();
         }
 
-        // Cards on the right sit on top of the ones to their left (and the dragged card on top of everything)
         for (int i = 0; i < n; i++)
         {
             CardUI card = spawnedCardUIList[i];
@@ -681,10 +661,6 @@ public class DeckManager : MonoBehaviour
         }
         if (draggingCard != null) draggingCard.transform.SetAsLastSibling();
     }
-
-    // ------------------------------------------------------------------
-    // Dragging cards to another spot (used by CardDragHandler)
-    // ------------------------------------------------------------------
 
     public bool CanDragCards
     {
@@ -706,7 +682,6 @@ public class DeckManager : MonoBehaviour
 
     private readonly Vector3[] clampCorners = new Vector3[4];
 
-    /// <summary>Keeps a dragged card on the screen (the hand container itself can be a thin strip, so the screen is the limit).</summary>
     public Vector2 ClampToHandArea(Vector2 pos, RectTransform cardRect)
     {
         RectTransform parent = handParentContainer as RectTransform;
@@ -717,7 +692,6 @@ public class DeckManager : MonoBehaviour
         RectTransform canvasRect = canvas.rootCanvas.transform as RectTransform;
         if (canvasRect == null) return pos;
 
-        // the screen's edges, in the same space as the card's anchored position
         canvasRect.GetWorldCorners(clampCorners);
         Vector2 center = parent.rect.center;
         Vector3 lo = parent.InverseTransformPoint(clampCorners[0]);
@@ -736,7 +710,6 @@ public class DeckManager : MonoBehaviour
         return pos;
     }
 
-    /// <summary>Called while a card is dragged: when it passes the middle of another card's spot they swap and the others slide aside.</summary>
     public void OnCardDragged(CardUI card)
     {
         if (card == null || card != draggingCard) return;
@@ -764,14 +737,10 @@ public class DeckManager : MonoBehaviour
         if (card == null || card != draggingCard) { if (card == null) draggingCard = null; return; }
 
         draggingCard = null;
-        card.SyncSpringState(); // the spring picks up from where the card was dropped
-        RebuildLayout(); // the dropped card glides into its new slot
+        card.SyncSpringState();
+        RebuildLayout();
         PlaySFX(cardDropSound);
     }
-
-    // ------------------------------------------------------------------
-    // Deck pile
-    // ------------------------------------------------------------------
 
     private RectTransform autoDeckRoot;
     private readonly List<Image> deckLayers = new List<Image>();
@@ -781,7 +750,6 @@ public class DeckManager : MonoBehaviour
         return deckPile != null || autoDeckRoot != null;
     }
 
-    /// <summary>Where the deck is, in the hand container's anchored space (cards spawn here and discards fly back here).</summary>
     private Vector2 GetDeckPosition()
     {
         if (deckPile != null && handParentContainer is RectTransform handRect)
@@ -809,7 +777,7 @@ public class DeckManager : MonoBehaviour
 
         GameObject root = new GameObject("DeckPile", typeof(RectTransform));
         root.transform.SetParent(handParentContainer, false);
-        root.transform.SetAsFirstSibling(); // always behind the cards
+        root.transform.SetAsFirstSibling();
 
         autoDeckRoot = root.GetComponent<RectTransform>();
         autoDeckRoot.anchorMin = new Vector2(0.5f, 0.5f);
@@ -838,7 +806,6 @@ public class DeckManager : MonoBehaviour
         }
     }
 
-    /// <summary>The auto-built pile shrinks as cards are drawn and disappears when the deck is empty.</summary>
     private void UpdateDeckVisual()
     {
         EnsureDeckVisual();
@@ -852,10 +819,6 @@ public class DeckManager : MonoBehaviour
         for (int i = 0; i < deckLayers.Count; i++)
             deckLayers[i].gameObject.SetActive(i < visible);
     }
-
-    // ------------------------------------------------------------------
-    // Destroy effect: the card shakes, then breaks into pieces that fade away
-    // ------------------------------------------------------------------
 
     private float GetDissolveTotalTime(int cardCount)
     {
@@ -873,7 +836,6 @@ public class DeckManager : MonoBehaviour
 
         PlaySFX(cardDestroySound, pitch);
 
-        // 1. Shake
         Vector2 basePos = cardRect.anchoredPosition;
         Quaternion baseRot = cardRect.localRotation;
         float t = 0f;
@@ -890,7 +852,6 @@ public class DeckManager : MonoBehaviour
         cardRect.anchoredPosition = basePos;
         cardRect.localRotation = baseRot;
 
-        // No usable sprite to cut up: just fade the card out
         if (img == null || img.sprite == null || img.sprite.texture == null)
         {
             CanvasGroup fade = card.GetComponent<CanvasGroup>();
@@ -905,7 +866,6 @@ public class DeckManager : MonoBehaviour
             yield break;
         }
 
-        // 2. Cut the card image into a grid of pieces, laid exactly over the card
         int cols = Mathf.Max(1, dissolveColumns);
         int rows = Mathf.Max(1, dissolveRows);
 
@@ -950,7 +910,7 @@ public class DeckManager : MonoBehaviour
                 pr.anchorMin = Vector2.zero;
                 pr.anchorMax = Vector2.zero;
                 pr.pivot = new Vector2(0.5f, 0.5f);
-                pr.sizeDelta = new Vector2(cw + 0.75f, ch + 0.75f); // tiny overlap hides seams
+                pr.sizeDelta = new Vector2(cw + 0.75f, ch + 0.75f);
                 startPos[k] = new Vector2((x + 0.5f) * cw, (y + 0.5f) * ch);
                 pr.anchoredPosition = startPos[k];
 
@@ -960,7 +920,6 @@ public class DeckManager : MonoBehaviour
                 raw.color = baseColor;
                 raw.raycastTarget = false;
 
-                // Pieces break off at random moments (not all at once) and drift up and outward, like dust
                 delay[k] = Random.value * dissolveDuration * 0.6f;
                 drift[k] = new Vector2(Random.Range(-1f, 1f), Random.Range(0.15f, 1f)).normalized * dissolveDriftDistance * Random.Range(0.35f, 1f);
                 spin[k] = Random.Range(-140f, 140f);
@@ -971,13 +930,11 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // Hide the real card now that the pieces sit exactly on top of it
         CanvasGroup cg = card.GetComponent<CanvasGroup>();
         if (cg == null) cg = card.gameObject.AddComponent<CanvasGroup>();
         cg.alpha = 0f;
         cg.blocksRaycasts = false;
 
-        // 3. Pieces break away one after another
         float elapsed = 0f;
         while (elapsed < dissolveDuration)
         {
@@ -1142,7 +1099,7 @@ public class DeckManager : MonoBehaviour
         RebuildLayout();
         UpdateHandCountDisplay();
 
-        yield return new GameSpeedWait(0.25f); // let the hand close up before dealing
+        yield return new GameSpeedWait(0.25f);
         int cardsToDraw = Mathf.Min(recycledCount, cardsRemainingInRound);
         if (cardsToDraw > 0)
         {
@@ -1160,7 +1117,6 @@ public class DeckManager : MonoBehaviour
         if (confirmButtonComp != null) confirmButtonComp.interactable = false;
         if (discardButtonComp != null) discardButtonComp.interactable = false;
 
-        // Prevent button interactions on Battle View during scoring and transition animations
         if (battleManager != null)
         {
             battleManager.SetBattleUIInteractable(false);
@@ -1186,7 +1142,7 @@ public class DeckManager : MonoBehaviour
         }
 
         PlaySFX(confirmSound);
-        TrinketSidebar.BeginScoring(); // locks the trinket order, slides the bar open
+        TrinketSidebar.BeginScoring();
 
         HorizontalLayoutGroup layoutGroup = handParentContainer.GetComponent<HorizontalLayoutGroup>();
         if (layoutGroup != null) layoutGroup.enabled = false;
@@ -1233,7 +1189,6 @@ public class DeckManager : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         yield return new GameSpeedWait(0.4f);
 
-        // --- STEP 1: ADD UP CHIPS CARD BY CARD (mult stays at 1 until the effects trigger, like Balatro) ---
         float setMult = 1f;
         bool hasSetBonus = false;
         AudioClip setBonusClip = null;
@@ -1274,7 +1229,6 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(0, currentMult);
         }
 
-        // Snapshot of the trinket row: effects trigger from the first (top) to the last (bottom)
         List<TrinketData> trinketOrder = new List<TrinketData>(TrinketInventory.Owned);
 
         int scoredIndex = 0;
@@ -1286,9 +1240,8 @@ public class DeckManager : MonoBehaviour
                 Vector3 origScale = card.transform.localScale;
                 card.transform.localScale = origScale * 1.25f;
 
-                int cardValue = card.cardData.GetEffectiveValue(); // includes the Wind Power boon on Wind cards
+                int cardValue = card.cardData.GetEffectiveValue();
 
-                // The card's own value first, then whatever the boosts add on top (shown as a second number)
                 int ownValue = Mathf.Min(cardValue, GetBaseCardValue(card.cardData, cardValue));
                 int boost = cardValue - ownValue;
 
@@ -1297,7 +1250,6 @@ public class DeckManager : MonoBehaviour
                 StartCoroutine(PulseBalatroText());
                 ShowCardPopup(card, "+" + ownValue, cardValuePopupColor, 0);
 
-                // Pitch climbs with every scored card
                 PlaySFX(cardScoreSound, Mathf.Min(1f + scoredIndex * 0.08f, 2f));
                 scoredIndex++;
 
@@ -1322,7 +1274,6 @@ public class DeckManager : MonoBehaviour
                 card.transform.localScale = origScale;
                 yield return new GameSpeedWait(0.2f);
 
-                // Trinkets that trigger when this card scores, TOP TO BOTTOM (Wind Charm, Sun Charm, Sun Plushie)
                 for (int ti = 0; ti < trinketOrder.Count; ti++)
                 {
                     string trinketLabel;
@@ -1343,9 +1294,6 @@ public class DeckManager : MonoBehaviour
 
         yield return new GameSpeedWait(0.3f);
 
-        // --- STEP 2: MULT EFFECTS TRIGGER ONE AFTER ANOTHER ---
-
-        // Hand trinkets (Wind Fan, Candy, Sugar Rush) trigger TOP TO BOTTOM in the order of the sidebar
         int windCardsInHand = CountCardsOfType<WindCard>(selectedCards);
         for (int ti = 0; ti < trinketOrder.Count; ti++)
         {
@@ -1369,7 +1317,6 @@ public class DeckManager : MonoBehaviour
             yield return new GameSpeedWait(0.6f);
         }
 
-        // Mood (Sugar Rush): multiplies the mult of the whole hand
         float moodMult = MoodManager.ScoreMultiplier;
         if (moodMult > 1.001f)
         {
@@ -1385,11 +1332,11 @@ public class DeckManager : MonoBehaviour
         {
             if (rollBonusIsMultiplicative)
             {
-                currentMult *= 1.5f; // X1.5 stacks on top of the set bonus, like chained X mult jokers
+                currentMult *= 1.5f;
             }
             else
             {
-                currentMult = hasSetBonus ? currentMult + 1.5f : 1.5f; // old additive behaviour
+                currentMult = hasSetBonus ? currentMult + 1.5f : 1.5f;
             }
 
             SetBalatroText(baseScore, currentMult);
@@ -1398,11 +1345,10 @@ public class DeckManager : MonoBehaviour
             yield return new GameSpeedWait(0.6f);
         }
 
-        TrinketSidebar.EndScoring(); // unlocks the order again
+        TrinketSidebar.EndScoring();
 
         float finalMult = currentMult;
 
-        // --- STEP 3: CALCULATE AND DISPLAY FINAL PRODUCT SCORE ---
         int rawFinalScore = Mathf.RoundToInt(baseScore * finalMult);
         int finalScore = rawFinalScore;
 
@@ -1434,7 +1380,6 @@ public class DeckManager : MonoBehaviour
             SetBalatroText(1, 1f);
         }
 
-        // --- STEP 4: SHOW FINAL SCORE POP-OUT & SHAKE ANIMATION IN CARD VIEW ---
         if (totalValueText != null)
         {
             totalValueText.text = finalScore.ToString();
@@ -1475,7 +1420,6 @@ public class DeckManager : MonoBehaviour
 
         yield return new GameSpeedWait(cameraSwitchDelay);
 
-        // --- STEP 5: SWITCH CAMERA & REPARENT TOTAL VALUE TEXT FOR COUNTDOWN ---
         PlaySFX(cameraSwitchSound);
         SetCameraState(false);
 
@@ -1504,7 +1448,6 @@ public class DeckManager : MonoBehaviour
             scoreShakeEffect.TriggerScoreEffect(scoreCountdownDuration);
         }
 
-        // --- STEP 6: COUNTDOWN ANIMATION ---
         int startRemainingScore = currentRemainingScore;
         int targetRemainingScore = currentRemainingScore - finalScore;
         float elapsed = 0f;
@@ -1564,12 +1507,10 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // --- STEP 7: USUAL ROUND ENDING SEQUENCE ---
         float endWait = discardFlyDuration + 0.05f;
 
         if (dissolveScoredCards)
         {
-            // Played cards shake and break apart (Balatro style)
             for (int di = 0; di < selectedCards.Count; di++)
                 StartCoroutine(DissolveCard(selectedCards[di], di * dissolveStagger, Mathf.Min(1f + di * 0.06f, 1.4f)));
 
@@ -1584,7 +1525,6 @@ public class DeckManager : MonoBehaviour
 
         yield return new GameSpeedWait(delayBetweenDiscards);
 
-        // The cards you didn't play go back into the deck
         if (dissolveScoredCards && remainingCards.Count > 0) PlaySFX(discardSound);
         foreach (CardUI card in remainingCards)
             StartCoroutine(FlyCardAway(card));
@@ -1605,10 +1545,8 @@ public class DeckManager : MonoBehaviour
         spawnedCardUIList.Clear();
         hand.Clear();
 
-
         ResetRoundState();
 
-        // Re-enable battle camera button interactions now that full countdown and animation sequence ended
         if (battleManager != null)
         {
             battleManager.SetBattleUIInteractable(true);
@@ -1632,15 +1570,11 @@ public class DeckManager : MonoBehaviour
         isScoring = false;
     }
 
-    // ------------------------------------------------------------------
-    // Sound + Balatro-style score display helpers
-    // ------------------------------------------------------------------
     private void PlaySFX(AudioClip clip, float pitch = 1f, float volumeScale = 1f)
     {
         GameSFX.Play(clip, sfxVolume * volumeScale, pitch);
     }
 
-    // The card's value before any boost (Wind Power boon, mood). Falls back to 'fallback' if it can't be found.
     private static int GetBaseCardValue(CardData data, int fallback)
     {
         if (data == null) return fallback;
@@ -1655,7 +1589,6 @@ public class DeckManager : MonoBehaviour
         return fallback;
     }
 
-    /// <summary>A number that pops up above a scoring card, floats up a little and fades out. stackIndex 1 sits above stackIndex 0.</summary>
     private void ShowCardPopup(CardUI card, string text, Color color, int stackIndex)
     {
         if (!showCardValuePopups || card == null || handParentContainer == null) return;
@@ -1674,10 +1607,10 @@ public class DeckManager : MonoBehaviour
         r.SetParent(handParentContainer, false);
         r.anchorMin = r.anchorMax = r.pivot = new Vector2(0.5f, 0.5f);
         r.sizeDelta = new Vector2(400f, popupFontSize * 1.4f);
-        r.SetAsLastSibling(); // above every card
+        r.SetAsLastSibling();
 
         TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
-        if (balatroScoreText != null) t.font = balatroScoreText.font; // same font as the score
+        if (balatroScoreText != null) t.font = balatroScoreText.font;
         t.text = text;
         t.color = color;
         t.fontSize = popupFontSize;
@@ -1692,7 +1625,6 @@ public class DeckManager : MonoBehaviour
         r.anchoredPosition = start;
         r.localScale = Vector3.zero;
 
-        // pop in with a little overshoot, drifting up
         float popTime = 0.2f;
         float e = 0f;
         while (e < popTime)
@@ -1708,7 +1640,6 @@ public class DeckManager : MonoBehaviour
         }
         r.localScale = Vector3.one;
 
-        // hold (still floating up slowly)
         float hold = 0f;
         while (hold < popupHoldTime)
         {
@@ -1718,7 +1649,6 @@ public class DeckManager : MonoBehaviour
             yield return null;
         }
 
-        // fade out
         float f = 0f;
         Vector2 fadeStart = r.anchoredPosition;
         while (f < popupFadeTime)
@@ -1752,7 +1682,6 @@ public class DeckManager : MonoBehaviour
         return "<color=#" + chipsHex + ">" + Compact(chips, "0") + "</color> x <color=#" + multHex + ">" + Compact(mult, "0.##") + "</color>";
     }
 
-    // Huge numbers get short (1.5M) so the score line never runs out of room
     private static string Compact(float value, string format)
     {
         float a = Mathf.Abs(value);
@@ -1762,7 +1691,6 @@ public class DeckManager : MonoBehaviour
         return value.ToString(format);
     }
 
-    // One line only; the text shrinks to fit its box instead of wrapping onto a second line
     private static void MakeTextFit(TMP_Text text, float minSize)
     {
         if (text == null) return;

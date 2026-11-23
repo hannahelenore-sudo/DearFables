@@ -3,10 +3,6 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-/// <summary>
-/// Draws any string marked [CharacterName] as a dropdown of the names in the IntroCutscene's Characters list.
-/// Put this file in a folder called "Editor" inside Assets.
-/// </summary>
 [CustomPropertyDrawer(typeof(CharacterNameAttribute))]
 public class CharacterNameDrawer : PropertyDrawer
 {

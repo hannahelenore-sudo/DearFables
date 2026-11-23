@@ -18,7 +18,7 @@ public class BattleManager : MonoBehaviour
     public GameObject battleUIParent;
     public ScoreToBeatUI scoreToBeatUI;
     public NumberSpinnerUI numberSpinnerUI;
-    public ScoreShakeEffect scoreShakeEffect; // Reference to the score shake/fall script
+    public ScoreShakeEffect scoreShakeEffect;
 
     [Header("Current Round Text References")]
     public TextMeshProUGUI currentRoundText1;
@@ -31,22 +31,22 @@ public class BattleManager : MonoBehaviour
     public TextMeshProUGUI roundPopupText;
 
     [Header("Ending Sequence UI References")]
-    public GameObject endingRootObject;         // The ENDING parent GameObject
-    public RectTransform paperImgTransform;     // PAPERIMG RectTransform
-    public TextMeshProUGUI targetScoreTxt;      // TARGETSCORETXT
-    public TextMeshProUGUI yourScoreTxt;        // YOURSCORETXT
-    public TextMeshProUGUI starsGainedTxt;      // STARSGAINEDTEXT
-    public TextMeshProUGUI batteriesGainedTxt;  // BATTERIESGAINEDTEXT (on the paper, under the stars line)
-    public GameObject winGameObject;            // WIN parent object
-    public GameObject lostGameObject;           // LOST parent object
+    public GameObject endingRootObject;
+    public RectTransform paperImgTransform;
+    public TextMeshProUGUI targetScoreTxt;
+    public TextMeshProUGUI yourScoreTxt;
+    public TextMeshProUGUI starsGainedTxt;
+    public TextMeshProUGUI batteriesGainedTxt;
+    public GameObject winGameObject;
+    public GameObject lostGameObject;
 
     [Header("Ending Settings")]
-    public int starsGainedOnWin = 1;            // Configurable stars in inspector
+    public int starsGainedOnWin = 1;
     public float paperFlyDuration = 0.5f;
-    public float countAnimationDuration = 0.8f; // Duration per individual stat count
+    public float countAnimationDuration = 0.8f;
     public float stampAnimationDuration = 0.35f;
-    public float delayBeforeStamp = 1.0f;      // Wait time after stars gained before stamp plays
-    public float lossStampDelay = 0.5f;        // On a loss there is no paper: wait this long, then the LOST stamp drops
+    public float delayBeforeStamp = 1.0f;
+    public float lossStampDelay = 0.5f;
     public string returnSceneName = "YourOtherSceneName";
 
     [Header("Boon Meter")]
@@ -126,28 +126,21 @@ public class BattleManager : MonoBehaviour
     private bool isTutorialFight;
     private const string RoundIntroLockKey = "BattleManager.RoundIntro";
     private const string EndingLockKey = "BattleManager.Ending";
-    private bool starDroppedThisFight = true; // false when the enemy that started the fight is not a star enemy
+    private bool starDroppedThisFight = true;
 
     private void Awake()
     {
-        // The enemy that started the fight says whether beating it gives a star (EnemyChase > Drops Star)
         starDroppedThisFight = BattleStarReward.Take();
 
-        // Permanent boons: +hands per round (extra scoring attempts)
         maxRounds += BoonProgress.ExtraHands;
 
-        // Mood (Angry): -1 hand
         maxRounds = Mathf.Max(1, maxRounds + MoodManager.HandsModifier);
 
-        // Difficulty meter: the more stars / fights, the higher the score to beat
-        difficultyAtStart = DifficultyProgress.Meter; // remembered for the battery reward
-        // Balatro-style blinds: the score depends on how many enemies you have defeated (a star enemy is a bit higher)
+        difficultyAtStart = DifficultyProgress.Meter;
+
         battleTargetScore = DifficultyProgress.GetEnemyScore(starDroppedThisFight);
         Debug.Log("BattleManager: " + DifficultyProgress.BlindLabel + (starDroppedThisFight ? " (star enemy)" : "") + " -> target score " + battleTargetScore);
 
-        // Tsinelas is no longer automatic: during the number spinner the player gets a popup and chooses (see OnTsinelasUsed)
-
-        // Advantage Hit: you hit the enemy with a card before the fight -> smaller score to beat
         scoreBeforeAdvantage = battleTargetScore;
         advantageApplied = AdvantageHit.BeginBattle();
         if (advantageApplied)
@@ -165,7 +158,6 @@ public class BattleManager : MonoBehaviour
         if (scoreToBeatUI != null) SetCanvasGroupState(scoreToBeatUI.gameObject, false, 0f);
         if (numberSpinnerUI != null) SetCanvasGroupState(numberSpinnerUI.gameObject, false, 0f);
 
-        // Opening sequence = look only. Nothing can be pressed (the Tsinelas popup is unlocked later, only if the player owns it)
         if (scoreToBeatUI != null) SetGroupInteractable(scoreToBeatUI.gameObject, false);
         if (numberSpinnerUI != null) SetGroupInteractable(numberSpinnerUI.gameObject, false);
 
@@ -184,8 +176,6 @@ public class BattleManager : MonoBehaviour
         SetBattleUIInteractable(false);
     }
 
-    // The enemy that started the fight (EnemyChase) passes its picture on through BattleEnemy.
-    // Only an enemy with "Custom Battle Picture" on also flips / enlarges / moves it; others show as placed.
     private void ApplyEnemySprite()
     {
         bool hasEnemy = BattleEnemy.HasEnemy;
@@ -223,7 +213,7 @@ public class BattleManager : MonoBehaviour
             }
         }
 
-        BattleEnemy.Clear(); // a later fight that has no enemy (e.g. from a zone) won't reuse it
+        BattleEnemy.Clear();
     }
 
     private void Update()
@@ -238,15 +228,13 @@ public class BattleManager : MonoBehaviour
 
     private void Start()
     {
-        // Tutorial fight: fixed easy score, no difficulty scaling and no Advantage Hit change.
-        // Decided here (not in Awake) because the tutorial flag is only reliable once the scene has loaded.
         isTutorialFight = CardGameTutorialGate.IsTutorialFight;
         if (isTutorialFight)
         {
             battleTargetScore = tutorialTargetScore;
             scoreBeforeAdvantage = battleTargetScore;
             advantageApplied = false;
-            difficultyAtStart = 0f; // battery reward is also calculated without difficulty
+            difficultyAtStart = 0f;
             Debug.Log("BattleManager: tutorial fight -> target score " + battleTargetScore + " (difficulty not applied)");
         }
 
@@ -269,7 +257,7 @@ public class BattleManager : MonoBehaviour
     {
         InputLock.Pop(RoundIntroLockKey);
         InputLock.Pop(EndingLockKey);
-        AdvantageHit.EndBattle(); // the advantage only lasts for this fight
+        AdvantageHit.EndBattle();
     }
 
     public void OnCardSystemButtonClicked()
@@ -299,7 +287,6 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    /// <summary>Turns clicks / taps on or off for one UI object (adds a CanvasGroup if needed).</summary>
     private void SetGroupInteractable(GameObject targetObj, bool isInteractable)
     {
         if (targetObj == null) return;
@@ -311,7 +298,6 @@ public class BattleManager : MonoBehaviour
 
     public void SetBattleUIInteractable(bool isInteractable)
     {
-        // While the opening sequence plays, nothing may be unlocked (even by other scripts calling this)
         if (isOpeningSequenceActive && isInteractable) return;
 
         GameObject targetObj = battleUIParent;
@@ -374,23 +360,20 @@ public class BattleManager : MonoBehaviour
         if (!isTutorialFight)
         {
             DifficultyProgress.AddBattle();
-            DifficultyProgress.AddDefeat(); // enemy defeated: the next one is the next blind (not the tutorial)
+            DifficultyProgress.AddDefeat();
         }
         int starsEarned = starDroppedThisFight ? starsGainedOnWin : 0;
         if (starsEarned > 0) PlayerProgress.AddStars(starsEarned);
 
-        // Batteries: Balatro style - a base reward plus a bonus for every hand you had left.
-        // They drop in the world (BatteryDropper) when you are back in the game scene.
         int handsLeft = Mathf.Max(0, maxRounds - currentRoundNumber);
         int batteryReward = BatteryManager.CalculateFightReward(handsLeft, difficultyAtStart);
         BatteryManager.QueueDrop(batteryReward);
         Debug.Log("BattleManager: won with " + handsLeft + " hand(s) left at " + Mathf.RoundToInt(difficultyAtStart * 100f) + "% difficulty -> " + batteryReward + " batteries");
 
-        MoodManager.OnFightEnded(); // timed moods count down
-        BoonProgress.AddMeter(boonMeterFillOnWin); // fills the boon meter in the overworld
+        MoodManager.OnFightEnded();
+        BoonProgress.AddMeter(boonMeterFillOnWin);
         SetBattleUIInteractable(false);
 
-        // Trigger the bread-like falling effect when score hits zero
         if (scoreShakeEffect != null)
         {
             scoreShakeEffect.TriggerFallDown();
@@ -406,10 +389,10 @@ public class BattleManager : MonoBehaviour
         isMatchOver = true;
         hasPlayerLost = true;
 
-        PlayerHealth.Lose(1); // losing the card game costs a health card
-        MoodManager.OnFightEnded(); // timed moods count down
-        if (!isTutorialFight) DifficultyProgress.AddBattle(); // every fight nudges the difficulty meter up (not the tutorial)
-        BoonProgress.AddMeter(boonMeterFillOnLoss); // fills the boon meter in the overworld
+        PlayerHealth.Lose(1);
+        MoodManager.OnFightEnded();
+        if (!isTutorialFight) DifficultyProgress.AddBattle();
+        BoonProgress.AddMeter(boonMeterFillOnLoss);
         SetBattleUIInteractable(false);
 
         int finalYourScore = battleTargetScore - (deckManager != null ? deckManager.currentRemainingScore : 0);
@@ -418,11 +401,10 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator RunEndingSequence(bool isWin, int targetScore, int yourScore, int starsGained, int batteriesGained = 0)
     {
-        InputLock.Push(EndingLockKey); // nothing can be pressed during the ending (the click to exit is read directly)
+        InputLock.Push(EndingLockKey);
 
         if (cardSystemCanvas != null) cardSystemCanvas.gameObject.SetActive(false);
 
-        // 1. DIM OVERLAY (Sorting Order 500 - Dims background only)
         if (roundDimOverlay != null)
         {
             roundDimOverlay.gameObject.SetActive(true);
@@ -437,14 +419,12 @@ public class BattleManager : MonoBehaviour
                 roundDimOverlay.gameObject.AddComponent<GraphicRaycaster>();
         }
 
-        // 2. ENDING ROOT & PAPER (Sorting Order 501 - Sits brightly above dim)
         if (endingRootObject != null)
         {
             endingRootObject.SetActive(true);
             ConfigureEndingSortingOrders();
         }
 
-        // Handle Paper Sliding Animation using Anchored Position
         Vector2 finalAnchoredPos = Vector2.zero;
         if (paperImgTransform != null)
         {
@@ -460,14 +440,12 @@ public class BattleManager : MonoBehaviour
         if (winGameObject != null) winGameObject.SetActive(false);
         if (lostGameObject != null) lostGameObject.SetActive(false);
 
-        // Losing: no paper and no scores, only the LOST stamp drops onto the dimmed screen
         SetPaperVisible(isWin);
 
         if (isWin)
         {
             PlaySFX(paperSlideSound);
 
-            // Fly PAPERIMG smoothly from below using local anchoredPosition
             float elapsed = 0f;
             Vector2 startAnchoredPos = paperImgTransform != null ? paperImgTransform.anchoredPosition : Vector2.zero;
 
@@ -481,20 +459,15 @@ public class BattleManager : MonoBehaviour
             }
             if (paperImgTransform != null) paperImgTransform.anchoredPosition = finalAnchoredPos;
 
-            // 1. COUNT TARGET SCORE
             yield return StartCoroutine(CountStatSequence(targetScoreTxt, "Target Score: ", targetScore));
 
-            // 2. COUNT YOUR SCORE
             yield return StartCoroutine(CountStatSequence(yourScoreTxt, "Your Score: ", yourScore));
 
-            // 3. COUNT BATTERIES GAINED
             yield return StartCoroutine(CountStatSequence(batteriesGainedTxt, "Batteries Gained: ", batteriesGained));
 
-            // 4. COUNT STARS GAINED (only when this enemy gives a star)
             if (starDroppedThisFight)
                 yield return StartCoroutine(CountStatSequence(starsGainedTxt, "Stars Gained: ", starsGained));
 
-            // Delay after counting is fully done before the stamp animation plays
             yield return new GameSpeedWait(delayBeforeStamp);
         }
         else
@@ -502,7 +475,6 @@ public class BattleManager : MonoBehaviour
             yield return new GameSpeedWait(lossStampDelay);
         }
 
-        // 4. Enable Win or Lost Stamping Object with Stamping Animation (Absolute Top - Sorting Order 503)
         GameObject targetStampObj = isWin ? winGameObject : lostGameObject;
         if (targetStampObj != null)
         {
@@ -527,7 +499,6 @@ public class BattleManager : MonoBehaviour
         isWaitingForClickToExit = true;
     }
 
-    /// <summary>Shows or hides the paper and its three score lines (only the paper's own picture is hidden, so a stamp placed inside it still shows).</summary>
     private void SetPaperVisible(bool visible)
     {
         if (paperImgTransform != null)
@@ -540,13 +511,12 @@ public class BattleManager : MonoBehaviour
 
         if (targetScoreTxt != null) targetScoreTxt.gameObject.SetActive(visible);
         if (yourScoreTxt != null) yourScoreTxt.gameObject.SetActive(visible);
-        if (starsGainedTxt != null) starsGainedTxt.gameObject.SetActive(visible && starDroppedThisFight); // no star = line stays disabled
+        if (starsGainedTxt != null) starsGainedTxt.gameObject.SetActive(visible && starDroppedThisFight);
         if (batteriesGainedTxt != null) batteriesGainedTxt.gameObject.SetActive(visible);
     }
 
     private void ConfigureEndingSortingOrders()
     {
-        // 1. Paper / Root Canvas (Sorting Order 501 - Above dim overlay 500)
         if (endingRootObject != null)
         {
             Canvas rootCanvas = endingRootObject.GetComponent<Canvas>();
@@ -566,13 +536,11 @@ public class BattleManager : MonoBehaviour
             }
         }
 
-        // 2. Text Canvas/Layer (Sorting Order 502 - Directly above paper)
         SetCanvasOrder(targetScoreTxt, 502);
         SetCanvasOrder(yourScoreTxt, 502);
         SetCanvasOrder(starsGainedTxt, 502);
         SetCanvasOrder(batteriesGainedTxt, 502);
 
-        // 3. Win / Lose GameObjects (Sorting Order 503 - Absolute front of everything)
         if (winGameObject != null)
         {
             Canvas winCanvas = winGameObject.GetComponent<Canvas>();
@@ -691,12 +659,10 @@ public class BattleManager : MonoBehaviour
 
         if (BattleTransition.IsPlaying)
         {
-            // Safety: never get stuck in the card game
             SceneManager.LoadScene(returnSceneName);
         }
         else
         {
-            // Fade to black, load the game scene under the black, then fade back in
             BattleTransition.PlayFade(() => SceneManager.LoadScene(returnSceneName), 0.6f);
         }
     }
@@ -745,7 +711,6 @@ public class BattleManager : MonoBehaviour
 
         yield return new GameSpeedWait(delayBetweenSequences);
 
-        // Cross-fade: Score To Beat fades out while the number spinner fades in (and starts spinning) at the same time
         Coroutine scoreFadeOut = null;
         if (scoreToBeatUI != null)
         {
@@ -756,14 +721,13 @@ public class BattleManager : MonoBehaviour
         {
             numberSpinnerUI.SetNumberLimits(1, 10);
 
-            // The ONLY allowed interaction in the opening: tapping the Tsinelas popup (and only if the player has it)
             bool canUseTsinelas = TrinketInventory.Has(TrinketType.Tsinelas);
             SetGroupInteractable(numberSpinnerUI.gameObject, canUseTsinelas);
 
             Coroutine spinnerFadeIn = StartCoroutine(FadeCanvasGroup(numberSpinnerUI.gameObject, 0f, 1f, crossFadeDuration));
 
             bool isSpinnerComplete = false;
-            // Tsinelas: the spinner pauses after the roll and offers a reroll of the enemy defence
+
             System.Func<int> tsinelasOffer = TrinketInventory.Has(TrinketType.Tsinelas) ? (System.Func<int>)OnTsinelasUsed : null;
 
             numberSpinnerUI.StartSequence((resultNumber) =>
@@ -771,9 +735,9 @@ public class BattleManager : MonoBehaviour
                 rolledNumber = resultNumber;
                 PlaySFX(spinnerResultSound);
                 isSpinnerComplete = true;
-            }, true, tsinelasOffer); // the fade-in above controls the alpha
+            }, true, tsinelasOffer);
             while (!isSpinnerComplete) yield return null;
-            SetGroupInteractable(numberSpinnerUI.gameObject, false); // spinner is done: locked again for the rest of the opening
+            SetGroupInteractable(numberSpinnerUI.gameObject, false);
             yield return spinnerFadeIn;
         }
 
@@ -809,7 +773,6 @@ public class BattleManager : MonoBehaviour
         SetBattleUIInteractable(true);
     }
 
-    /// <summary>Called by the spinner when the player taps the Tsinelas popup. Rerolls the score to beat and returns the new value.</summary>
     private int OnTsinelasUsed()
     {
         int before = battleTargetScore;
@@ -825,7 +788,6 @@ public class BattleManager : MonoBehaviour
         return battleTargetScore;
     }
 
-    // Every button is locked while the round intro plays (see InputLock)
     public IEnumerator PlayRoundIntroSequence(int roundNum)
     {
         InputLock.Push(RoundIntroLockKey);
@@ -856,7 +818,7 @@ public class BattleManager : MonoBehaviour
         PlaySFX((roundNum >= maxRounds && finalRoundSound != null) ? finalRoundSound : roundIntroSound);
 
         roundDimOverlay.gameObject.SetActive(true);
-        roundDimOverlay.raycastTarget = true; // the dim overlay swallows clicks during the intro
+        roundDimOverlay.raycastTarget = true;
         roundPopupText.gameObject.SetActive(true);
 
         Color dimColor = roundDimOverlay.color;
@@ -922,7 +884,7 @@ public class BattleManager : MonoBehaviour
         while (elapsedTime < duration)
         {
             elapsedTime += GameSpeed.DeltaTime;
-            canvasGroup.alpha = Mathf.SmoothStep(startAlpha, endAlpha, Mathf.Clamp01(elapsedTime / duration)); // eased, so it starts and ends softly
+            canvasGroup.alpha = Mathf.SmoothStep(startAlpha, endAlpha, Mathf.Clamp01(elapsedTime / duration));
             yield return null;
         }
 

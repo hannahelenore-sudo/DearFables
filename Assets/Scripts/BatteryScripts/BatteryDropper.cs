@@ -2,13 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Spawns BatteryPickups that burst out like Mario coins.
-/// Two ways to use it:
-///  1) On an ENEMY: call GetComponent&lt;BatteryDropper&gt;().Drop() when that enemy is defeated.
-///  2) One in the game scene (Tools > Battery > Create Battery Drops): after you WIN a fight, the batteries you earned
-///     drop where you were standing when the fight started. Nothing else to hook up.
-/// </summary>
 public class BatteryDropper : MonoBehaviour
 {
     [Tooltip("The battery pickup to spawn (Tools > Battery > Create Battery Pickup Prefab). If empty, a plain yellow dot is used.")]
@@ -38,7 +31,6 @@ public class BatteryDropper : MonoBehaviour
     private PlayerMovement player;
     private float nextPlayerSearch;
 
-    // Safety net: if the scene you return to has no scene-level dropper, make one, so won batteries ALWAYS drop.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void HookSceneLoad()
     {
@@ -48,12 +40,12 @@ public class BatteryDropper : MonoBehaviour
 
     private static void EnsureSceneDropper(Scene scene, LoadSceneMode mode)
     {
-        if (scene.name == CardGameTutorialGate.CardGameSceneName) return; // only the game scene drops / tracks
+        if (scene.name == CardGameTutorialGate.CardGameSceneName) return;
 
-        BatteryDropper template = null; // a dropper of yours that has a pickup prefab assigned
+        BatteryDropper template = null;
         foreach (BatteryDropper d in Object.FindObjectsByType<BatteryDropper>(FindObjectsSortMode.None))
         {
-            if (d.dropPendingOnStart) return; // you already set one up
+            if (d.dropPendingOnStart) return;
             if (template == null && d.pickupPrefab != null) template = d;
         }
 
@@ -62,11 +54,9 @@ public class BatteryDropper : MonoBehaviour
         auto.dropPendingOnStart = true;
         auto.trackPlayerPosition = true;
 
-        // Use YOUR pickup prefab and settings instead of the plain yellow dot
         if (template != null) auto.CopySettingsFrom(template);
     }
 
-    /// <summary>Takes the prefab and drop settings of another dropper (not the pending-drop switches).</summary>
     public void CopySettingsFrom(BatteryDropper other)
     {
         if (other == null) return;
@@ -84,7 +74,6 @@ public class BatteryDropper : MonoBehaviour
     {
         if (!dropPendingOnStart) return;
 
-        // Read these NOW, before the position tracking below overwrites the fight location
         int total = BatteryManager.TakePendingDrop();
         if (total <= 0) return;
 
@@ -93,7 +82,7 @@ public class BatteryDropper : MonoBehaviour
         else
         {
             PlayerMovement p = Object.FindAnyObjectByType<PlayerMovement>();
-            where = p != null ? p.transform.position : transform.position; // no saved spot: drop at the player
+            where = p != null ? p.transform.position : transform.position;
         }
         StartCoroutine(DropAfterDelay(where, total));
     }
@@ -105,7 +94,7 @@ public class BatteryDropper : MonoBehaviour
         if (player == null && Time.unscaledTime >= nextPlayerSearch)
         {
             player = Object.FindAnyObjectByType<PlayerMovement>();
-            nextPlayerSearch = Time.unscaledTime + 0.5f; // don't search every frame (menus have no player)
+            nextPlayerSearch = Time.unscaledTime + 0.5f;
         }
         if (player != null && Time.timeScale > 0f)
             BatteryManager.RememberPlayerPosition(player.transform.position);
@@ -117,7 +106,6 @@ public class BatteryDropper : MonoBehaviour
         DropAt(where, total);
     }
 
-    /// <summary>Drops 'amount' batteries at this object.</summary>
     public void Drop()
     {
         DropAt(transform.position, amount);
@@ -147,7 +135,6 @@ public class BatteryDropper : MonoBehaviour
             if (pickup == null) pickup = go.AddComponent<BatteryPickup>();
             pickup.value = value;
 
-            // Spread them around in a circle, each with a little random push
             float angle = (i / (float)pickups) * Mathf.PI * 2f + Random.Range(-0.4f, 0.4f);
             float speed = Random.Range(scatterSpeed * 0.5f, scatterSpeed);
             Vector3 v = new Vector3(Mathf.Cos(angle) * speed, popUpSpeed * Random.Range(0.8f, 1.2f), Mathf.Sin(angle) * speed);
@@ -155,7 +142,6 @@ public class BatteryDropper : MonoBehaviour
         }
     }
 
-    // Used when no prefab is assigned: a plain yellow dot, so it works with zero setup
     private static Sprite placeholderSprite;
 
     private static GameObject CreatePlaceholderPickup()

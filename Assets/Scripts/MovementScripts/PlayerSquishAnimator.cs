@@ -1,15 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Adds "juice" to the player sprite:
-///  - Idle breathing (subtle squish)
-///  - Little bounce while running
-///  - Stretch in the air, squash on landing, stretch on takeoff
-///  - Leans into the direction of travel (more when running / dashing)
-///
-/// Put this on the PLAYER object (the one with the Rigidbody).
-/// Best results: the SpriteRenderer lives on a CHILD object, assigned to "Visual".
-/// </summary>
 public class PlayerSquishAnimator : MonoBehaviour
 {
     [Header("References")]
@@ -64,7 +54,6 @@ public class PlayerSquishAnimator : MonoBehaviour
     private Quaternion baseRot;
     private float spriteBottom;
 
-    // Squash spring (positive = squashed, negative = stretched)
     private float squash;
     private float squashVel;
     private float airStretch;
@@ -117,7 +106,6 @@ public class PlayerSquishAnimator : MonoBehaviour
         }
     }
 
-    // LateUpdate so we apply after the Animator has run
     void LateUpdate()
     {
         float dt = Mathf.Min(Time.deltaTime, 0.033f);
@@ -128,7 +116,6 @@ public class PlayerSquishAnimator : MonoBehaviour
         float speed = flat.magnitude;
         bool grounded = CheckGrounded();
 
-        // ---- Takeoff / landing detection ----
         if (grounded)
         {
             if (!wasGrounded)
@@ -156,16 +143,13 @@ public class PlayerSquishAnimator : MonoBehaviour
         }
         wasGrounded = grounded;
 
-        // ---- Spring (landing / takeoff wobble) ----
         float acc = -springStiffness * squash - springDamping * squashVel;
         squashVel += acc * dt;
         squash += squashVel * dt;
 
-        // ---- Stretch while in the air ----
         float targetAir = grounded ? 0f : -Mathf.Clamp(Mathf.Abs(vel.y) * airStretchAmount, 0f, maxAirStretch);
         airStretch = Mathf.Lerp(airStretch, targetAir, 1f - Mathf.Exp(-15f * dt));
 
-        // ---- Idle vs run weights ----
         float runTarget = (grounded && speed > 0.1f) ? Mathf.Clamp01(speed / leanSpeedReference) : 0f;
         float idleTarget = (grounded && speed <= 0.1f) ? 1f : 0f;
         runWeight = Mathf.Lerp(runWeight, runTarget, 1f - Mathf.Exp(-10f * dt));
@@ -177,7 +161,6 @@ public class PlayerSquishAnimator : MonoBehaviour
         float breath = -Mathf.Sin(breathPhase) * breathAmount * idleWeight;
         float runBob = -Mathf.Sin(runPhase) * runBobAmount * runWeight;
 
-        // ---- Combine into one squash value and apply ----
         float s = Mathf.Clamp(squash + airStretch + breath + runBob, -0.35f, 0.45f);
 
         float scaleY = 1f - s;
@@ -190,7 +173,6 @@ public class PlayerSquishAnimator : MonoBehaviour
             visual.localPosition = basePos + baseRot * (Vector3.up * offset);
         }
 
-        // ---- Lean into movement direction ----
         Vector3 right = Vector3.right;
         Vector3 fwd = Vector3.forward;
         Camera cam = Camera.main;
@@ -204,7 +186,7 @@ public class PlayerSquishAnimator : MonoBehaviour
             fwd.y = 0f;
             if (fwd.sqrMagnitude < 0.001f)
             {
-                fwd = cam.transform.up; // looking straight down
+                fwd = cam.transform.up;
                 fwd.y = 0f;
             }
             fwd = fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;

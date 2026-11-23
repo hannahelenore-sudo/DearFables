@@ -1,10 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Shows PlayerStamina as a bar. The Fill is shrunk from the right, so any sprite
-/// (pixel art, sliced, plain colour) works without needing a "Filled" image type.
-/// </summary>
 public class StaminaBarHUD : MonoBehaviour
 {
     [Header("References")]

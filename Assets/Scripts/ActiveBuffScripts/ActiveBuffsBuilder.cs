@@ -4,35 +4,26 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Must live in a folder named "Editor".
-// Builds the Active Buffs bar (left side of the screen) as the hand-drawn ruled card (b_gg.png),
-// laid out like the Stats page of the GameMenu. Everything is placed in the PNG's own pixel coordinates.
-//
-// BEFORE YOU RUN IT: put b_gg.png in your project (Assets/Resources/MenuUI/ is a good place, next to the menu art)
-// and set its Texture Type to "Sprite (2D and UI)". Delete the old Active Buffs bar from the scene first.
 public static class ActiveBuffsBuilder
 {
     private const string CardSpriteName = "b_gg";
 
-    // The PNG is 1920 x 1080, but the drawn card only covers this part of it
     private const float PngW = 1920f, PngH = 1080f;
     private const float CardLeft = 301f, CardRight = 1591f, CardTop = 48f, CardBottom = 992f;
 
-    // On-screen size of the card (1 = the PNG at full size)
     private const float DefaultScale = 0.5f;
 
     private static readonly Color Navy = new Color(47f / 255f, 51f / 255f, 105f / 255f, 1f);
     private static readonly Color BoxFill = new Color(0.95f, 0.99f, 1f, 1f);
-    private static readonly Color CardBlue = new Color(0.74f, 0.83f, 0.93f, 1f); // only used if the PNG is missing
+    private static readonly Color CardBlue = new Color(0.74f, 0.83f, 0.93f, 1f); 
 
-    // The ruled lines of the card: text sits in the gap between two lines (centre of each gap, y down from the PNG's top)
-    private const float RowMood = 384f;       // gap 355-419   (the portrait is on the right: keep these two narrow)
-    private const float RowBoons = 449f;      // gap 419-486
-    private const float RowBlueprint = 517f;  // gap 486-553
-    private const float RowTrinkets1 = 587f;  // gap 553-626
-    private const float RowTrinkets2 = 655f;  // gap 626-691
-    private const float RowTrinkets3 = 717f;  // gap 691-750
-    private const float RowAdvantage = 779f;  // gap 750-815 (the little star is bottom right: keep it narrow)
+    private const float RowMood = 384f;       
+    private const float RowBoons = 449f;      
+    private const float RowBlueprint = 517f;  
+    private const float RowTrinkets1 = 587f;  
+    private const float RowTrinkets2 = 655f;  
+    private const float RowTrinkets3 = 717f;  
+    private const float RowAdvantage = 779f;  
 
     private const float TextX = 382f;
     private const float RowSize = 44f;
@@ -50,10 +41,9 @@ public static class ActiveBuffsBuilder
             return;
         }
 
-        // ---- Copy what we can from the Trinket bar ----
         TrinketSidebar trinket = Object.FindAnyObjectByType<TrinketSidebar>();
         int order = 45;
-        font = FindAsset<TMP_FontAsset>("MenuFont"); // the menu's own font, so the two match
+        font = FindAsset<TMP_FontAsset>("MenuFont"); 
 
         if (trinket != null)
         {
@@ -96,16 +86,14 @@ public static class ActiveBuffsBuilder
         bar.cardLeft = CardLeft;
         bar.cardRight = CardRight;
 
-        // ---- The card: a PNG-sized block, vertically centred on the left edge. It slides left to hide. ----
         GameObject root = NewUI("SlideRoot", canvasGO.transform);
         RectTransform rr = root.GetComponent<RectTransform>();
         rr.anchorMin = rr.anchorMax = new Vector2(0f, 0.5f);
         rr.pivot = new Vector2(0f, 0.5f);
         rr.sizeDelta = new Vector2(PngW, PngH);
         rr.localScale = new Vector3(DefaultScale, DefaultScale, 1f);
-        // the drawn card is a little lower than the PNG's middle: nudge so it is centred on screen
         float centreShift = (PngH * 0.5f - (CardTop + CardBottom) * 0.5f) * DefaultScale;
-        rr.anchoredPosition = new Vector2(-CardRight * DefaultScale, centreShift); // starts closed
+        rr.anchoredPosition = new Vector2(-CardRight * DefaultScale, centreShift); 
         bar.slideRoot = rr;
 
         GameObject cardGO = NewUI("Card", root.transform);
@@ -115,7 +103,6 @@ public static class ActiveBuffsBuilder
         if (cardSprite != null) { cardImg.sprite = cardSprite; cardImg.color = Color.white; }
         else cardImg.color = CardBlue;
 
-        // invisible rectangle over the drawn card: blocks clicks to the world and tells the script where the mouse is
         GameObject hit = NewUI("HitArea", root.transform);
         RectTransform hr = hit.GetComponent<RectTransform>();
         Place(hr, new Vector2(CardLeft, CardTop), new Vector2(CardRight - CardLeft, CardBottom - CardTop), new Vector2(0f, 1f));
@@ -124,29 +111,24 @@ public static class ActiveBuffsBuilder
         hitImg.raycastTarget = true;
         bar.hitArea = hr;
 
-        // ---- Sun / Wind / Speed across the top (left of the portrait) ----
         const float statY = 205f;
         bar.sunPower = MakeStat(root.transform, "SunPower", "SUN", new Vector2(640f, statY), new Vector2(690f, statY), new Vector2(120f, 90f));
         bar.windPower = MakeStat(root.transform, "WindPower", "WIND", new Vector2(860f, statY), new Vector2(910f, statY), new Vector2(120f, 90f));
         bar.moveSpeed = MakeStat(root.transform, "MoveSpeed", "SPD", new Vector2(1080f, statY), new Vector2(1130f, statY), new Vector2(105f, 90f));
 
-        // ---- The written rows, each on its own ruled line ----
         bar.moodSection = MakeLine(root.transform, "Moods", "Moods", RowMood, 850f);
         bar.boonsSection = MakeLine(root.transform, "Boons", "Boons", RowBoons, 850f);
         bar.structureSection = MakeLine(root.transform, "Blueprints", "Blueprints", RowBlueprint, 1190f);
 
-        // Trinkets can be many: three ruled lines, the text continues on the next one when a line is full
         bar.trinketsSection = MakeLine(root.transform, "Trinkets", "Trinkets", RowTrinkets1, 1190f);
         bar.trinketsSection.moreLines = new TMP_Text[]
         {
             MakeRowText(root.transform, "Trinkets2", "", RowTrinkets2, 1190f, false),
             MakeRowText(root.transform, "Trinkets3", "", RowTrinkets3, 1190f, false)
         };
-        bar.trinketsSection.text.enableAutoSizing = false; // these lines wrap by themselves instead of shrinking
 
         bar.advantageSection = MakeLine(root.transform, "AdvantageHit", "Advantage hit", RowAdvantage, 980f);
 
-        // ---- Toggle tab (sticks out of the card's right edge so it stays visible when the card is hidden) ----
         GameObject tab = NewUI("Tab", root.transform);
         RectTransform tr = tab.GetComponent<RectTransform>();
         Place(tr, new Vector2(CardRight - 6f, 520f), new Vector2(96f, 156f), new Vector2(0f, 0.5f));
@@ -170,12 +152,10 @@ public static class ActiveBuffsBuilder
         Stretch(arrow.gameObject);
         bar.toggleArrow = arrow;
 
-        // ---- Icons: the menu's own Sun / Wind / Speed icons if they exist, otherwise the Trinket bar's ----
         FillIcon(bar.sunPower, "Sun_Icon", trinket != null ? trinket.sunPower : null);
         FillIcon(bar.windPower, "Wind_Icon", trinket != null ? trinket.windPower : null);
         FillIcon(bar.moveSpeed, "Speed_Icon", trinket != null ? trinket.moveSpeed : null);
 
-        // ---- Power cards (their current value is the Sun / Wind stat) ----
         bar.sunCard = FindAsset<SolarCard>(null);
         bar.windCard = FindAsset<WindCard>(null);
 
@@ -187,11 +167,6 @@ public static class ActiveBuffsBuilder
                   "Size: change 'Panel Scale' on the bar. Text positions are the children of SlideRoot, in the PNG's pixels.");
     }
 
-    // ------------------------------------------------------------------
-    // Pieces
-    // ------------------------------------------------------------------
-
-    // One row of text on a ruled line. The title is written in bold in front of it by the script.
     private static ActiveBuffsSidebar.Section MakeLine(Transform parent, string name, string title, float y, float width)
     {
         ActiveBuffsSidebar.Section s = new ActiveBuffsSidebar.Section();
@@ -211,7 +186,6 @@ public static class ActiveBuffsBuilder
         t.overflowMode = TextOverflowModes.Ellipsis;
         if (fit)
         {
-            // a long line shrinks (down to half size) instead of running off the card
             t.enableAutoSizing = true;
             t.fontSizeMax = RowSize;
             t.fontSizeMin = RowSize * 0.5f;
@@ -219,7 +193,6 @@ public static class ActiveBuffsBuilder
         return t;
     }
 
-    // icon + number (+ a small text label that is only shown while the icon has no sprite)
     private static ActiveBuffsSidebar.StatRow MakeStat(Transform parent, string name, string fallback, Vector2 iconCentre, Vector2 textPos, Vector2 textBox)
     {
         GameObject icon = NewUI(name + "Icon", parent);
@@ -235,7 +208,7 @@ public static class ActiveBuffsBuilder
 
         TextMeshProUGUI value = AddText(parent, name + "Value", "0", 62f, Navy, FontStyles.Bold, TextAlignmentOptions.Left);
         Place(value.rectTransform, textPos, textBox, new Vector2(0f, 0.5f));
-        value.enableAutoSizing = true; // long numbers shrink instead of wrapping
+        value.enableAutoSizing = true; 
         value.fontSizeMax = 62f;
         value.fontSizeMin = 24f;
 #pragma warning disable 618
@@ -261,11 +234,6 @@ public static class ActiveBuffsBuilder
         }
     }
 
-    // ------------------------------------------------------------------
-    // Finding assets
-    // ------------------------------------------------------------------
-
-    // "Sun_Icon", "Sun Icon" and "sun-icon" all count as the same name
     private static string Norm(string s)
     {
         System.Text.StringBuilder sb = new System.Text.StringBuilder();
@@ -274,8 +242,6 @@ public static class ActiveBuffsBuilder
         return sb.ToString();
     }
 
-    // Finds a sprite by its file name (spaces / underscores / case ignored). Also works when the PNG's Sprite Mode is
-    // "Multiple" (sprites are then called b_gg_0 ...): the first sprite of that file is used.
     private static Sprite FindSprite(string name)
     {
         string want = Norm(name);
@@ -299,7 +265,6 @@ public static class ActiveBuffsBuilder
         return null;
     }
 
-    // by type (and, when a name is given, by name)
     private static T FindAsset<T>(string name) where T : Object
     {
         string filter = "t:" + typeof(T).Name + (string.IsNullOrEmpty(name) ? "" : " " + name);
@@ -308,11 +273,6 @@ public static class ActiveBuffsBuilder
         return AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(guids[0]));
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
-    // Position in the PNG's pixels: from the top-left corner, y going DOWN. 'pivot' says which point of the object sits there.
     private static void Place(RectTransform r, Vector2 pos, Vector2 size, Vector2 pivot)
     {
         r.anchorMin = r.anchorMax = new Vector2(0f, 1f);

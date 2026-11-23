@@ -3,11 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// The little circle that shows the player's mood, with the mood's name at the bottom.
-/// Build it with  Tools > HUD > Create Player HUD  and then just swap the sprites.
-/// Each mood's face comes from its MoodData asset (Resources/Moods). Moods without a face use Default Portrait.
-/// </summary>
 public class MoodHUD : MonoBehaviour
 {
     [Header("UI")]
@@ -96,7 +91,6 @@ public class MoodHUD : MonoBehaviour
         if (fightsText != null && timed) fightsText.text = MoodManager.FightsLeft.ToString();
     }
 
-    /// <summary>Makes the circle bounce, optionally with a popup text (DeckManager uses this when a mood effect triggers).</summary>
     public static void Pulse(string label = null)
     {
         if (instance == null) return;

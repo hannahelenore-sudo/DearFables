@@ -15,7 +15,6 @@ public class SolarCard : CardData
     public AudioClip bonusSound;
     [Range(0f, 1f)] public float bonusVolume = 1f;
 
-    /// <summary>The set bonus Mult including the Solar Panel's Mult upgrades.</summary>
     public float EffectiveMultiplier
     {
         get { return multiplier + StructureProgress.MultBonus(StructureType.Solar); }
@@ -23,7 +22,6 @@ public class SolarCard : CardData
 
     public override int GetEffectiveValue()
     {
-        // Keeps whatever the base class already adds, then the Solar Panel's Power upgrade (halved by Low Power like the rest)
         return base.GetEffectiveValue() + ApplyLowPower(StructureProgress.PowerBonus(StructureType.Solar));
     }
 

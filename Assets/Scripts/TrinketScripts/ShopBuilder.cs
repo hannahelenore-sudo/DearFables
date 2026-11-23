@@ -5,16 +5,11 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
-// Must live in a folder named "Editor".
 public static class ShopBuilder
 {
-    // ------------------------------------------------------------------
-    // Tools > Shop > Create Shop UI
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Shop/Create Shop UI")]
     public static void CreateShopUI()
     {
-        // Canvas
         GameObject canvasGO = new GameObject("ShopCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Undo.RegisterCreatedObjectUndo(canvasGO, "Create Shop UI");
 
@@ -34,7 +29,6 @@ public static class ShopBuilder
             Undo.RegisterCreatedObjectUndo(es, "Create Shop UI");
         }
 
-        // Script holder (always active) + the part that is shown/hidden
         GameObject shopGO = NewUI("TrinketShop", canvasGO.transform);
         Stretch(shopGO);
         TrinketShopUI ui = shopGO.AddComponent<TrinketShopUI>();
@@ -53,7 +47,6 @@ public static class ShopBuilder
         AddText(panel.transform, "Title", "Trinket Shop", 44, new Color(1f, 0.93f, 0.7f), FontStyles.Bold,
             TextAlignmentOptions.Center, new Vector2(0f, 280f), new Vector2(600f, 70f));
 
-        // 3 slots
         TrinketShopUI.Slot[] slots = new TrinketShopUI.Slot[3];
         float[] xs = { -340f, 0f, 340f };
         Color ink = new Color(0.25f, 0.16f, 0.08f);
@@ -99,13 +92,11 @@ public static class ShopBuilder
             };
         }
 
-        // Reshuffle + close
         Button reshuffle = NewButton(panel.transform, "ReshuffleButton", "RESHUFFLE", new Color(0.25f, 0.6f, 0.3f),
             new Vector2(0f, -285f), new Vector2(320f, 70f), 34);
         Button close = NewButton(panel.transform, "CloseButton", "X", new Color(0.7f, 0.2f, 0.2f),
             new Vector2(500f, 285f), new Vector2(60f, 60f), 34);
 
-        // Shopkeeper dialogue box (just a name + text, no character sprites)
         GameObject box = NewUI("DialogueBox", root.transform);
         SetRect(box, new Vector2(0f, -400f), new Vector2(1100f, 170f));
         AddImage(box, new Color(0.10f, 0.07f, 0.05f, 0.95f));
@@ -132,9 +123,6 @@ public static class ShopBuilder
         Debug.Log("Shop UI created. It is visible in the editor so you can style it; it hides itself when the game starts.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > Shop > Create Shop World Objects
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Shop/Create Shop World Objects")]
     public static void CreateWorldObjects()
     {
@@ -153,15 +141,12 @@ public static class ShopBuilder
 
         ShopInteractable interact = car.GetComponent<ShopInteractable>();
         interact.shopUI = Object.FindAnyObjectByType<TrinketShopUI>();
-        interact.shopkeeper = keeper.transform; // the "Press E" prompt floats above the shopkeeper
+        interact.shopkeeper = keeper.transform;
 
         Selection.activeObject = car;
         Debug.Log("Created 'Shopkeeper' and 'Shop Car'. Assign your sprites in their Sprite Renderers, then resize the Box Collider on the car to fit it.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > Shop > Create Trinket Sidebar
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Shop/Create Trinket Sidebar")]
     public static void CreateSidebar()
     {
@@ -178,7 +163,7 @@ public static class ShopBuilder
 
         Canvas canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 60; // above the shop (50) so you can still sell while it is open
+        canvas.sortingOrder = 60;
 
         CanvasScaler scaler = canvasGO.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -198,18 +183,15 @@ public static class ShopBuilder
         Color frameColor = new Color(0.58f, 0.58f, 0.58f, 1f);
         Color ink = new Color(0.25f, 0.16f, 0.08f);
 
-        // The sliding part: anchored to the right edge, middle of the screen
         GameObject slide = NewUI("SlideRoot", canvasGO.transform);
         RectTransform sr = slide.GetComponent<RectTransform>();
         sr.anchorMin = sr.anchorMax = new Vector2(1f, 0.5f);
         sr.pivot = new Vector2(1f, 0.5f);
-        // Already short: the Sun / Wind / Speed stats live in the Active Buffs bar, so no room is left for them here
         sr.sizeDelta = new Vector2(190f, 696f);
         sr.anchoredPosition = Vector2.zero;
-        sr.localScale = new Vector3(0.75f, 0.75f, 1f); // matches 'Panel Scale' on the TrinketSidebar
+        sr.localScale = new Vector3(0.75f, 0.75f, 1f);
         AddImage(slide, panelColor);
 
-        // 5 empty frames (top slot = first effect to trigger)
         RectTransform[] frames = new RectTransform[TrinketInventory.MaxTrinkets];
         for (int i = 0; i < frames.Length; i++)
         {
@@ -220,7 +202,6 @@ public static class ShopBuilder
             frames[i] = f.GetComponent<RectTransform>();
         }
 
-        // Item template (cloned for every trinket you own)
         GameObject tpl = NewUI("ItemTemplate", slide.transform);
         SetRect(tpl, Vector2.zero, new Vector2(160f, 120f));
         Image tplBg = AddImage(tpl, new Color(0.96f, 0.90f, 0.75f));
@@ -249,9 +230,6 @@ public static class ShopBuilder
         tplView.selectedOutline = outline;
         tpl.SetActive(false);
 
-        // Stats: Sun Power, Wind Power, Movement Speed. They are shown in the Active Buffs bar, so this holder is
-        // created HIDDEN (the icons here are only the source the Active Buffs builder copies from).
-        // Assign your stat icon sprites on the Icon images inside "Stats (hidden)".
         GameObject statsHolder = NewUI("Stats (hidden)", slide.transform);
         SetRect(statsHolder, Vector2.zero, new Vector2(190f, 240f));
         TrinketSidebar.StatRow sun = NewStatRow(statsHolder.transform, "SunPower", new Vector2(0f, 70f), new Color(1f, 0.75f, 0.1f));
@@ -259,7 +237,6 @@ public static class ShopBuilder
         TrinketSidebar.StatRow speed = NewStatRow(statsHolder.transform, "MoveSpeed", new Vector2(0f, -70f), new Color(0.55f, 0.33f, 0.15f));
         statsHolder.SetActive(false);
 
-        // Open / close tab on the left edge of the bar
         GameObject tab = NewUI("ToggleTab", slide.transform);
         RectTransform tr = tab.GetComponent<RectTransform>();
         tr.anchorMin = tr.anchorMax = new Vector2(0f, 0.5f);
@@ -272,7 +249,6 @@ public static class ShopBuilder
         TextMeshProUGUI arrow = AddText(tab.transform, "Arrow", ">", 44, new Color(0.8f, 0.8f, 0.8f), FontStyles.Bold,
             TextAlignmentOptions.Center, Vector2.zero, new Vector2(46f, 120f));
 
-        // Info card (shown on hover / selection, sits left of the tab)
         GameObject card = NewUI("InfoCard", slide.transform);
         SetRect(card, new Vector2(-330f, 0f), new Vector2(300f, 240f));
         AddImage(card, new Color(0.10f, 0.07f, 0.05f, 0.95f));
@@ -301,7 +277,7 @@ public static class ShopBuilder
         bar.sellButton = sell;
 
         Selection.activeObject = canvasGO;
-        bar.statsLiveInBuffBar = true; // stats are hidden and the bar is short already (baked in)
+        bar.statsLiveInBuffBar = true;
 
         Debug.Log("Trinket Sidebar created. It is shown open in the editor so you can style it; in play mode it starts closed, opens with the shop, and follows you into the card scene. Assign the stat icons, slot sprites and sounds on the TrinketSidebar component.");
     }
@@ -319,10 +295,6 @@ public static class ShopBuilder
 
         return new TrinketSidebar.StatRow { icon = icon, valueText = value };
     }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private static GameObject NewUI(string name, Transform parent)
     {

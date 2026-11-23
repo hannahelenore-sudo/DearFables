@@ -5,11 +5,6 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 
-/// <summary>
-/// One card in the hand. DeckManager decides WHERE the card belongs (slotPosition / slotRotation);
-/// this script makes it glide there with a springy, Balatro-style feel, and adds the
-/// lift / scale / tilt for hover and selection on top of that slot.
-/// </summary>
 public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Data Reference")]
@@ -54,11 +49,10 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     public float hoverScaleBonus = 0.05f;
 
     [Header("Hover Bubble Customization")]
-    public Vector2 bubbleOffset = new Vector2(0f, 35f); // Lowered closer to the card
+    public Vector2 bubbleOffset = new Vector2(0f, 35f);
     public Color bubbleBackgroundColor = new Color(0f, 0f, 0f, 0.85f);
     public Color bubbleTextColor = Color.yellow;
 
-    // ---- set by DeckManager.RebuildLayout ----
     [HideInInspector] public bool followSlot = false;
     [HideInInspector] public Vector2 slotPosition;
     [HideInInspector] public float slotRotation;
@@ -75,12 +69,11 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
     private TextMeshProUGUI bubbleTextComponent;
     private Image bubbleIconImage;
 
-    // spring state
     private Vector2 posVel;
     private float scaleVel, rotVel;
     private float curScale = 1f, curRot = 0f;
 
-    private float currentVisualOffsetY = 0f; // legacy (AnimateToLayout)
+    private float currentVisualOffsetY = 0f;
     public bool isAnimatingToLayout = false;
 
     private static System.Reflection.FieldInfo scoringField;
@@ -119,7 +112,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
     public void ApplySelectionStateImmediately()
     {
-        if (isAnimatingToLayout || followSlot) return; // slot-following cards handle this every frame
+        if (isAnimatingToLayout || followSlot) return;
 
         if (isSelected)
         {
@@ -140,10 +133,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         }
     }
 
-    // ------------------------------------------------------------------
-    // Spring motion toward the slot (runs every frame)
-    // ------------------------------------------------------------------
-
     void LateUpdate()
     {
         UpdateBubbleOrientation();
@@ -160,24 +149,20 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         float targetRot = slotRotation + (hoverLift ? GetPointerTilt() : 0f);
         Vector2 targetPos = slotPosition + new Vector2(0f, lift);
 
-        // position
         Vector2 pos = rectTransform.anchoredPosition;
         posVel += ((targetPos - pos) * springStiffness - posVel * springDamping) * dt;
         pos += posVel * dt;
         rectTransform.anchoredPosition = pos;
 
-        // scale
         scaleVel += ((targetScale - curScale) * springStiffness - scaleVel * springDamping) * dt;
         curScale += scaleVel * dt;
         transform.localScale = Vector3.one * curScale;
 
-        // rotation
         rotVel += ((targetRot - curRot) * springStiffness - rotVel * springDamping) * dt;
         curRot += rotVel * dt;
         rectTransform.localRotation = Quaternion.Euler(0f, 0f, curRot);
-        if (liquid != null) liquid.SetCardRotation(curRot); // the surface stays level as the card tilts
+        if (liquid != null) liquid.SetCardRotation(curRot);
 
-        // tint
         if (cardImage != null)
         {
             Color targetColor = isSelected ? cardTintOnSelect : cardDefaultTint;
@@ -198,7 +183,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         return 0f;
     }
 
-    /// <summary>Instantly places the card (used for spawning a card at the deck before it flies into the hand).</summary>
     public void SnapTo(Vector2 pos, float scale, float rotZ)
     {
         EnsureRefs();
@@ -219,10 +203,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         SnapTo(slotPosition, 1f, slotRotation);
     }
 
-    /// <summary>
-    /// Call after something else (dragging) moved the card, right before followSlot is turned back on.
-    /// The spring continues from where the card really is, so it glides into its slot instead of jumping.
-    /// </summary>
     public void SyncSpringState()
     {
         EnsureRefs();
@@ -247,7 +227,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             cardImage.sprite = cardData.cardArt;
         }
 
-        // Low Power cards look dimmed out, like they're genuinely weak
         if (cardData != null && cardData.isLowPower)
         {
             cardDefaultTint = lowPowerTint;
@@ -265,10 +244,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         UpdateBubbleText();
         StartCoroutine(InitializeSelectionState());
     }
-
-    // ------------------------------------------------------------------
-    // Low Power liquid: fills the bottom of the card, clipped to the card's shape
-    // ------------------------------------------------------------------
 
     private LowPowerLiquid liquid;
 
@@ -295,7 +270,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         EnsureRefs();
         if (rectTransform == null) return null;
 
-        // A container shaped like the card (its sprite is the mask), so the liquid never pokes out of rounded corners
         GameObject maskGO = new GameObject("LowPowerLiquidMask", typeof(RectTransform), typeof(LayoutElement));
         RectTransform mr = maskGO.GetComponent<RectTransform>();
         mr.SetParent(transform, false);
@@ -376,7 +350,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         activeValueBubble.SetActive(false);
     }
 
-    // Keeps the tooltip upright while the card tilts
     private void UpdateBubbleOrientation()
     {
         if (activeValueBubble != null && activeValueBubble.activeSelf)
@@ -427,7 +400,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             }
             else if (cardData is WindCard wind)
             {
-                int boost = wind.GetEffectiveValue() - wind.primaryValue; // Wind Power boon + mood Power
+                int boost = wind.GetEffectiveValue() - wind.primaryValue;
                 if (boost > 0)
                     bubbleTextComponent.text = $"{wind.GetEffectiveValue()}\n<size=85%>({wind.primaryValue} base +{boost} Wind Power)</size>";
                 else
@@ -465,16 +438,15 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         if (!CanHover()) return;
 
         isHovered = true;
-        scaleVel += selectPopKick * 0.4f; // tiny bounce on hover
+        scaleVel += selectPopKick * 0.4f;
         if (liquid != null) liquid.Slosh(28f);
 
-        // Draw the hovered card on top of its overlapping neighbours
         siblingBeforeHover = transform.GetSiblingIndex();
         transform.SetAsLastSibling();
 
         if (activeValueBubble != null)
         {
-            UpdateBubbleText(); // power can change while the card is in your hand (moods, debug power...)
+            UpdateBubbleText();
             UpdateBubbleVisuals();
             activeValueBubble.SetActive(true);
         }
@@ -525,7 +497,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             }
         }
 
-        // Balatro-style "pop": a little kick of scale and wobble when the selection changes
         if (changed && followSlot && !isAnimatingToLayout)
         {
             scaleVel += isSelected ? selectPopKick : -selectPopKick * 0.5f;
@@ -549,10 +520,6 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         if (cardImage != null) cardImage.color = cardDefaultTint;
     }
 
-    /// <summary>
-    /// Smoothly flies the card to a position (used for scoring and discarding). Optionally shrinks / rotates it on the way.
-    /// While this runs the card stops following its hand slot.
-    /// </summary>
     public IEnumerator MoveToAnchoredPosition(Vector2 targetAnchoredPos, float duration, float endScale = 1f, float endRotation = 0f)
     {
         isAnimatingToLayout = true;

@@ -1,12 +1,6 @@
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// Put this on the shop GameObject in the world (the car).
-/// - The shop opens ONLY by pressing the interact key (E) while the player is near.
-/// - A "Press E to interact" prompt floats above the shopkeeper while the player is in range.
-/// - While the shop is open the player can't do anything (walk, run, drag, jump, dash), and the camera peek is paused.
-/// </summary>
 public class ShopInteractable : MonoBehaviour
 {
     [Header("Shop")]
@@ -48,7 +42,6 @@ public class ShopInteractable : MonoBehaviour
     private bool warnedNoPlayer;
     private float nextFindTime;
 
-    // The object that really moves is the one with PlayerMovement on it
     private Transform PlayerTransform
     {
         get { return playerMovement != null ? playerMovement.transform : player; }
@@ -75,7 +68,6 @@ public class ShopInteractable : MonoBehaviour
 
         bool open = shopUI != null && shopUI.IsOpen;
 
-        // Keeps the player frozen exactly as long as the shop is open (however it was closed)
         if (open != lockedForShop) SetPlayerLocked(open);
 
         bool inRange = IsPlayerInRange();
@@ -107,10 +99,6 @@ public class ShopInteractable : MonoBehaviour
     {
         if (autoPrompt && promptRoot != null) Destroy(promptRoot.gameObject);
     }
-
-    // -------------------------------------------------------------------
-    // Opening
-    // -------------------------------------------------------------------
 
     private void TryOpen()
     {
@@ -160,18 +148,12 @@ public class ShopInteractable : MonoBehaviour
         return Vector3.Distance(a, b);
     }
 
-    // -------------------------------------------------------------------
-    // Freeze the player while shopping
-    // -------------------------------------------------------------------
-
     private void SetPlayerLocked(bool locked)
     {
         lockedForShop = locked;
 
-        // Walk, run, mouse-drag, jump, dash are all blocked inside PlayerMovement
         if (playerMovement != null) playerMovement.InputLocked = locked;
 
-        // Any other player scripts
         if (extraScriptsToDisable != null)
         {
             if (extraWasEnabled == null || extraWasEnabled.Length != extraScriptsToDisable.Length)
@@ -194,7 +176,6 @@ public class ShopInteractable : MonoBehaviour
             }
         }
 
-        // Camera sneak peek
         if (pauseCameraPeek)
         {
             if (cameraFollow == null) cameraFollow = Object.FindAnyObjectByType<CameraFollow>();
@@ -212,10 +193,6 @@ public class ShopInteractable : MonoBehaviour
             }
         }
     }
-
-    // -------------------------------------------------------------------
-    // "Press E" prompt above the shopkeeper
-    // -------------------------------------------------------------------
 
     private void BuildPrompt()
     {
@@ -237,7 +214,7 @@ public class ShopInteractable : MonoBehaviour
             t.color = Color.white;
             t.outlineWidth = 0.25f;
             t.outlineColor = new Color32(0, 0, 0, 255);
-            t.sortingOrder = 200; // draw on top of sprites
+            t.sortingOrder = 200;
             t.rectTransform.sizeDelta = new Vector2(10f, 3f);
 
             promptRoot = go.transform;
@@ -272,7 +249,7 @@ public class ShopInteractable : MonoBehaviour
             promptRoot.position = anchor.position + promptOffset + Vector3.up * bob;
 
             Camera cam = Camera.main;
-            if (cam != null) promptRoot.rotation = cam.transform.rotation; // always faces the camera
+            if (cam != null) promptRoot.rotation = cam.transform.rotation;
         }
     }
 

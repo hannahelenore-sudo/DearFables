@@ -4,9 +4,6 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// Everything about how the ending looks. Shown as a foldout on the EndingNPC.
-/// </summary>
 [System.Serializable]
 public class EndingSettings
 {
@@ -37,11 +34,6 @@ public class EndingSettings
     public Color screenColor = Color.white;
 }
 
-/// <summary>
-/// Fades the screen to white, shows a message, waits for a click, then loads the main menu.
-/// Call it from anywhere:  EndingSequence.Play(settings);   (or EndingSequence.Play() for the defaults)
-/// It builds its own full-screen canvas, so there is nothing to set up in the scene.
-/// </summary>
 public class EndingSequence : MonoBehaviour
 {
     public static bool IsPlaying { get; private set; }
@@ -72,13 +64,12 @@ public class EndingSequence : MonoBehaviour
         float previousScale = Time.timeScale;
         if (s.freezeGame) Time.timeScale = 0f;
 
-        // ---------- Build the overlay ----------
         GameObject canvasGO = new GameObject("EndingCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         canvasGO.transform.SetParent(transform, false);
 
         Canvas canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 32000; // above everything
+        canvas.sortingOrder = 32000;
 
         CanvasScaler scaler = canvasGO.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -86,7 +77,6 @@ public class EndingSequence : MonoBehaviour
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
 
-        // The white screen also blocks clicks on any UI underneath it
         GameObject bgGO = new GameObject("White", typeof(RectTransform));
         bgGO.transform.SetParent(canvasGO.transform, false);
         Stretch(bgGO.GetComponent<RectTransform>());
@@ -114,7 +104,6 @@ public class EndingSequence : MonoBehaviour
         hr.anchoredPosition = new Vector2(0f, 70f);
         SetAlpha(hint, 0f);
 
-        // ---------- 1. Fade to white ----------
         float t = 0f;
         float fade = Mathf.Max(0.01f, s.fadeToWhite);
         while (t < fade)
@@ -127,7 +116,6 @@ public class EndingSequence : MonoBehaviour
         screen.a = 1f;
         bg.color = screen;
 
-        // ---------- 2. Message fades in ----------
         t = 0f;
         float textFade = Mathf.Max(0.01f, s.textFadeIn);
         while (t < textFade)
@@ -138,10 +126,8 @@ public class EndingSequence : MonoBehaviour
         }
         SetAlpha(message, 1f);
 
-        // ---------- 3. Wait a moment, then wait for a click ----------
         if (s.clickDelay > 0f) yield return new WaitForSecondsRealtime(s.clickDelay);
 
-        // The click that closed the last dialogue must not count
         while (Input.GetMouseButton(0)) yield return null;
 
         float pulse = 0f;
@@ -153,7 +139,6 @@ public class EndingSequence : MonoBehaviour
             yield return null;
         }
 
-        // ---------- 4. Back to the main menu ----------
         Time.timeScale = previousScale > 0f ? previousScale : 1f;
 
         if (Application.CanStreamedLevelBeLoaded(s.mainMenuScene))

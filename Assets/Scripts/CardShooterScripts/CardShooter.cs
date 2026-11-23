@@ -2,15 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-/// <summary>
-/// Press E to cycle through the items you own. The icons float above your head.
-/// Left click uses the selected item (toward the mouse):
-///   Card      - flies up to 'range' meters, then falls with real physics. Hitting an EnemyChase starts the battle.
-///   Tsinelas  - (needs the Tsinelas trinket) hitting an enemy stuns it: it spins and sees stars.
-///   Small Rock- (needs the Small Rock trinket) hitting an enemy clears your current Mood.
-///   Wind Card - HOLD left click to run faster. Drains the same stamina bar. See WindBoost.cs.
-/// Every throw costs stamina from the bar.
-/// </summary>
 public class CardShooter : MonoBehaviour
 {
     [Header("Shooting")]
@@ -122,7 +113,6 @@ public class CardShooter : MonoBehaviour
 
     private void Start()
     {
-        // Use the tallest sprite under the player as the "character" (for sizes and sorting)
         float best = 0f;
         foreach (SpriteRenderer sr in GetComponentsInChildren<SpriteRenderer>())
         {
@@ -133,7 +123,6 @@ public class CardShooter : MonoBehaviour
             }
         }
 
-        // Thrown things must never collide with the player who throws them
         ownColliders = GetComponentsInChildren<Collider>();
 
         if (stamina == null) stamina = GetComponent<CardStamina>();
@@ -160,29 +149,26 @@ public class CardShooter : MonoBehaviour
     {
         if (cooldownTimer > 0f) cooldownTimer -= Time.deltaTime;
 
-        if (Time.timeScale <= 0f) return; // paused: the boost just waits
+        if (Time.timeScale <= 0f) return;
 
         RefreshItems();
 
         if (Input.GetKeyDown(cycleKey)) CycleItem();
 
-        // Don't use items when clicking UI (boon cards, buttons)
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
-        // ---- Wind Card: click once, runs until the stamina is drained ----
         if (selected == ThrowItem.WindCard)
         {
             if (Input.GetMouseButtonDown(shootMouseButton) && !overUI)
             {
-                if (wind.IsActive) { }                 // already running
+                if (wind.IsActive) { }
                 else if (wind.CanStart) { wind.Activate(); ShowIcon(false); }
                 else Denied();
             }
             return;
         }
-        wind.Deactivate(); // any other item selected: no boost, no drain
+        wind.Deactivate();
 
-        // ---- Throwing ----
         if (!Input.GetMouseButtonDown(shootMouseButton)) return;
         if (cooldownTimer > 0f) return;
         if (overUI) return;
@@ -211,8 +197,6 @@ public class CardShooter : MonoBehaviour
             GameSFX.Play(emptySound, emptyVolume, 1f);
     }
 
-    // ---------------- Items ----------------
-
     private void RefreshItems()
     {
         available.Clear();
@@ -221,7 +205,6 @@ public class CardShooter : MonoBehaviour
         if (TrinketEffects.CanRemoveMoods) available.Add(ThrowItem.SmallRock);
         if (!windRequiresWindFan || TrinketEffects.HasDash) available.Add(ThrowItem.WindCard);
 
-        // Lost the selected item (sold it, or the last Small Rock was thrown) -> back to the card
         if (!available.Contains(selected))
         {
             selected = ThrowItem.Card;
@@ -234,7 +217,6 @@ public class CardShooter : MonoBehaviour
         if (icons != null) icons.Show(GetIcon(selected), pop);
     }
 
-    /// <summary>The Small Rock is a consumable: each throw uses up one (the sidebar animates the removal).</summary>
     private void ConsumeSmallRock()
     {
         var owned = TrinketInventory.Owned;
@@ -260,7 +242,7 @@ public class CardShooter : MonoBehaviour
                 GameSFX.Play(cycleSound, cycleVolume, 1f);
         }
 
-        ShowIcon(true); // pressing E always shows what you're holding
+        ShowIcon(true);
     }
 
     private float GetCost(ThrowItem item)
@@ -303,8 +285,6 @@ public class CardShooter : MonoBehaviour
         return null;
     }
 
-    // ---------------- Aiming ----------------
-
     private bool TryGetAimDirection(out Vector3 direction)
     {
         direction = Vector3.zero;
@@ -312,7 +292,6 @@ public class CardShooter : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null) return false;
 
-        // Where does the mouse point on the ground, at the player's height?
         Plane ground = new Plane(Vector3.up, transform.position);
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
         if (!ground.Raycast(ray, out float distance)) return false;
@@ -327,7 +306,6 @@ public class CardShooter : MonoBehaviour
         return true;
     }
 
-    /// <summary>Scale that makes a sprite a fixed fraction of the character's height.</summary>
     private float GetScaleFor(Sprite sprite, float heightRatio)
     {
         float characterHeight = characterRenderer != null
@@ -344,7 +322,6 @@ public class CardShooter : MonoBehaviour
     {
         if (sortBehindPlayer && characterRenderer != null)
         {
-            // Same sorting layer as the player, a few steps behind it
             target.sortingLayerID = characterRenderer.sortingLayerID;
             target.sortingOrder = Mathf.Clamp(characterRenderer.sortingOrder - stepsBehindPlayer + extraOffset, -32768, 32767);
         }
@@ -372,7 +349,6 @@ public class CardShooter : MonoBehaviour
         sr.sprite = sprite;
         ApplySorting(sr, 0);
 
-        // Soft glow behind the card (a child, so it moves/spins/falls with it)
         if (isCard && glow && sprite != null)
         {
             GameObject g = new GameObject("Glow");
@@ -384,7 +360,7 @@ public class CardShooter : MonoBehaviour
             SpriteRenderer gsr = g.AddComponent<SpriteRenderer>();
             gsr.sprite = GetGlowSprite();
             gsr.color = glowColor;
-            ApplySorting(gsr, -1); // right behind the card
+            ApplySorting(gsr, -1);
         }
 
         EnemyChase[] enemies = FindObjectsByType<EnemyChase>(FindObjectsSortMode.None);
@@ -407,7 +383,6 @@ public class CardShooter : MonoBehaviour
             GameSFX.Play(clip, throwVolume, Random.Range(0.95f, 1.08f));
     }
 
-    // Generates a soft round gradient so no glow image is needed
     private static Sprite GetGlowSprite()
     {
         if (glowSprite != null) return glowSprite;
@@ -429,7 +404,6 @@ public class CardShooter : MonoBehaviour
         }
         tex.Apply();
 
-        // pixelsPerUnit = size -> the glow sprite is exactly 1 unit wide
         glowSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         return glowSprite;
     }

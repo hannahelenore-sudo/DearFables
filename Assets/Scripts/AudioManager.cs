@@ -12,7 +12,6 @@ public class PlayerFootsteps : MonoBehaviour
 
     void Update()
     {
-        // Check if movement keys (W, A, S, D or arrows) are pressed
         if (Input.GetAxis("Vertical") != 0 || Input.GetAxis("Horizontal") != 0)
         {
             isMoving = true;
@@ -22,12 +21,10 @@ public class PlayerFootsteps : MonoBehaviour
             isMoving = false;
         }
 
-        // Play sound if moving and not already playing
         if (isMoving && !audioSource.isPlaying)
         {
             audioSource.Play();
         }
-        // Stop sound when not moving
         else if (!isMoving && audioSource.isPlaying)
         {
             audioSource.Stop();

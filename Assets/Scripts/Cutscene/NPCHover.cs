@@ -23,7 +23,6 @@ public class NPCHover : MonoBehaviour
 
         if (hovering)
         {
-            
             float bounce = (Mathf.Sin(bounceTime) + 1f) / 2f;
 
             targetPosition.y = originalPosition.y +
@@ -33,11 +32,9 @@ public class NPCHover : MonoBehaviour
         }
         else
         {
-            
             bounceTime = 0f;
         }
 
-        
         transform.localPosition = Vector3.SmoothDamp(
             transform.localPosition,
             targetPosition,

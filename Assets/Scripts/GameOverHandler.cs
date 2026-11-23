@@ -1,14 +1,8 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Ends the game when the player's health reaches 0 (PlayerHealth.Died).
-/// No setup: it creates itself when the game starts and stays alive across scenes.
-/// Shows a simple GAME OVER screen with a Try Again button (or press Enter).
-/// </summary>
 public class GameOverHandler : MonoBehaviour
 {
-    // Scene to load on Try Again. Leave empty to use the first scene in Build Settings (usually the title screen).
     public const string RestartSceneName = "";
 
     private static GameOverHandler instance;

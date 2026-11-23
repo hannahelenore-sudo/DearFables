@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Cartoon stars circling an enemy's head while it is stunned.
-/// Added automatically by EnemyChase the first time the enemy is stunned.
-/// </summary>
 public class DizzyStars : MonoBehaviour
 {
     public int starCount = 4;
@@ -97,7 +93,6 @@ public class DizzyStars : MonoBehaviour
             t.rotation = cam.transform.rotation * Quaternion.Euler(0f, 0f, Time.time * selfSpin + i * 40f);
             t.localScale = Vector3.one * (height * starHeightRatio * intensity);
 
-            // In front of the head when closer to the camera, behind it otherwise
             float depth = Vector3.Dot(offset, camFwd);
             sr.sortingOrder = depth < 0f ? baseOrder + 2 : baseOrder - 2;
         }

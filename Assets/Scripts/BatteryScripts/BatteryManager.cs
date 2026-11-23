@@ -1,28 +1,21 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Batteries: the money of the game (trinkets cost batteries). Static, survives scene loads, wiped when the game closes.
-/// The numbers below follow Balatro's economy (start $4, a fight pays $3 + $1 per hand left, a reroll costs $5 and goes
-/// up by $1 each time, selling gives half). Change them here.
-/// </summary>
 public static class BatteryManager
 {
-    // ---------------- Economy (Balatro style) ----------------
     public const int StartingBatteries = 4;
-    public const int FightBaseReward = 3;      // Balatro: Small Blind pays $3
-    public const int RewardPerHandLeft = 1;    // Balatro: +$1 for every hand you didn't need
-    public const int RerollBaseCost = 5;       // Balatro: the first reroll costs $5
-    public const int RerollCostIncrease = 1;   // ...and each reroll in the same shop costs $1 more
-    public const float SellRate = 0.5f;        // Balatro: items sell for half of their price
-    public const int MaxDifficultyBonus = 4;   // extra batteries a win pays at 100% difficulty (scales linearly from 0)
+    public const int FightBaseReward = 3;
+    public const int RewardPerHandLeft = 1;
+    public const int RerollBaseCost = 5;
+    public const int RerollCostIncrease = 1;
+    public const float SellRate = 0.5f;
+    public const int MaxDifficultyBonus = 4;
 
     private static int count = StartingBatteries;
     private static int pendingDrop;
     private static Vector3 lastPlayerPosition;
     private static bool hasLastPlayerPosition;
 
-    /// <summary>Fires when the amount changes. The number is how much it changed by (negative = spent).</summary>
     public static event Action<int> Changed;
 
     public static int Count { get { return count; } }
@@ -48,7 +41,6 @@ public static class BatteryManager
         if (Changed != null) Changed(amount);
     }
 
-    /// <summary>Takes the batteries and returns true, or returns false (and takes nothing) if you can't afford it.</summary>
     public static bool TrySpend(int cost)
     {
         if (cost <= 0) return true;
@@ -59,20 +51,17 @@ public static class BatteryManager
         return true;
     }
 
-    /// <summary>What a won fight pays: base + a bonus for every hand you had left.</summary>
     public static int CalculateFightReward(int handsLeft)
     {
         return FightBaseReward + RewardPerHandLeft * Mathf.Max(0, handsLeft);
     }
 
-    /// <summary>Same, plus a bonus that grows with the difficulty meter (0..1): harder fights pay more.</summary>
     public static int CalculateFightReward(int handsLeft, float difficulty)
     {
         int bonus = Mathf.RoundToInt(Mathf.Clamp01(difficulty) * MaxDifficultyBonus);
         return CalculateFightReward(handsLeft) + bonus;
     }
 
-    /// <summary>Batteries won in a fight that haven't dropped in the world yet (BatteryDropper spawns them).</summary>
     public static void QueueDrop(int amount)
     {
         pendingDrop += Mathf.Max(0, amount);

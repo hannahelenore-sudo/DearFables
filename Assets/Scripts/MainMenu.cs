@@ -4,11 +4,6 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
-/// <summary>
-/// Main menu: Start plays an intro video (fading in over the menu), then loads the next scene.
-/// Quit closes the game.
-/// The video screen is created automatically on your Canvas - you just need to assign the clip.
-/// </summary>
 public class MainMenu : MonoBehaviour
 {
     [Header("Scenes")]
@@ -44,7 +39,6 @@ public class MainMenu : MonoBehaviour
 
     private void Awake()
     {
-        // Audio source used for the button click sounds
         sfx = gameObject.AddComponent<AudioSource>();
         sfx.playOnAwake = false;
         sfx.spatialBlend = 0f;
@@ -59,8 +53,6 @@ public class MainMenu : MonoBehaviour
             sfx.PlayOneShot(clip, clickVolume);
     }
 
-    // ---- Hook these up to your buttons' On Click () ----
-
     public void StartGame()
     {
         if (isStarting || isQuitting) return;
@@ -68,7 +60,6 @@ public class MainMenu : MonoBehaviour
 
         PlaySound(startClickSound);
 
-        // New game: stars back to 0 and all enemies come back
         PlayerProgress.ResetAll();
         EnemyChase.ResetCaughtEnemies();
 
@@ -91,7 +82,6 @@ public class MainMenu : MonoBehaviour
 
     private IEnumerator QuitAfterSound()
     {
-        // Let the click sound finish before the game closes (max 2 seconds)
         float wait = 0f;
         if (quitClickSound != null)
         {
@@ -109,11 +99,8 @@ public class MainMenu : MonoBehaviour
 #endif
     }
 
-    // ----------------------------------------------------
-
     private IEnumerator PlayIntroThenLoad()
     {
-        // Stop any more button clicks
         if (menuPanel != null)
         {
             CanvasGroup menuGroup = menuPanel.GetComponent<CanvasGroup>();
@@ -122,16 +109,12 @@ public class MainMenu : MonoBehaviour
             menuGroup.blocksRaycasts = false;
         }
 
-        // Start loading the game in the background (it won't switch until the video is done)
         if (preloadWhileVideoPlays)
         {
             preload = SceneManager.LoadSceneAsync(gameScene);
             preload.allowSceneActivation = false;
         }
 
-        // The video gets its OWN canvas, on top of everything. Looking for "some canvas in the scene" is not safe:
-        // the scene's own Canvas may be switched off, and the canvases that survive from the game scene
-        // (Trinket bar, Buffs bar, GameMenu) are hidden or switched off on the title screen, so the video would be invisible.
         GameObject canvasObj = new GameObject("IntroVideoCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = canvasObj.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -142,7 +125,6 @@ public class MainMenu : MonoBehaviour
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
 
-        // ---- Build a black panel with the video inside it (starts invisible) ----
         GameObject panelObj = new GameObject("IntroVideoPanel", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
         panelObj.transform.SetParent(canvas.transform, false);
         panelObj.transform.SetAsLastSibling();
@@ -157,10 +139,9 @@ public class MainMenu : MonoBehaviour
         Stretch(videoObj.GetComponent<RectTransform>());
 
         AspectRatioFitter fitter = videoObj.GetComponent<AspectRatioFitter>();
-        fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent; // keeps the video's shape, black bars if needed
+        fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
         fitter.aspectRatio = (float)introVideo.width / introVideo.height;
 
-        // ---- Video player drawing into a texture ----
         RenderTexture rt = new RenderTexture((int)introVideo.width, (int)introVideo.height, 0);
         videoObj.GetComponent<RawImage>().texture = rt;
 
@@ -189,11 +170,9 @@ public class MainMenu : MonoBehaviour
             SetVolume(vp, 0f);
             vp.Play();
 
-            // The video has started: fade the menu music out
             if (menuMusic != null)
                 menuMusic.FadeOut();
 
-            // ---- Play, fading in as it goes ----
             float elapsed = 0f;
             while (!finished)
             {
@@ -217,7 +196,7 @@ public class MainMenu : MonoBehaviour
     private void GoToGame()
     {
         if (preload != null)
-            preload.allowSceneActivation = true; // already loaded in the background, switch now
+            preload.allowSceneActivation = true;
         else
             SceneManager.LoadScene(gameScene);
     }

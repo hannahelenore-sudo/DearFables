@@ -29,10 +29,9 @@ public class CardData : ScriptableObject
     [HideInInspector]
     [Tooltip("Set at runtime by DeckManager: a drawn copy that only scores half. Never set this on the asset.")]
     public bool isLowPower;
-    /// <summary>For a Low Power copy: the original card it was made from (so the debug button can restore it).</summary>
+
     [System.NonSerialized] public CardData lowPowerSource;
 
-    // Debug power (DebugShortcuts buttons). Session only, added on top of every Wind / Solar card.
     public static int DebugWindPower;
     public static int DebugSunPower;
 
@@ -43,7 +42,6 @@ public class CardData : ScriptableObject
         DebugSunPower = 0;
     }
 
-    /// <summary>+Power from the Blueprint Shop structure (Solar Panel buffs Solar cards, Windmill buffs Wind cards).</summary>
     protected int StructurePower()
     {
         if (this is SolarCard) return StructureProgress.PowerBonus(StructureType.Solar);
@@ -51,18 +49,16 @@ public class CardData : ScriptableObject
         return 0;
     }
 
-    /// <summary>Low Power cards score half (rounded down, never below 1).</summary>
     protected int ApplyLowPower(int value)
     {
         if (!isLowPower || value <= 0) return value;
         return Mathf.Max(1, value / 2);
     }
 
-    /// <summary>Primary value including permanent boons. Used for scoring AND for the hover text.</summary>
     public virtual int GetEffectiveValue()
     {
         int sun = this is SolarCard ? DebugSunPower : 0;
-        return ApplyLowPower(primaryValue + MoodManager.PowerBonus + sun + StructurePower()); // Angry: +Power to every Power type
+        return ApplyLowPower(primaryValue + MoodManager.PowerBonus + sun + StructurePower());
     }
 
     public virtual int EvaluateScore(int currentTotal, List<CardUI> selectedCards)

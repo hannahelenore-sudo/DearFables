@@ -2,16 +2,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// The Wind Card: click once while it is selected and the boost stays on until the bar runs dry
-/// (or you switch to another item).
-/// Drains the same stamina bar as the thrown items, and shows a wind aura around the player.
-/// Added automatically by CardShooter (you can also add it yourself to tweak the values).
-///
-/// SPEED: by default this adds the extra speed itself (it watches how far the player moved
-/// each frame and moves them a bit further). If your movement script has a speed variable you'd
-/// rather change, turn off 'Auto Apply To Movement' and multiply your speed by WindBoost.SpeedMultiplier.
-/// </summary>
 public class WindBoost : MonoBehaviour
 {
     [Tooltip("1.8 = 80% faster while boosting.")]
@@ -42,7 +32,6 @@ public class WindBoost : MonoBehaviour
     [Tooltip("How far above the character's head the text starts, as a fraction of the character's height. The held item icon sits just above the head, so keep this higher than the icon.")]
     public float popupHeightAbove = 0.6f;
 
-    /// <summary>1 normally, speedMultiplier while boosting. Read this in your movement script.</summary>
     public static float SpeedMultiplier { get; private set; } = 1f;
     public static bool IsBoosting { get; private set; }
 
@@ -55,7 +44,6 @@ public class WindBoost : MonoBehaviour
     private Vector3 lastPos;
     private float movingTimer;
 
-    // Popup
     private SpriteRenderer characterRenderer;
     private GameObject popupCanvasGO;
     private Canvas popupCanvas;
@@ -80,17 +68,14 @@ public class WindBoost : MonoBehaviour
         aura.Init(characterRenderer);
     }
 
-    /// <summary>True while the boost is switched on (it stays on until the stamina is drained or you switch items).</summary>
     public bool IsActive { get { return wantBoost; } }
 
-    /// <summary>CardShooter calls this when the player clicks with the Wind Card selected.</summary>
     public void Activate()
     {
-        if (!wantBoost) ShowPopup(); // only when it actually switches on, not on every click
+        if (!wantBoost) ShowPopup();
         wantBoost = true;
     }
 
-    /// <summary>Switching to another item (or anything that should cancel the boost). Stops the drain and the effect.</summary>
     public void Deactivate()
     {
         wantBoost = false;
@@ -118,7 +103,7 @@ public class WindBoost : MonoBehaviour
         if (wantBoost && stamina != null && !stamina.IsExhausted && (boosting || CanStart))
         {
             boost = true;
-            // Only costs stamina while you actually run
+
             if (moved) boost = stamina.Drain(drainPerSecond * Time.deltaTime);
         }
 
@@ -129,7 +114,6 @@ public class WindBoost : MonoBehaviour
             else transform.position += extra;
         }
 
-        // Ran dry -> the boost switches itself off (click again once the bar is full)
         if (wantBoost && !boost && stamina != null && stamina.IsExhausted) wantBoost = false;
 
         boosting = boost;
@@ -159,14 +143,11 @@ public class WindBoost : MonoBehaviour
         if (popupCanvasGO != null) Destroy(popupCanvasGO);
     }
 
-    // ---------------- "Speed Up!" popup ----------------
-
     private void ShowPopup()
     {
         if (!showPopup) return;
         if (popupCanvasGO == null) BuildPopup();
 
-        // Applied on every show, so you can tweak these while playing
         popupLabel.text = popupText;
         popupLabel.fontSize = popupFontSize;
         popupLabel.color = popupColor;
@@ -207,7 +188,6 @@ public class WindBoost : MonoBehaviour
         popupRect.pivot = new Vector2(0.5f, 0.5f);
     }
 
-    // Pops in (small overshoot), floats up, then fades out. Follows the player's head on screen.
     private void UpdatePopup()
     {
         if (popupGroup == null) return;
@@ -222,7 +202,7 @@ public class WindBoost : MonoBehaviour
         if (cam == null) return;
 
         popupTimer -= Time.unscaledDeltaTime;
-        float t = 1f - Mathf.Clamp01(popupTimer / Mathf.Max(0.1f, popupDuration)); // 0 -> 1 over the popup
+        float t = 1f - Mathf.Clamp01(popupTimer / Mathf.Max(0.1f, popupDuration));
 
         float charH = 2f;
         Vector3 head = transform.position + Vector3.up * 2f;
@@ -241,14 +221,12 @@ public class WindBoost : MonoBehaviour
         float rise = popupRisePixels * (1f - (1f - t) * (1f - t)) * scale;
         popupRect.position = new Vector2(sp.x, sp.y + rise);
 
-        // Ease-out-back pop during the first 20%
         float pt = Mathf.Clamp01(t / 0.2f);
         const float c1 = 1.70158f;
         const float c3 = c1 + 1f;
         float eased = 1f + c3 * Mathf.Pow(pt - 1f, 3f) + c1 * Mathf.Pow(pt - 1f, 2f);
         popupRect.localScale = Vector3.one * Mathf.Max(0.01f, eased);
 
-        // Fully visible, then fades over the last 40%
         popupGroup.alpha = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
     }
 }

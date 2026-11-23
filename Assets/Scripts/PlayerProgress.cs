@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Static save data that survives scene loads. No GameObject needed.
-/// Stars are also written to PlayerPrefs so they persist between play sessions.
-/// </summary>
 public static class PlayerProgress
 {
     private const string StarsKey = "TotalStars";
@@ -11,7 +7,6 @@ public static class PlayerProgress
     private static int _totalStars;
     private static bool _loaded;
 
-    /// <summary>Stars earned in the most recent battle (for "+N" popups). Reset with ClearLastGained().</summary>
     public static int LastGained { get; private set; }
 
     public static int TotalStars
@@ -37,7 +32,6 @@ public static class PlayerProgress
         LastGained = 0;
     }
 
-    /// <summary>Wipe all stars (handy for testing).</summary>
     public static void ResetAll()
     {
         _totalStars = 0;
@@ -49,8 +43,6 @@ public static class PlayerProgress
     private static void EnsureLoaded()
     {
         if (_loaded) return;
-        // Stars are NOT saved between sessions: every launch starts at 0.
-        // (Also clears any stars saved by an older version of this script.)
         PlayerPrefs.DeleteKey(StarsKey);
         _totalStars = 0;
         _loaded = true;

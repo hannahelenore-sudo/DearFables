@@ -2,8 +2,6 @@
 using UnityEditor;
 using UnityEngine;
 
-// Must live in a folder named "Editor". Test buttons shown under each HUD component while the game is running.
-
 [CustomEditor(typeof(MoodHUD))]
 public class MoodHUDEditor : Editor
 {

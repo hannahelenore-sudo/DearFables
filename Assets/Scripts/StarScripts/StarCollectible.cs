@@ -23,7 +23,6 @@ public class StarHover : MonoBehaviour
     private bool collected;
     private string rememberedKey;
 
-    // Stars collected this session (static = survives scene loads, like the card game round trip)
     private static readonly HashSet<string> collectedStars = new HashSet<string>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -32,7 +31,6 @@ public class StarHover : MonoBehaviour
         collectedStars.Clear();
     }
 
-    /// <summary>Brings every collected star back (call it from your "New Game" button).</summary>
     public static void ResetCollected()
     {
         collectedStars.Clear();
@@ -43,7 +41,6 @@ public class StarHover : MonoBehaviour
         string id = starId;
         if (string.IsNullOrEmpty(id))
         {
-            // Scene + hierarchy path + position, so two stars with the same name are still different
             string path = name;
             for (Transform t = transform.parent; t != null; t = t.parent) path = t.name + "/" + path;
             Vector3 p = transform.position;
@@ -59,8 +56,8 @@ public class StarHover : MonoBehaviour
         rememberedKey = BuildKey();
         if (collectedStars.Contains(rememberedKey))
         {
-            collected = true; // can't be collected again in the frame before it is destroyed
-            Destroy(gameObject); // collected earlier: it does not respawn
+            collected = true;
+            Destroy(gameObject);
         }
     }
 

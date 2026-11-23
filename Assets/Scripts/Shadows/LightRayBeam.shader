@@ -1,6 +1,3 @@
-// Put this anywhere under Assets/ (e.g. Assets/Shaders/LightRayBeam.shader)
-// Soft additive light beam: fades at the edges, fades in at the top, fades out near the ground,
-// and shimmers slowly. Used by LightRays.cs. URP only.
 Shader "LightRays/Beam"
 {
     Properties
@@ -30,7 +27,7 @@ Shader "LightRays/Beam"
             Name "Beam"
             Tags { "LightMode" = "UniversalForward" }
 
-            Blend SrcAlpha One   // additive: only ever adds light
+            Blend SrcAlpha One
             ZWrite Off
             ZTest LEqual
             Cull Off
@@ -73,19 +70,16 @@ Shader "LightRays/Beam"
 
             half4 frag(Varyings IN) : SV_Target
             {
-                float x = IN.uv.x;   // 0..1 across the beam
-                float y = IN.uv.y;   // 0 = top of the beam, 1 = where it hits the ground
+                float x = IN.uv.x;   
+                float y = IN.uv.y;   
 
-                // soft sides
                 float edge = 1.0 - abs(x * 2.0 - 1.0);
                 edge = smoothstep(0.0, _EdgeSoftness, edge);
                 edge *= edge;
-
-                // fade in from the top, fade out toward the ground
+                
                 float topF = smoothstep(0.0, _TopFade, y);
                 float botF = 1.0 - smoothstep(1.0 - _BottomFade, 1.0, y);
 
-                // slow shimmering streaks inside the beam
                 float t = _Time.y;
                 float s1 = sin(x * 23.0 + t * 0.45 + _Seed * 6.2831);
                 float s2 = sin(x * 11.0 - t * 0.31 + _Seed * 3.1);

@@ -4,10 +4,6 @@ using UnityEngine.Video;
 using TMPro;
 using System.Collections;
 
-/// <summary>
-/// Loading scene: plays an intro video, then shows "Loading..." and switches to the game scene.
-/// The game scene loads in the background WHILE the video plays, so there is little or no waiting afterwards.
-/// </summary>
 public class SceneLoader : MonoBehaviour
 {
     [Header("Scene")]
@@ -39,7 +35,6 @@ public class SceneLoader : MonoBehaviour
 
     void Start()
     {
-        // Hide the loading text while the video plays
         if (loadingText != null)
             loadingText.gameObject.SetActive(false);
 
@@ -53,11 +48,9 @@ public class SceneLoader : MonoBehaviour
         if (preloadWhileVideoPlays)
             StartLoading();
 
-        // 1. Play the video (if there is one)
         if (videoPlayer != null)
             yield return StartCoroutine(PlayVideo());
 
-        // 2. Show the loading text
         if (loadingText != null)
         {
             loadingText.gameObject.SetActive(true);
@@ -67,7 +60,6 @@ public class SceneLoader : MonoBehaviour
         if (operation == null)
             StartLoading();
 
-        // 3. Wait for the scene to be ready AND the minimum time to pass
         float timer = 0f;
         while (operation.progress < 0.9f || timer < minimumLoadingScreenTime)
         {
@@ -81,12 +73,11 @@ public class SceneLoader : MonoBehaviour
     void StartLoading()
     {
         operation = SceneManager.LoadSceneAsync(sceneToLoad);
-        operation.allowSceneActivation = false; // don't switch until we say so
+        operation.allowSceneActivation = false;
     }
 
     IEnumerator PlayVideo()
     {
-        // The video draws on the camera, so a camera is needed in this scene
         Camera cam = Camera.main;
         if (cam == null) cam = FindFirstObjectByType<Camera>();
         if (cam == null)
@@ -112,7 +103,7 @@ public class SceneLoader : MonoBehaviour
         while (!videoPlayer.isPrepared && !finished)
             yield return null;
 
-        if (finished) yield break; // error while preparing
+        if (finished) yield break;
 
         videoPlayer.Play();
 

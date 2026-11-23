@@ -1,10 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// One mood. The three default moods (Neutral, Sugar Rush, Angry) are created as assets for you by
-/// Tools > HUD > Create Mood Assets (in Assets/Resources/Moods). Change the numbers on those assets to retune them,
-/// or right click > Create > Custom Card System > Mood to make new ones.
-/// </summary>
 [CreateAssetMenu(fileName = "NewMood", menuName = "Custom Card System/Mood")]
 public class MoodData : ScriptableObject
 {
@@ -46,7 +41,6 @@ public class MoodData : ScriptableObject
         return sb.ToString().Trim();
     }
 
-    /// <summary>The built-in values for "Neutral", "SugarRush" and "Angry". Used by the asset creator and as a fallback.</summary>
     public static MoodData Build(string key)
     {
         MoodData m = CreateInstance<MoodData>();

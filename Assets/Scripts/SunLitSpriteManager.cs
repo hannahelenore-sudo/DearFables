@@ -4,19 +4,6 @@ using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
-/// <summary>
-/// Put this on an empty GameObject in your scene (e.g. "SunLitManager") and drag
-/// the SpriteSunLit material into the Material slot.
-/// Periodically makes sure that:
-///  - every SpriteRenderer uses the sun-lit material (including things spawned after Play starts)
-///  - every TilemapRenderer uses a ground version of it (no rim outline on tile borders)
-///  - sprites/tilemaps/meshes receive shadows; sprites cast them
-/// Anything with a custom material (e.g. your glowing card) keeps its material.
-///
-/// Optimised: each renderer is processed ONCE (tracked by instance id), shader checks are
-/// cached instead of reading shader.name (which allocates a string) for every renderer on
-/// every scan, and the flat ContactShadow blobs no longer cast shadows.
-/// </summary>
 public class SunLitSpriteManager : MonoBehaviour
 {
     public Material sunLitMaterial;
@@ -38,7 +25,6 @@ public class SunLitSpriteManager : MonoBehaviour
     readonly Dictionary<Shader, bool> _isReplaceable = new Dictionary<Shader, bool>();
     readonly Dictionary<Shader, bool> _isSunLit = new Dictionary<Shader, bool>();
 
-    /// <summary>Optional: call this right after spawning lots of objects to process them immediately.</summary>
     public static void RequestScan() { if (_instance != null) _instance._dirty = true; }
 
     void Awake()
@@ -82,7 +68,6 @@ public class SunLitSpriteManager : MonoBehaviour
         foreach (var sr in FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (!_done.Add(sr.GetInstanceID())) continue;
-            // the flat ground blobs from ContactShadow must not cast shadows themselves
             bool cast = spritesCastShadows && sr.gameObject.name != ContactShadow.BlobName;
             Fix(sr, sunLitMaterial, cast);
         }
@@ -106,13 +91,11 @@ public class SunLitSpriteManager : MonoBehaviour
 
     void Fix(Renderer r, Material target, bool cast)
     {
-        // leave shadow-only renderers (e.g. CloudShadows clouds) alone
         if (r.shadowCastingMode == ShadowCastingMode.ShadowsOnly) return;
 
         var m = r.sharedMaterial;
         if (Replaceable(m)) { r.sharedMaterial = target; m = target; }
 
-        // only touch shadow flags on renderers that use our shader
         if (m != null && IsSunLit(m.shader))
         {
             var mode = cast ? ShadowCastingMode.On : ShadowCastingMode.Off;
@@ -128,7 +111,6 @@ public class SunLitSpriteManager : MonoBehaviour
         return v;
     }
 
-    // missing material, broken (magenta) shader, or one of the stock sprite shaders
     bool Replaceable(Material m)
     {
         if (m == null || m.shader == null) return true;

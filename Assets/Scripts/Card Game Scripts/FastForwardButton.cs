@@ -3,10 +3,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-/// <summary>
-/// Put this on a UI Button. Each click cycles the game speed: 1x -> 2x -> 4x -> back to 1x.
-/// Optional: drag a TMP label in to show the current speed, and set a hotkey (default: Q).
-/// </summary>
 [RequireComponent(typeof(Button))]
 public class FastForwardButton : MonoBehaviour
 {
@@ -39,7 +35,6 @@ public class FastForwardButton : MonoBehaviour
 
     private void OnEnable()
     {
-        // pick up whatever speed is already active (e.g. after a scene reload)
         index = 0;
         for (int i = 0; i < speeds.Length; i++)
             if (Mathf.Approximately(speeds[i], GameSpeed.Multiplier)) index = i;
@@ -52,7 +47,6 @@ public class FastForwardButton : MonoBehaviour
             Cycle();
     }
 
-    /// <summary>Changes the idle color of the button (used by FastForwardOverlay for live tweaking).</summary>
     public void SetNormalColor(Color color)
     {
         normalColor = color;

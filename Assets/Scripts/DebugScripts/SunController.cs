@@ -1,10 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Put this on your "Directional Light". It is the sun.
-/// Manual mode: Azimuth + Elevation sliders.
-/// Auto Cycle: a full day/night loop (sunrise > noon > sunset > night).
-/// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(Light))]
 public class SunController : MonoBehaviour
@@ -17,13 +12,13 @@ public class SunController : MonoBehaviour
 
     [Header("Shadows")]
     [Range(0f, 1f)] public float shadowStrength = 1f;
-    [Tooltip("Hard shadows are much cheaper than Soft. This was hard-coded to Soft before.")]
+    [Tooltip("Hard shadows are much cheaper than Soft.")]
     public LightShadows shadowType = LightShadows.Hard;
 
     [Header("Day / Night Cycle")]
     public bool autoCycle = true;
     [Min(5f)] public float dayLengthSeconds = 120f;
-    [Range(0f, 1f)] public float timeOfDay = 0.2f;   // 0 sunrise, .25 noon, .5 sunset, .75 midnight
+    [Range(0f, 1f)] public float timeOfDay = 0.2f;
     [Range(10f, 85f)] public float maxElevation = 65f;
     public Gradient colorOverDay;
     public AnimationCurve intensityOverDay;
@@ -64,7 +59,7 @@ public class SunController : MonoBehaviour
         if (autoCycle)
         {
             float t = timeOfDay;
-            az = Mathf.Repeat(90f + t * 360f, 360f);               // east > south > west > under the ground
+            az = Mathf.Repeat(90f + t * 360f, 360f);
             el = Mathf.Max(Mathf.Sin(t * Mathf.PI * 2f) * maxElevation, 8f);
             col = colorOverDay.Evaluate(t);
             inten = intensityOverDay.Evaluate(t);
@@ -90,11 +85,11 @@ public class SunController : MonoBehaviour
         g.SetKeys(
             new[]
             {
-                new GradientColorKey(new Color(1f, 0.72f, 0.55f), 0f),     // sunrise
-                new GradientColorKey(new Color(1f, 0.99f, 0.96f), 0.25f),  // noon
-                new GradientColorKey(new Color(1f, 0.6f, 0.45f), 0.5f),    // sunset
-                new GradientColorKey(new Color(0.4f, 0.5f, 0.9f), 0.75f),  // night
-                new GradientColorKey(new Color(1f, 0.72f, 0.55f), 1f)      // back to sunrise
+                new GradientColorKey(new Color(1f, 0.72f, 0.55f), 0f),
+                new GradientColorKey(new Color(1f, 0.99f, 0.96f), 0.25f),
+                new GradientColorKey(new Color(1f, 0.6f, 0.45f), 0.5f),
+                new GradientColorKey(new Color(0.4f, 0.5f, 0.9f), 0.75f),
+                new GradientColorKey(new Color(1f, 0.72f, 0.55f), 1f)
             },
             new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
         colorOverDay = g;

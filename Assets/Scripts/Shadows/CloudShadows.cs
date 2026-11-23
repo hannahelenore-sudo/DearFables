@@ -1,21 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// <summary>
-/// Drifting cloud shadows on the ground (tilemap), characters and every other
-/// sprite that uses the SpriteSunLit shader.
-///
-/// Mode 1 (default, "Projected"): the shader projects a procedural cloud pattern
-/// from the sun's direction onto the world. Soft edges, infinite, no shadow-map
-/// settings needed. Only affects things using the SpriteSunLit shader
-/// (sprites + your ground tilemap).
-///
-/// Mode 2 ("Real Shadow Casters", optional): invisible cloud sprites high above
-/// cast real shadows from the Directional Light. This also reaches a 3D Plane
-/// with a URP Lit material, but needs shadow distance / cascades set up.
-///
-/// Put this on an empty GameObject (e.g. "Clouds") in Assets/Scripts (NOT in an Editor folder).
-/// </summary>
 [ExecuteAlways]
 public class CloudShadows : MonoBehaviour
 {
@@ -36,8 +21,8 @@ public class CloudShadows : MonoBehaviour
 
     [Header("Optional: real shadow-casting clouds")]
     public bool useRealShadowCasters = false;
-    public Material shadowMaterial;                 // your SpriteSunLit material
-    public Transform follow;                        // player; defaults to main camera
+    public Material shadowMaterial;
+    public Transform follow;
     [Range(1, 60)] public int cloudCount = 14;
     public Vector2 casterSize = new Vector2(8f, 20f);
     public float areaSize = 90f;
@@ -58,7 +43,7 @@ public class CloudShadows : MonoBehaviour
 
     void OnDisable()
     {
-        Shader.SetGlobalVector(ParamsId, Vector4.zero);   // strength 0 = shader effect off
+        Shader.SetGlobalVector(ParamsId, Vector4.zero);
         DestroyCasters();
     }
 
@@ -82,21 +67,15 @@ public class CloudShadows : MonoBehaviour
         Shader.SetGlobalVector(ScrollId, new Vector4(_scroll.x, _scroll.y, height, 0f));
     }
 
-    /// <summary>
-    /// 0 = full sun, 1 = fully under a cloud, at a ground point, for light travelling in lightDir.
-    /// Used by LightRays so the beams dim when a cloud passes over them.
-    /// Uses the same size / coverage / softness / wind settings as the projected shadows.
-    /// </summary>
     public float SampleShadow(Vector3 groundPos, Vector3 lightDir)
     {
         if (!isActiveAndEnabled) return 0f;
 
-        // follow the sun ray up to the cloud layer
         float t = (height - groundPos.y) / Mathf.Max(0.05f, -lightDir.y);
         Vector3 p = groundPos - lightDir * t;
 
         float s = 1f / Mathf.Max(cloudSize, 0.1f);
-        float u = 1000f + p.x * s - _scroll.x;   // +1000 keeps Perlin out of its mirrored zone around 0
+        float u = 1000f + p.x * s - _scroll.x;
         float v = 1000f + p.z * s - _scroll.y;
 
         float n = Mathf.PerlinNoise(u, v) * 0.65f
@@ -106,9 +85,6 @@ public class CloudShadows : MonoBehaviour
         return k * k * (3f - 2f * k);
     }
 
-    // ------------------------------------------------------------------
-    // Optional real shadow casters
-    // ------------------------------------------------------------------
     void BuildCasters()
     {
         if (shadowMaterial == null) { Debug.LogWarning("CloudShadows: assign Shadow Material to use real shadow casters."); return; }

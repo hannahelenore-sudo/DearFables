@@ -26,7 +26,6 @@ public class FadeIn : MonoBehaviour
 
     private IEnumerator Start()
     {
-        // Stay black while the scene finishes spawning and loading
         float held = 0f;
         int smoothFrames = 0;
 
@@ -35,7 +34,6 @@ public class FadeIn : MonoBehaviour
             float dt = Time.unscaledDeltaTime;
             held += dt;
 
-            // Count consecutive frames that are fast (under ~25ms = 40fps+)
             smoothFrames = dt < 0.025f ? smoothFrames + 1 : 0;
 
             if (held >= minHoldTime && smoothFrames >= 10)
@@ -44,7 +42,6 @@ public class FadeIn : MonoBehaviour
             yield return null;
         }
 
-        // Fade using a smootherstep curve (softer start and end than linear)
         float timer = 0f;
         while (timer < fadeDuration)
         {

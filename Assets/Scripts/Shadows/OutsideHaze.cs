@@ -3,17 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
-/// <summary>
-/// Cult-of-the-Lamb style "everything outside the play area is hazy".
-///
-/// How it works: it reads your ground Tilemaps once, builds a small distance map
-/// (how far is any point from the nearest ground tile), and then hazes each sprite
-/// according to how far its FEET are from the ground. Things standing on the ground
-/// stay crisp (even tall ones whose heads stick out past the edge). Things further
-/// outside fade smoothly into the haze colour. The blur comes from Depth of Field.
-///
-/// Setup: add this to any GameObject (e.g. your "Fog" object). Press Play.
-/// </summary>
 public class OutsideHaze : MonoBehaviour
 {
     [Header("Play area")]
@@ -92,11 +81,6 @@ public class OutsideHaze : MonoBehaviour
         ResetAll();
     }
 
-    // ------------------------------------------------------------------
-    // Distance map
-    // ------------------------------------------------------------------
-
-    /// <summary>Call again if you add/remove ground tiles at runtime.</summary>
     [ContextMenu("Rebuild Distance Map")]
     public void Rebuild()
     {
@@ -104,7 +88,6 @@ public class OutsideHaze : MonoBehaviour
             ? playAreaTilemaps
             : FindObjectsByType<Tilemap>(FindObjectsSortMode.None);
 
-        // World bounds covering every tilemap
         bool any = false;
         Bounds wb = new Bounds();
         foreach (var m in maps)
@@ -158,7 +141,6 @@ public class OutsideHaze : MonoBehaviour
             }
         }
 
-        // Two-pass chamfer distance transform (in sample units), then scale to world units
         const float D1 = 1f, D2 = 1.41421356f;
         for (int z = 0; z < nz; z++)
         {
@@ -197,13 +179,12 @@ public class OutsideHaze : MonoBehaviour
         built = true;
     }
 
-    /// <summary>Distance in world units from (x,z) to the nearest ground tile (0 = on the ground).</summary>
     float SampleDistance(float x, float z)
     {
         float s = Mathf.Max(0.05f, sampleSize);
         float fx = (x - originX) / s;
         float fz = (z - originZ) / s;
-        if (fx < 0f || fz < 0f || fx > nx - 1 || fz > nz - 1) return float.MaxValue; // far outside
+        if (fx < 0f || fz < 0f || fx > nx - 1 || fz > nz - 1) return float.MaxValue;
 
         int x0 = Mathf.Min((int)fx, nx - 2);
         int z0 = Mathf.Min((int)fz, nz - 2);
@@ -216,13 +197,8 @@ public class OutsideHaze : MonoBehaviour
         return Mathf.Lerp(Mathf.Lerp(d00, d10, tx), Mathf.Lerp(d01, d11, tx), tz);
     }
 
-    // ------------------------------------------------------------------
-    // Sprites
-    // ------------------------------------------------------------------
-
     void Scan()
     {
-        // drop anything that has become excluded since the last scan (restores its colour)
         dead.Clear();
         foreach (var kv in entries)
         {
@@ -246,7 +222,6 @@ public class OutsideHaze : MonoBehaviour
 
     bool IsExcluded(SpriteRenderer r)
     {
-        // dragged-in objects (and everything under them)
         if (excludeObjects != null)
         {
             foreach (var go in excludeObjects)
@@ -256,7 +231,6 @@ public class OutsideHaze : MonoBehaviour
             }
         }
 
-        // names
         string objectName = r.gameObject.name;
         if (excludeNameContains != null)
         {
@@ -317,7 +291,6 @@ public class OutsideHaze : MonoBehaviour
 
     void Apply(Entry e, float amount)
     {
-        // For shaders that read the haze themselves
         if (Mathf.Abs(amount - e.lastAmount) > 0.003f)
         {
             e.lastAmount = amount;
@@ -327,10 +300,9 @@ public class OutsideHaze : MonoBehaviour
             e.r.SetPropertyBlock(mpb);
         }
 
-        // Works with any shader that multiplies by sprite colour
         if (tintSpriteColor)
         {
-            if (e.r.color != e.applied) e.baseColor = e.r.color; // something else changed it (e.g. hit flash)
+            if (e.r.color != e.applied) e.baseColor = e.r.color;
             Color c = e.baseColor * Color.Lerp(Color.white, hazeColor, amount);
             c.a = e.baseColor.a;
             e.r.color = c;

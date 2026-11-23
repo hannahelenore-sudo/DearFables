@@ -19,8 +19,8 @@ public class ScoreShakeEffect : MonoBehaviour
 
     [Header("Fall Down Settings")]
     public float fallDuration = 0.8f;
-    public float fallDistance = 8f;     // How far down the object drops
-    public float maxTiltAngle = 45f;    // Max rotation tilt as it falls like bread
+    public float fallDistance = 8f;
+    public float maxTiltAngle = 45f;
 
     private void Awake()
     {
@@ -33,9 +33,6 @@ public class ScoreShakeEffect : MonoBehaviour
         originalLocalRotation = transform.localRotation;
     }
 
-    /// <summary>
-    /// Call this method from DeckManager to start the shake and red tint effect matching the duration.
-    /// </summary>
     public void TriggerScoreEffect(float duration)
     {
         StopAllCoroutines();
@@ -44,7 +41,6 @@ public class ScoreShakeEffect : MonoBehaviour
 
     private IEnumerator ShakeAndRedRoutine(float duration)
     {
-        // Turn red and start shaking
         if (spriteRenderer != null)
         {
             spriteRenderer.color = flashColor;
@@ -56,7 +52,6 @@ public class ScoreShakeEffect : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
 
-            // Generate a random shake offset
             float offsetX = Random.Range(-1f, 1f) * shakeMagnitude;
             float offsetY = Random.Range(-1f, 1f) * shakeMagnitude;
 
@@ -65,7 +60,6 @@ public class ScoreShakeEffect : MonoBehaviour
             yield return null;
         }
 
-        // Reset back to original position and color when countdown ends
         transform.localPosition = originalLocalPosition;
         if (spriteRenderer != null)
         {
@@ -73,9 +67,6 @@ public class ScoreShakeEffect : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Triggers the bread-like falling down animation when the score hits zero.
-    /// </summary>
     public void TriggerFallDown()
     {
         StopAllCoroutines();
@@ -86,7 +77,6 @@ public class ScoreShakeEffect : MonoBehaviour
     {
         Vector3 startPos = transform.localPosition;
 
-        // Pick a random side drift and tilt angle for the bread fall
         float randomXOffset = Random.Range(-2f, 2f);
         Vector3 targetPos = startPos + new Vector3(randomXOffset, -fallDistance, 0f);
         float targetTilt = Random.Range(-maxTiltAngle, maxTiltAngle);
@@ -97,7 +87,6 @@ public class ScoreShakeEffect : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / fallDuration);
 
-            // Quadratic ease-in (t * t) simulates gravity acceleration
             float gravityEase = t * t;
 
             transform.localPosition = Vector3.Lerp(startPos, targetPos, gravityEase);

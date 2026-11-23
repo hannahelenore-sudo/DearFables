@@ -3,12 +3,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>
-/// A row of cards showing the player's health. Losing the card game flips one card over and dims it.
-/// If the HUD isn't in the scene when you lose (for example in the card game), the animation plays
-/// the next time a scene with this HUD loads.
-/// Build it with  Tools > HUD > Create Player HUD  and then just swap the card sprites.
-/// </summary>
 public class HealthCardsHUD : MonoBehaviour
 {
     [Tooltip("The card images, left to right. Extra cards beyond the player's max health are hidden.")]
@@ -54,7 +48,6 @@ public class HealthCardsHUD : MonoBehaviour
     {
         PlayerHealth.Changed += OnHealthChanged;
 
-        // Start from what we last showed, then animate to the real value
         ShowInstant(PlayerHealth.DisplayedHealth);
         OnHealthChanged();
     }
@@ -104,16 +97,14 @@ public class HealthCardsHUD : MonoBehaviour
 
     private IEnumerator AnimateToCurrent()
     {
-        yield return null; // let everything else in the scene start first
+        yield return null; 
 
-        // Cards for a bigger / smaller max health
         for (int i = 0; i < cards.Length; i++)
             if (cards[i] != null) cards[i].gameObject.SetActive(i < PlayerHealth.Max);
 
         int shown = PlayerHealth.DisplayedHealth;
         int target = PlayerHealth.Current;
 
-        // Lost cards: the right-most remaining card goes first
         while (shown > target)
         {
             shown--;
@@ -121,7 +112,6 @@ public class HealthCardsHUD : MonoBehaviour
             yield return new WaitForSecondsRealtime(0.15f);
         }
 
-        // Gained cards
         while (shown < target)
         {
             if (shown < cards.Length) yield return StartCoroutine(GainCard(shown));
@@ -139,7 +129,6 @@ public class HealthCardsHUD : MonoBehaviour
         }
     }
 
-    // Shake, flip over, dim
     private IEnumerator LoseCard(int index)
     {
         if (index < 0 || index >= cards.Length || cards[index] == null) yield break;
@@ -147,7 +136,6 @@ public class HealthCardsHUD : MonoBehaviour
         RectTransform r = cards[index].rectTransform;
         Vector2 start = basePositions[index];
 
-        // 1. shake + flash red
         const float shakeTime = 0.35f;
         float t = 0f;
         while (t < shakeTime)
@@ -160,7 +148,6 @@ public class HealthCardsHUD : MonoBehaviour
         }
         r.anchoredPosition = start;
 
-        // 2. flip (squash to nothing, swap, open again)
         const float flipTime = 0.18f;
         t = 0f;
         while (t < flipTime)

@@ -1,14 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Put this on the StarQuest NPC (the object that has StarQuestNPC + EnemyChase).
-/// When the player hits it with a card or touches it while it is acting as an enemy, the card
-/// game that opens next is flagged as "started by the StarQuest NPC", which is the only case
-/// where the CardGame tutorial runs.
-///
-/// Exact alternative: call CardGameTutorialGate.MarkFromStarQuest() from your own
-/// "start battle" code for this NPC.
-/// </summary>
 [DisallowMultipleComponent]
 public class StarQuestTutorialTrigger : MonoBehaviour
 {
@@ -28,7 +19,6 @@ public class StarQuestTutorialTrigger : MonoBehaviour
 
     void Awake()
     {
-        // Fresh overworld: drop any flag left over from an earlier battle.
         CardGameTutorialGate.Pending = false;
         enemyChase = GetComponent("EnemyChase") as Behaviour;
     }

@@ -2,15 +2,6 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// <summary>
-/// Draws a soft dark blob flat on the ground under a sprite so it looks planted.
-/// Added automatically by ContactShadowSpawner, or put it on any sprite by hand.
-/// The shadow is a separate object (not a child), so it never inherits your sprite's
-/// tiny scale or rotation. It shrinks and fades when the sprite is in the air (jump).
-///
-/// FloorBG and Picnic are hard-coded as never getting a contact shadow: if this component
-/// ends up on one of them (by any script, prefab or by hand) it removes itself.
-/// </summary>
 [DisallowMultipleComponent]
 public class ContactShadow : MonoBehaviour
 {
@@ -45,10 +36,8 @@ public class ContactShadow : MonoBehaviour
 
     public const string BlobName = "ContactShadowBlob";
 
-    // Objects whose name contains any of these never get a contact shadow.
     static readonly string[] NeverShadow = { "FloorBG", "Picnic" };
 
-    // last values we drew with, so a sprite that hasn't moved costs almost nothing
     Vector3 _lastCenter, _lastSize;
     float _lastZ;
     int _lastOrder;
@@ -74,7 +63,6 @@ public class ContactShadow : MonoBehaviour
 
     void Start()
     {
-        // Hard exclusion: remove ourselves before creating any blob.
         if (IsNeverShadow(gameObject.name))
         {
             Destroy(this);
@@ -95,9 +83,9 @@ public class ContactShadow : MonoBehaviour
         var go = new GameObject(BlobName);
         shadowT = go.transform;
         shadowT.SetParent(container, false);
-        shadowT.rotation = Quaternion.Euler(90f, 0f, 0f); // lie flat, facing up
+        shadowT.rotation = Quaternion.Euler(90f, 0f, 0f);
 
-        shadow = go.AddComponent<SpriteRenderer>(); // default sprite material, unlit
+        shadow = go.AddComponent<SpriteRenderer>();
         shadow.sprite = GetBlobSprite();
         shadow.shadowCastingMode = ShadowCastingMode.Off;
         shadow.receiveShadows = false;
@@ -135,8 +123,6 @@ public class ContactShadow : MonoBehaviour
         Bounds b = target.bounds;
         float zPos = transform.position.z;
 
-        // Nothing moved and the width has settled: the shadow is already correct
-        // (this skips the per-frame raycast for static things like trees).
         if (_hasLast && b.center == _lastCenter && b.size == _lastSize && zPos == _lastZ
             && target.sortingOrder == _lastOrder
             && Mathf.Abs(width - b.size.x * widthScale) < 0.0001f)
@@ -149,7 +135,6 @@ public class ContactShadow : MonoBehaviour
         float groundY;
         if (!TryFindGround(origin, out groundY)) groundY = fallbackGroundY;
 
-        // Smooth width so animation frames of different widths don't make it jitter.
         float targetWidth = b.size.x * widthScale;
         width = Mathf.Lerp(width, targetWidth, 1f - Mathf.Exp(-12f * Time.deltaTime));
 
@@ -159,7 +144,6 @@ public class ContactShadow : MonoBehaviour
         float alpha = opacity * Mathf.Lerp(1f, 0.4f, t);
 
         shadowT.position = new Vector3(b.center.x, groundY + groundOffset, transform.position.z + zOffset);
-        // Sprite is 1 unit wide/tall; after rotating flat, local Y maps to world Z (depth).
         shadowT.localScale = new Vector3(width * size, width * depthRatio * size, 1f);
 
         shadow.color = new Color(color.r, color.g, color.b, alpha);
@@ -177,8 +161,8 @@ public class ContactShadow : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             Collider c = hits[i].collider;
-            if (c.transform.IsChildOf(transform)) continue;      // our own collider
-            if (c.attachedRigidbody != null) continue;           // other characters/enemies
+            if (c.transform.IsChildOf(transform)) continue;
+            if (c.attachedRigidbody != null) continue;
             if (hits[i].distance < best)
             {
                 best = hits[i].distance;
@@ -207,7 +191,7 @@ public class ContactShadow : MonoBehaviour
                 float dx = (x + 0.5f) / S * 2f - 1f;
                 float dy = (y + 0.5f) / S * 2f - 1f;
                 float d = Mathf.Sqrt(dx * dx + dy * dy);
-                float a = 1f - Mathf.SmoothStep(0.1f, 1f, d); // soft falloff to the edge
+                float a = 1f - Mathf.SmoothStep(0.1f, 1f, d);
                 tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
             }
         }

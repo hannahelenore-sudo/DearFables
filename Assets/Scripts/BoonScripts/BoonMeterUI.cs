@@ -3,13 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// A container image with a liquid that fills up each time the player fights an enemy.
-/// When it is full, the "Choose Your Boon" screen opens and the pick becomes a permanent upgrade.
-///
-/// Put this in the scene the player returns to after a battle (the overworld).
-/// The fill animates from where it was last time to where it is now.
-/// </summary>
 public class BoonMeterUI : MonoBehaviour
 {
     [Header("Meter Visuals")]
@@ -79,10 +72,6 @@ public class BoonMeterUI : MonoBehaviour
     private RectTransform pulseTarget;
     private IntroCutscene[] cutscenes;
 
-    // -------------------------------------------------------------------
-    // Setup
-    // -------------------------------------------------------------------
-
     private void Awake()
     {
         pulseTarget = containerImage != null ? containerImage.rectTransform : transform as RectTransform;
@@ -90,7 +79,6 @@ public class BoonMeterUI : MonoBehaviour
 
         if (liquidImage != null)
         {
-            // A filled Image needs a sprite, so give it a plain white one if none is assigned
             if (liquidImage.sprite == null) liquidImage.sprite = GetWhiteSprite();
 
             liquidImage.type = Image.Type.Filled;
@@ -148,26 +136,16 @@ public class BoonMeterUI : MonoBehaviour
             playerMovement = player.GetComponent("PlayerMovement") as Behaviour;
     }
 
-    // -------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------
-
-    /// <summary>Animates the meter to the current value. Called automatically when the scene loads.</summary>
     public void Refresh()
     {
         if (!isActiveAndEnabled || running) return;
         StartCoroutine(RunRoutine());
     }
 
-    /// <summary>Hook this to a Button, or use the Meter Button field. Opens the boon screen when ready.</summary>
     public void OnMeterClicked()
     {
         if (IsReady) clickRequested = true;
     }
-
-    // -------------------------------------------------------------------
-    // Main loop
-    // -------------------------------------------------------------------
 
     private IEnumerator RunRoutine()
     {
@@ -177,7 +155,6 @@ public class BoonMeterUI : MonoBehaviour
 
         while (running)
         {
-            // 1. Animate to the real meter value
             float target = Mathf.Min(BoonProgress.Meter, 1f);
             if (Mathf.Abs(target - shownFill) > 0.001f)
             {
@@ -188,7 +165,6 @@ public class BoonMeterUI : MonoBehaviour
             shownFill = target;
             BoonProgress.DisplayedMeter = target;
 
-            // 2. Not full yet -> done for now
             if (!BoonProgress.IsMeterFull) break;
 
             if (selectionUI == null)
@@ -197,14 +173,12 @@ public class BoonMeterUI : MonoBehaviour
                 break;
             }
 
-            // 3. Full -> a boon is ready (but it waits while a cutscene is playing)
             yield return StartCoroutine(WaitForCutscenes());
 
             SetReady(true);
             PlaySFX(readySound);
             yield return new WaitForSecondsRealtime(readyHoldTime);
 
-            // A cutscene may have started during the hold: the boon stays on hold until it is over
             yield return StartCoroutine(WaitForCutscenes());
 
             if (!autoOpenWhenFull)
@@ -212,7 +186,6 @@ public class BoonMeterUI : MonoBehaviour
                 clickRequested = false;
                 if (meterButton != null) meterButton.interactable = true;
 
-                // Clicks during a cutscene are ignored
                 while (!clickRequested || CutscenePlaying())
                 {
                     if (CutscenePlaying()) clickRequested = false;
@@ -222,10 +195,8 @@ public class BoonMeterUI : MonoBehaviour
                 if (meterButton != null) meterButton.interactable = false;
             }
 
-            // Last check right before the screen opens
             yield return StartCoroutine(WaitForCutscenes());
 
-            // 4. Let the player pick
             FreezePlayer(true);
 
             BoonData picked = null;
@@ -235,7 +206,6 @@ public class BoonMeterUI : MonoBehaviour
 
             FreezePlayer(false);
 
-            // 5. Permanent upgrade, empty the meter (leftover carries over), loop again
             BoonProgress.ApplyBoon(picked);
             BoonProgress.ConsumeFullMeter();
             SetReady(false);
@@ -244,7 +214,6 @@ public class BoonMeterUI : MonoBehaviour
         running = false;
     }
 
-    // True while any IntroCutscene in the scene is playing
     private bool CutscenePlaying()
     {
         if (!waitForCutscenes) return false;
@@ -258,8 +227,6 @@ public class BoonMeterUI : MonoBehaviour
         return false;
     }
 
-    // Returns at once if nothing is playing. Otherwise waits for the cutscene to end (plus a short settle time,
-    // restarting if another cutscene begins), so the boon never opens on top of a cutscene.
     private IEnumerator WaitForCutscenes()
     {
         if (!CutscenePlaying()) yield break;
@@ -311,7 +278,7 @@ public class BoonMeterUI : MonoBehaviour
         if (gaining)
         {
             PlaySFX(fillDoneSound);
-            if (liquidGraphic != null) liquidGraphic.Slosh(1f); // liquid rocks when the level stops
+            if (liquidGraphic != null) liquidGraphic.Slosh(1f);
             yield return StartCoroutine(PulseContainer());
         }
     }
@@ -333,10 +300,6 @@ public class BoonMeterUI : MonoBehaviour
 
         pulseTarget.localScale = containerBaseScale;
     }
-
-    // -------------------------------------------------------------------
-    // Visuals
-    // -------------------------------------------------------------------
 
     private void SetFill(float value)
     {
@@ -363,7 +326,6 @@ public class BoonMeterUI : MonoBehaviour
     {
         if (!IsReady) return;
 
-        // Glow + gentle breathing while a boon is waiting
         float wave = (Mathf.Sin(Time.unscaledTime * readyPulseSpeed) + 1f) * 0.5f;
 
         if (liquidImage != null)
@@ -375,10 +337,6 @@ public class BoonMeterUI : MonoBehaviour
         if (pulseTarget != null)
             pulseTarget.localScale = containerBaseScale * (1f + wave * 0.04f);
     }
-
-    // -------------------------------------------------------------------
-    // Player
-    // -------------------------------------------------------------------
 
     private void FreezePlayer(bool freeze)
     {

@@ -6,16 +6,6 @@ using UnityEngine.UI;
 using UnityEditor;
 #endif
 
-/// <summary>
-/// Builds an always-on-top Canvas with a fast-forward button, so the button works everywhere
-/// in the card game no matter which other canvases get switched on or off.
-/// Add this to ONE empty GameObject in the CardGame scene.
-///
-/// To SEE and tune it without pressing Play: right-click this component's header
-/// > "Build Preview In Editor". The button then shows in the Scene/Game view and every
-/// value below updates live, both in edit mode and while the game is running.
-/// "Remove Preview" deletes it again (it is rebuilt automatically at runtime).
-/// </summary>
 public class FastForwardOverlay : MonoBehaviour
 {
     private const string CanvasName = "FastForwardCanvas";
@@ -67,11 +57,8 @@ public class FastForwardOverlay : MonoBehaviour
     private FastForwardButton ff;
     private Color appliedNormal = new Color(-1f, -1f, -1f, -1f);
 
-    // ------------------------------------------------------------------
-
     private void Awake()
     {
-        // Reuse a preview built in the editor, otherwise build fresh
         if (!FindExisting()) Build();
         Apply();
     }
@@ -86,7 +73,6 @@ public class FastForwardOverlay : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
-            // delayed: editing other objects directly inside OnValidate gives Unity warnings
             EditorApplication.delayCall += () =>
             {
                 if (this != null && FindExisting()) Apply();
@@ -96,8 +82,6 @@ public class FastForwardOverlay : MonoBehaviour
 #endif
         if (rt != null) Apply();
     }
-
-    // ------------------------------------------------------------------
 
     private bool FindExisting()
     {
@@ -118,7 +102,6 @@ public class FastForwardOverlay : MonoBehaviour
     {
         RemoveExisting();
 
-        // Canvas
         GameObject canvasGO = new GameObject(CanvasName);
         canvasGO.transform.SetParent(transform, false);
         canvas = canvasGO.AddComponent<Canvas>();
@@ -130,7 +113,6 @@ public class FastForwardOverlay : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
         canvasGO.AddComponent<GraphicRaycaster>();
 
-        // Button (created inactive so the label can be assigned before FastForwardButton starts)
         GameObject btnGO = new GameObject(ButtonName, typeof(RectTransform));
         btnGO.SetActive(false);
         btnGO.transform.SetParent(canvasGO.transform, false);
@@ -140,7 +122,6 @@ public class FastForwardOverlay : MonoBehaviour
         Button btn = btnGO.AddComponent<Button>();
         btn.targetGraphic = img;
 
-        // Label
         GameObject textGO = new GameObject("Label", typeof(RectTransform));
         textGO.transform.SetParent(btnGO.transform, false);
         RectTransform trt = (RectTransform)textGO.transform;
@@ -173,15 +154,12 @@ public class FastForwardOverlay : MonoBehaviour
         else DestroyImmediate(old.gameObject);
     }
 
-    // ------------------------------------------------------------------
-
     private void Apply()
     {
         if (canvas == null || rt == null || img == null || label == null) return;
 
         canvas.sortingOrder = sortingOrder;
 
-        // Position + size
         Vector2 a = new Vector2(Mathf.Clamp01(anchor.x), Mathf.Clamp01(anchor.y));
         rt.anchorMin = rt.anchorMax = rt.pivot = a;
         rt.anchoredPosition = new Vector2(a.x >= 0.5f ? -margin.x : margin.x,
@@ -192,12 +170,10 @@ public class FastForwardOverlay : MonoBehaviour
         rt.sizeDelta = baseSize * sizeMultiplier;
         label.fontSize = fontSize * sizeMultiplier;
 
-        // Container sprite
         if (img.sprite != containerSprite) img.sprite = containerSprite;
         img.preserveAspect = preserveAspect;
         img.type = (hasSprite && containerSprite.border != Vector4.zero) ? Image.Type.Sliced : Image.Type.Simple;
 
-        // Colors
         Color normal = hasSprite ? Color.white : backgroundColor;
         if (Application.isPlaying && ff != null)
         {
@@ -213,7 +189,6 @@ public class FastForwardOverlay : MonoBehaviour
             if (!Application.isPlaying) label.text = ">>";
         }
 
-        // Button behaviour
         if (ff != null)
         {
             ff.speeds = speeds;
@@ -234,8 +209,6 @@ public class FastForwardOverlay : MonoBehaviour
         }
 #endif
     }
-
-    // ------------------------------------------------------------------
 
     [ContextMenu("Build Preview In Editor")]
     private void BuildPreview()

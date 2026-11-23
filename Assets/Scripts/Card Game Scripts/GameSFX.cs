@@ -1,10 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Tiny shared sound-effect player. No setup needed: it creates a hidden persistent
-/// GameObject with a small pool of 2D AudioSources the first time a sound is played.
-/// Each sound gets its own source, so changing the pitch of one never affects another.
-/// </summary>
 public static class GameSFX
 {
     private const int PoolSize = 12;
@@ -12,7 +7,6 @@ public static class GameSFX
     private static AudioSource[] pool;
     private static int nextIndex;
 
-    // Keeps things safe when "Enter Play Mode Options > Reload Domain" is turned off
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -32,7 +26,7 @@ public static class GameSFX
         {
             AudioSource src = host.AddComponent<AudioSource>();
             src.playOnAwake = false;
-            src.spatialBlend = 0f; // 2D, so it is always heard no matter which camera is active
+            src.spatialBlend = 0f;
             pool[i] = src;
         }
     }
@@ -53,7 +47,6 @@ public static class GameSFX
             }
         }
 
-        // Every source is busy: reuse the next one in line
         if (chosen == null)
         {
             chosen = pool[nextIndex];

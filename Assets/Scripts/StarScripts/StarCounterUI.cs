@@ -2,11 +2,6 @@ using System.Collections;
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// Put this on the scene you return to after the card battle.
-/// Shows the total stars, and if the player just won some, counts up from the old total
-/// and gives the spinning star icon a little pop.
-/// </summary>
 public class StarCounterUI : MonoBehaviour
 {
     [Header("References")]
@@ -27,7 +22,6 @@ public class StarCounterUI : MonoBehaviour
 
         if (gained > 0)
         {
-            // Show the old total first, then count up to the new one
             SetText(total - gained);
             StartCoroutine(CountUp(total - gained, total));
             PlayerProgress.ClearLastGained();

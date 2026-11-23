@@ -2,23 +2,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Liquid-style difficulty meter (sideways). Put this on a UI object in your GAME scene (not the card game scene,
-/// so it never shows up there).
-///
-/// SETUP
-///  1. Right-click your Canvas > UI > Image (or just add this component to an empty UI object: it adds the Image).
-///  2. Optional: drag your own bar / tube sprite into that Image's "Source Image". With NO sprite it draws a dark
-///     rounded bar for you (it stretches without squashing the corners, so you can resize it freely).
-///  3. Move / resize / anchor it anywhere with the normal Rect Transform.
-///
-/// It is visible in the EDITOR too (not only in Play mode): use "Preview Fill" to see how full it looks.
-/// The preview objects are hidden and never saved into your scene.
-///
-/// The liquid is clipped to the shape of your sprite (its opaque pixels), so draw the sprite as the
-/// inside of the container. For a glass outline or shine on top of the liquid, put it in "Overlay Sprite".
-/// The liquid fills sideways, from the left edge of the object's rectangle (or the right if "Fill From Right" is on).
-/// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(Image), typeof(Mask))]
 public class DifficultyMeter : MonoBehaviour
@@ -58,10 +41,9 @@ public class DifficultyMeter : MonoBehaviour
     [Tooltip("Shows the difficulty as a percentage, e.g. 42%.")]
     public TextMeshProUGUI percentText;
 
-    // Remembered between scenes so you SEE the liquid move after a battle
     private static float lastShown = -1f;
 
-    private const string GeneratedPrefix = "DM_"; // generated children, swept and rebuilt (never saved in edit mode)
+    private const string GeneratedPrefix = "DM_";
 
     private SidewaysLiquidGraphic backWave;
     private SidewaysLiquidGraphic frontWave;
@@ -78,7 +60,6 @@ public class DifficultyMeter : MonoBehaviour
         lastShown = -1f;
     }
 
-    // Called by Unity when the component is first added: a sensible size so it is visible straight away
     private void Reset()
     {
         RectTransform rt = transform as RectTransform;
@@ -109,20 +90,14 @@ public class DifficultyMeter : MonoBehaviour
 #if UNITY_EDITOR
     private void OnValidate()
     {
-        // Redraw the preview when a value is changed in the Inspector
         UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
     }
 #endif
-
-    // -------------------------------------------------------------------
-    // Visuals
-    // -------------------------------------------------------------------
 
     private void BuildVisuals()
     {
         DestroyVisuals();
 
-        // The container sprite doubles as the mask, so the liquid never leaves the shape
         Mask mask = GetComponent<Mask>();
         if (mask == null) mask = gameObject.AddComponent<Mask>();
         mask.showMaskGraphic = true;
@@ -145,7 +120,6 @@ public class DifficultyMeter : MonoBehaviour
 
     private void DestroyVisuals()
     {
-        // Also removes anything left over from before a script reload / entering Play mode
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
             Transform child = transform.GetChild(i);
@@ -162,7 +136,6 @@ public class DifficultyMeter : MonoBehaviour
         else DestroyImmediate(go);
     }
 
-    // No sprite assigned: a dark rounded bar, so the meter can always be seen and resized
     private void ApplyContainerLook()
     {
         Image img = GetComponent<Image>();
@@ -198,7 +171,6 @@ public class DifficultyMeter : MonoBehaviour
         {
             for (int x = 0; x < size; x++)
             {
-                // Distance to a rounded rectangle, so the corners are smooth
                 float qx = Mathf.Abs(x + 0.5f - half) - (half - radius);
                 float qy = Mathf.Abs(y + 0.5f - half) - (half - radius);
                 float d = new Vector2(Mathf.Max(qx, 0f), Mathf.Max(qy, 0f)).magnitude + Mathf.Min(Mathf.Max(qx, qy), 0f) - radius;
@@ -215,10 +187,6 @@ public class DifficultyMeter : MonoBehaviour
         return defaultSprite;
     }
 
-    // -------------------------------------------------------------------
-    // Update
-    // -------------------------------------------------------------------
-
     private void Update()
     {
         if (!Application.isPlaying)
@@ -230,7 +198,6 @@ public class DifficultyMeter : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         float target = DifficultyProgress.Meter;
 
-        // Splash more while the level is changing, settle down when it stops
         slosh = Mathf.MoveTowards(slosh, Mathf.Clamp01(Mathf.Abs(target - shown) * 6f), dt * 1.5f);
         shown = Mathf.MoveTowards(shown, target, fillSpeed * dt);
         phase += waveSpeed * dt;
@@ -239,7 +206,6 @@ public class DifficultyMeter : MonoBehaviour
         Refresh(shown, amp, phase);
     }
 
-    // Editor only: a still picture of the meter at "Preview Fill"
     private void UpdatePreview()
     {
         if (backWave == null || frontWave == null || builtOverlay != overlaySprite) BuildVisuals();
@@ -257,7 +223,6 @@ public class DifficultyMeter : MonoBehaviour
             ? Color.Lerp(lowColor, midColor, level * 2f)
             : Color.Lerp(midColor, highColor, (level - 0.5f) * 2f);
 
-        // Back wave: lighter, slightly ahead, moving the other way, so the edge looks like it has depth
         Color back = new Color(Mathf.Lerp(c.r, 1f, 0.35f), Mathf.Lerp(c.g, 1f, 0.35f), Mathf.Lerp(c.b, 1f, 0.35f), 0.6f);
         Apply(backWave, Mathf.Min(1f, level + 0.015f), amp * 0.8f, -ph * 0.7f + 2f, back);
         Apply(frontWave, level, amp, ph, c);
@@ -278,14 +243,9 @@ public class DifficultyMeter : MonoBehaviour
         g.SetVerticesDirty();
     }
 
-    // -------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------
-
     private GameObject NewChild(string objectName, params System.Type[] components)
     {
         GameObject go = new GameObject(objectName, typeof(RectTransform));
-        // In the editor the preview objects are hidden and never saved into the scene
         go.hideFlags = Application.isPlaying ? HideFlags.None : HideFlags.HideAndDontSave;
         go.transform.SetParent(transform, false);
         Stretch(go.GetComponent<RectTransform>());

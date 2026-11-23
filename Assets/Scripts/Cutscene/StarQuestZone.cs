@@ -1,11 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Add this to any GameObject that has a Collider (a Box Collider is added for you if there is none) and drag the
-/// Star Quest NPC into "Npc". When the player steps into the collider, the NPC's Intro dialogue plays by itself,
-/// but only if the quest has not been accepted yet. After that the zone switches itself off (or just does nothing).
-/// The player needs a Rigidbody or CharacterController, like for any trigger.
-/// </summary>
 public class StarQuestZone : MonoBehaviour
 {
     [Tooltip("The Star Quest NPC whose Intro dialogue this zone starts. Leave empty to auto-find the one in the scene.")]

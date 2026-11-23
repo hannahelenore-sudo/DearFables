@@ -74,7 +74,6 @@ public class TreeSpawner : MonoBehaviour
             GameObject t = spawnedTrees[i];
             if (t == null) continue;
 
-            // flat distance (the field lies on the X/Z plane)
             Vector3 pos = t.transform.position;
             float dx = pos.x - pp.x;
             float dz = pos.z - pp.z;

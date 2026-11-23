@@ -4,20 +4,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>
-/// One switch that makes EVERY button / clickable UI element unpressable while something is playing
-/// (round intro, ending animation, tutorial steps ...).
-///
-///   InputLock.Push(this);   // start: nothing can be clicked or "Submit"-ed any more
-///   InputLock.Pop(this);    // end: everything works again (only when nobody else still holds a lock)
-///
-/// Several scripts can lock at the same time; the buttons only come back when ALL of them have released.
-/// It does not touch any button's own "Interactable" setting, so nothing can be left disabled by accident.
-/// Put this file anywhere in Assets (it is a plain static class, nothing to add to a GameObject).
-/// </summary>
 public static class InputLock
 {
-    /// <summary>Sits above the whole game UI, below the tutorial overlay (32000).</summary>
     public const int SortingOrder = 31000;
 
     private static readonly HashSet<object> owners = new HashSet<object>();
@@ -38,7 +26,6 @@ public static class InputLock
         hooked = false;
     }
 
-    /// <summary>Lock all buttons. "owner" can be any object (usually "this" or a string).</summary>
     public static void Push(object owner)
     {
         if (owner == null) return;
@@ -47,7 +34,6 @@ public static class InputLock
         Apply();
     }
 
-    /// <summary>Release your lock. Buttons come back once nobody holds a lock any more.</summary>
     public static void Pop(object owner)
     {
         if (owner == null) return;
@@ -55,7 +41,6 @@ public static class InputLock
         if (owners.Count == 0) Remove();
     }
 
-    /// <summary>Drops every lock at once (used when the card game scene closes).</summary>
     public static void ReleaseAll()
     {
         owners.Clear();
@@ -75,7 +60,7 @@ public static class InputLock
                 prevNavigation = es.sendNavigationEvents;
                 navigationSaved = true;
             }
-            es.sendNavigationEvents = false;   // Space / Enter / arrows can't press a selected button
+            es.sendNavigationEvents = false;
             es.SetSelectedGameObject(null);
         }
     }
@@ -89,7 +74,6 @@ public static class InputLock
         navigationSaved = false;
     }
 
-    // An invisible full-screen graphic: every click / tap lands on it instead of a button
     private static GameObject CreateBlocker()
     {
         GameObject go = new GameObject("InputLockBlocker", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));

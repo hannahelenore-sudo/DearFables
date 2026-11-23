@@ -2,11 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Developer shortcut. Put this on an empty GameObject in BOTH the overworld scene and the card game scene,
-/// and set the GameObject's Tag to "EditorOnly" so Unity strips it from builds.
-/// It has no in-game UI: use the buttons in this component's Inspector while in Play mode.
-/// </summary>
 public class DebugShortcuts : MonoBehaviour
 {
     [Header("Scenes")]
@@ -30,7 +25,6 @@ public class DebugShortcuts : MonoBehaviour
     [Tooltip("Stars given by Win Card Game.")]
     public int debugStarsOnWin = 1;
 
-    // Static so it survives the scene load from the card game back to the overworld
     private static bool pendingOpenBoons;
 
     private IEnumerator Start()
@@ -38,11 +32,10 @@ public class DebugShortcuts : MonoBehaviour
         if (!pendingOpenBoons) yield break;
         pendingOpenBoons = false;
 
-        yield return new WaitForSecondsRealtime(0.6f); // let the scene / fade settle
+        yield return new WaitForSecondsRealtime(0.6f);
         OpenBoons();
     }
 
-    /// <summary>Overworld: opens the Choose Your Boon screen right now.</summary>
     public void OpenBoons()
     {
         BoonSelectionUI ui = boonSelectionUI != null ? boonSelectionUI : Object.FindAnyObjectByType<BoonSelectionUI>();
@@ -59,7 +52,6 @@ public class DebugShortcuts : MonoBehaviour
         });
     }
 
-    /// <summary>Overworld: jumps straight into the card game.</summary>
     public void StartCardGame()
     {
         if (string.IsNullOrEmpty(cardGameSceneName)) return;
@@ -74,7 +66,6 @@ public class DebugShortcuts : MonoBehaviour
             SceneManager.LoadScene(cardGameSceneName);
     }
 
-    /// <summary>Card game: ends the battle (no win/loss, no stars, no meter) and opens the boon screen in the overworld.</summary>
     public void EndCardGameAndOpenBoons()
     {
         BattleManager battle = Object.FindAnyObjectByType<BattleManager>();
@@ -87,8 +78,6 @@ public class DebugShortcuts : MonoBehaviour
         SceneManager.LoadScene(target);
     }
 
-    // ---------------- Fake fight results ----------------
-
     string ReturnSceneName()
     {
         BattleManager battle = Object.FindAnyObjectByType<BattleManager>();
@@ -97,10 +86,6 @@ public class DebugShortcuts : MonoBehaviour
             : overworldSceneName;
     }
 
-    /// <summary>
-    /// Pretends you won a fight: batteries drop in the overworld, stars are added, the mood counts down one fight,
-    /// then you go back to the overworld. (It doesn't run BattleManager's own win code.)
-    /// </summary>
     public void WinCardGame()
     {
         BatteryManager.QueueDrop(BatteryManager.CalculateFightReward(debugHandsLeft));
@@ -111,17 +96,13 @@ public class DebugShortcuts : MonoBehaviour
         SceneManager.LoadScene(ReturnSceneName());
     }
 
-    /// <summary>
-    /// Pretends you lost a fight: the mood counts down, you lose a health card (Angry at 1, game over at 0),
-    /// then you go back to the overworld. (It doesn't run BattleManager's own loss code.)
-    /// </summary>
     public void FailCardGame()
     {
         Time.timeScale = 1f;
         MoodManager.OnFightEnded();
         PlayerHealth.Lose(1);
 
-        if (PlayerHealth.IsDead) return; // the game over screen takes over
+        if (PlayerHealth.IsDead) return;
         SceneManager.LoadScene(ReturnSceneName());
     }
 
@@ -130,15 +111,11 @@ public class DebugShortcuts : MonoBehaviour
         BatteryManager.Add(amount);
     }
 
-    // ---------------- Card power ----------------
-
-    /// <summary>Adds (or removes, if negative) Wind Power for the whole session. Shows in the trinket bar and adds to every Wind card.</summary>
     public void AddWindPower(int amount)
     {
         CardData.DebugWindPower += amount;
     }
 
-    /// <summary>Adds (or removes, if negative) Sun Power for the whole session. Shows in the trinket bar and adds to every Solar card.</summary>
     public void AddSunPower(int amount)
     {
         CardData.DebugSunPower += amount;
@@ -150,8 +127,6 @@ public class DebugShortcuts : MonoBehaviour
         CardData.DebugSunPower = 0;
     }
 
-    // ---------------- Low Power cards (card game scene) ----------------
-
     public bool HasDeck { get { return Object.FindAnyObjectByType<DeckManager>() != null; } }
 
     public float LowPowerChance
@@ -160,7 +135,6 @@ public class DebugShortcuts : MonoBehaviour
         set { DeckManager d = Object.FindAnyObjectByType<DeckManager>(); if (d != null) d.lowPowerChance = Mathf.Clamp01(value); }
     }
 
-    /// <summary>Makes cards in your hand Low Power (half score, dimmed). onlySelected = just the selected ones.</summary>
     public void MakeHandLowPower(bool onlySelected)
     {
         DeckManager d = Object.FindAnyObjectByType<DeckManager>();

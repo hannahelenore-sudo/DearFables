@@ -2,15 +2,11 @@ using UnityEngine;
 
 public enum BoonType
 {
-    ExtraHandPerRound,  // +amount hands (extra scoring attempts) every battle
-    HandSize,           // +amount cards in your hand
-    WindPower           // +amount flat Wind Power (primary value) added to every played hand
+    ExtraHandPerRound,
+    HandSize,
+    WindPower
 }
 
-/// <summary>
-/// One permanent upgrade. Create these via: Right click > Create > Custom Card System > Boon.
-/// If you don't create any, BoonSelectionUI builds the three default boons automatically (no icons).
-/// </summary>
 [CreateAssetMenu(fileName = "NewBoon", menuName = "Custom Card System/Boon")]
 public class BoonData : ScriptableObject
 {
@@ -44,7 +40,6 @@ public class BoonData : ScriptableObject
         return "";
     }
 
-    /// <summary>Builds a boon in code (used for the default boons).</summary>
     public static BoonData CreateRuntime(string name, string desc, BoonType type, int amount)
     {
         BoonData data = CreateInstance<BoonData>();

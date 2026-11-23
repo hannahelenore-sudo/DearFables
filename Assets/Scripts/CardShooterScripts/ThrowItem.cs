@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>Everything the player can hold. Press E to cycle through the ones you own.</summary>
 public enum ThrowItem
 {
     Card,
@@ -10,10 +9,6 @@ public enum ThrowItem
     WindCard
 }
 
-/// <summary>
-/// Generates simple fallback sprites in code, so everything works before you have real art.
-/// If you assign real sprites (in CardShooter or in the Trinket assets) those are used instead.
-/// </summary>
 public static class ItemSprites
 {
     private static Sprite card, tsinelas, rock, wind, star, streak;
@@ -39,11 +34,9 @@ public static class ItemSprites
         tex.SetPixels(px);
         tex.Apply();
 
-        // pixelsPerUnit = width -> the sprite is exactly 1 unit wide
         return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), w);
     }
 
-    // d = signed distance (negative = inside). Gives a soft 2px edge.
     private static float Aa(float d)
     {
         return Mathf.Clamp01(0.5f - d / 0.03f);
@@ -102,7 +95,7 @@ public static class ItemSprites
         float th = Mathf.Atan2(dy, dx);
 
         float t = Mathf.Repeat(th / (2f * Mathf.PI) - r * 4f, 1f);
-        float line = Mathf.Min(t, 1f - t); // 0 right on the spiral
+        float line = Mathf.Min(t, 1f - t);
         float a = Mathf.Clamp01((0.14f - line) / 0.05f);
         a *= Mathf.Clamp01((0.44f - r) / 0.05f) * Mathf.Clamp01((r - 0.06f) / 0.04f);
         return new Color(0.75f, 0.93f, 1f, a);
@@ -112,15 +105,14 @@ public static class ItemSprites
     {
         float dx = u - 0.5f, dy = v - 0.5f;
         float r = Mathf.Sqrt(dx * dx + dy * dy);
-        float th = Mathf.Atan2(dx, dy); // angle from straight up
-        float k = Mathf.Abs(Mathf.Repeat(th * 5f / (2f * Mathf.PI), 1f) - 0.5f) * 2f; // 1 at the points
+        float th = Mathf.Atan2(dx, dy);
+        float k = Mathf.Abs(Mathf.Repeat(th * 5f / (2f * Mathf.PI), 1f) - 0.5f) * 2f;
         float R = Mathf.Lerp(0.2f, 0.47f, k);
         float d = r - R;
         Color c = d > -0.04f ? new Color(1f, 0.6f, 0.1f) : new Color(1f, 0.93f, 0.3f);
         return new Color(c.r, c.g, c.b, Aa(d));
     }
 
-    // Wind streak: the head is on the right (u = 1), the tail fades out on the left
     private static Color StreakPixel(float u, float v)
     {
         float w = Mathf.Pow(u, 0.7f) * Mathf.Clamp01((1f - u) * 8f);

@@ -1,17 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// Put this in the GAME scene (not the card game scene) on an object that is always active.
-///
-/// Walls To Remove: solid objects that BLOCK the player until the card game tutorial has been
-/// finished. Drag the player into the Player slot so the wall is guaranteed to stop it.
-/// When the tutorial is finished the wall's collision is switched off straight away and the
-/// wall shrinks away.
-///
-/// The state is remembered for the play session, so the walls stay gone when you come back
-/// to the scene later (no animation then, they are simply not there).
-/// </summary>
 public class CardGameTutorialUnlock : MonoBehaviour
 {
     [Header("Player (the wall blocks this)")]
@@ -40,8 +29,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
     private CharacterController playerController;
     private Rigidbody playerBody;
 
-    // -------------------------------------------------------------------
-
     private void Awake()
     {
         if (CardGameTutorialGate.Completed)
@@ -50,7 +37,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
             return;
         }
 
-        // Not done yet: walls are up and solid
         var found = new System.Collections.Generic.List<Collider>();
         if (wallsToRemove != null)
         {
@@ -68,7 +54,7 @@ public class CardGameTutorialUnlock : MonoBehaviour
                 foreach (Collider c in cols3D)
                 {
                     c.enabled = true;
-                    c.isTrigger = false; // a trigger would let the player walk straight through
+                    c.isTrigger = false;
                     found.Add(c);
                 }
                 foreach (Collider2D c in cols2D) { c.enabled = true; c.isTrigger = false; }
@@ -89,7 +75,7 @@ public class CardGameTutorialUnlock : MonoBehaviour
             return;
         }
 
-        if (!playerLinked) TryLinkPlayer(); // the player may spawn a moment later
+        if (!playerLinked) TryLinkPlayer();
     }
 
     private void LateUpdate()
@@ -97,10 +83,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
         if (removed || !pushPlayerOut || !playerLinked) return;
         PushPlayerOut();
     }
-
-    // -------------------------------------------------------------------
-    // Player
-    // -------------------------------------------------------------------
 
     private void TryLinkPlayer()
     {
@@ -116,7 +98,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
         playerController = player.GetComponentInParent<CharacterController>();
         playerBody = player.GetComponentInParent<Rigidbody>();
 
-        // Make sure nothing (collision matrix, an old IgnoreCollision) lets the player through
         if (wallsToRemove != null)
             foreach (GameObject wall in wallsToRemove)
             {
@@ -130,8 +111,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
         playerLinked = true;
     }
 
-    // CharacterController and normal Rigidbodies are stopped by the wall by themselves.
-    // This only helps a player that is moved by setting its position directly.
     private void PushPlayerOut()
     {
         if (playerController != null) return;
@@ -156,10 +135,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
         }
     }
 
-    // -------------------------------------------------------------------
-    // Remove
-    // -------------------------------------------------------------------
-
     private void Remove(bool animate)
     {
         removed = true;
@@ -171,7 +146,6 @@ public class CardGameTutorialUnlock : MonoBehaviour
         {
             if (wall == null) continue;
 
-            // Collision off right away so the player can walk through
             foreach (Collider c in wall.GetComponentsInChildren<Collider>(true)) c.enabled = false;
             foreach (Collider2D c in wall.GetComponentsInChildren<Collider2D>(true)) c.enabled = false;
 
@@ -198,7 +172,7 @@ public class CardGameTutorialUnlock : MonoBehaviour
 
         if (wall != null)
         {
-            t.localScale = baseScale; // restore, so the object is normal if it is ever re-enabled
+            t.localScale = baseScale;
             wall.SetActive(false);
         }
     }

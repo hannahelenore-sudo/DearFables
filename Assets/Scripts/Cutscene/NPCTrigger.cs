@@ -4,15 +4,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-/// <summary>
-/// An NPC the player talks to. The player has to walk close to it; while they are close a
-/// "Press E to Interact" prompt shows at the bottom of the screen, and pressing E starts the cutscene.
-/// Standing too far away does nothing (clicks included).
-///
-/// The distance is measured in the WORLD between this object and the object tagged "Player".
-/// If your NPC is a UI Image on a Canvas, its position is not a world position, so put an empty
-/// object where the NPC stands in the world and drag it into "Distance From".
-/// </summary>
 public class NPCTrigger : MonoBehaviour, IPointerClickHandler
 {
     [Header("Cutscene")]
@@ -60,15 +51,10 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
     private float debugTimer;
     private bool lastShow;
 
-    // One shared automatic prompt for every NPC in the scene
     private static GameObject sharedPrompt;
     private static TMP_Text sharedText;
     private static Text sharedLegacyText;
     private static NPCTrigger promptOwner;
-
-    // -------------------------------------------------------------------
-    // Editor: a new Id automatically gets an entry on the IntroCutscene
-    // -------------------------------------------------------------------
 
 #if UNITY_EDITOR
     private bool addPending;
@@ -79,7 +65,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         if (UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
         if (cutscene == null || !HasMissingCutsceneIds()) return;
 
-        // Wait until you stop typing so "S", "Sh", "Sho"... don't each become a cutscene
         lastEditTime = UnityEditor.EditorApplication.timeSinceStartup;
         if (!addPending)
         {
@@ -122,30 +107,22 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
     }
 #endif
 
-    /// <summary>Every cutscene Id this NPC uses (so the editor can create the missing entries). Subclasses add theirs.</summary>
     protected virtual IEnumerable<string> AllCutsceneIds()
     {
         yield return cutsceneId;
     }
 
-    /// <summary>The Id to play when the player presses E.</summary>
     protected virtual string CurrentCutsceneId()
     {
         return cutsceneId;
     }
 
-    /// <summary>Whether the NPC can be talked to right now (hides the prompt when false).</summary>
     protected virtual bool CanTalk()
     {
         return !(playOnlyOnce && hasPlayed);
     }
 
-    /// <summary>Called when a cutscene started from this NPC really begins.</summary>
     protected virtual void OnCutsceneStarted(string id) { }
-
-    // -------------------------------------------------------------------
-    // Unity
-    // -------------------------------------------------------------------
 
     protected virtual void Awake()
     {
@@ -210,28 +187,21 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         Gizmos.DrawWireSphere(origin.position, interactDistance);
     }
 
-    // Works when the NPC is a UI Image on a Canvas (only if Allow Mouse Click is on)
     public void OnPointerClick(PointerEventData eventData)
     {
         if (allowMouseClick && IsPlayerNear())
             TryPlay();
     }
 
-    // Works when the NPC is a sprite/object in the world with a Collider (only if Allow Mouse Click is on)
     private void OnMouseDown()
     {
         if (!allowMouseClick || !IsPlayerNear()) return;
 
-        // Ignore clicks that land on UI in front of the NPC
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
         TryPlay();
     }
-
-    // -------------------------------------------------------------------
-    // Proximity + input
-    // -------------------------------------------------------------------
 
     protected bool IsPlayerNear()
     {
@@ -259,7 +229,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         return lastDistance <= interactDistance;
     }
 
-    /// <summary>True if this collider belongs to the player (tag 'Player' on it, its Rigidbody, or its root).</summary>
     protected bool IsPlayerCollider(Collider other)
     {
         if (other == null) return false;
@@ -269,7 +238,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         return other.transform.root.CompareTag("Player");
     }
 
-    // Works with the old Input Manager, the new Input System, or both
     private static bool InteractPressed()
     {
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
@@ -279,10 +247,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         return Input.GetKeyDown(KeyCode.E);
 #endif
     }
-
-    // -------------------------------------------------------------------
-    // Prompt
-    // -------------------------------------------------------------------
 
     private void ShowPrompt()
     {
@@ -308,7 +272,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
             return;
         }
 
-        // Only hide the shared prompt if it is ours (another NPC may be showing it)
         if (promptOwner != this) return;
         promptOwner = null;
 
@@ -358,7 +321,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         }
         else
         {
-            // TextMeshPro has no default font in this project: use Unity's built-in font so the prompt is always visible
             Debug.LogWarning("NPCTrigger: TextMeshPro has no default font, so the prompt uses Unity's built-in font. Drag your font into Prompt Font File to change it.", this);
 
             Text text = textGo.AddComponent<Text>();
@@ -377,18 +339,12 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         sharedPrompt.SetActive(false);
     }
 
-    // -------------------------------------------------------------------
-    // Play
-    // -------------------------------------------------------------------
-
-    /// <summary>Presses-E entry point: plays whatever this NPC currently has to say.</summary>
     protected bool TryPlay()
     {
         if (!CanTalk()) return false;
         return PlayId(CurrentCutsceneId());
     }
 
-    /// <summary>Plays the cutscene with this Id (with clear warnings when something is wrong). Returns true if it started.</summary>
     protected bool PlayId(string id)
     {
         if (cutscene == null)
@@ -399,7 +355,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
 
         if (cutscene.IsPlaying) return false;
 
-        // Say clearly when the Id doesn't match anything on the IntroCutscene
         if (!string.IsNullOrEmpty(id) && !cutscene.HasCutscene(id))
         {
             Debug.LogWarning("NPCTrigger: the IntroCutscene has no cutscene with the Id '" + id
@@ -407,7 +362,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
             return false;
         }
 
-        // Cutscene object can stay disabled until now
         if (!cutscene.gameObject.activeSelf)
             cutscene.gameObject.SetActive(true);
 
@@ -417,7 +371,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
             return false;
         }
 
-        // Only counts as played if it really started (e.g. the Id exists and has lines)
         if (cutscene.TryPlayCutscene(id))
         {
             hasPlayed = true;
@@ -428,10 +381,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         Debug.LogWarning("NPCTrigger: the cutscene '" + id + "' did not start. See the IntroCutscene message just above (usually: it has no lines).", this);
         return false;
     }
-
-    // -------------------------------------------------------------------
-    // Text helper for subclasses (uses the same font settings as the prompt)
-    // -------------------------------------------------------------------
 
     protected struct LabelRef
     {
@@ -445,7 +394,6 @@ public class NPCTrigger : MonoBehaviour, IPointerClickHandler
         }
     }
 
-    /// <summary>Adds a text component (TextMeshPro, or Unity's built-in font if TMP has no default font) to an object that has a RectTransform.</summary>
     protected LabelRef AddLabel(GameObject go, string text, float size, Color color, bool alignLeft)
     {
         var label = new LabelRef();

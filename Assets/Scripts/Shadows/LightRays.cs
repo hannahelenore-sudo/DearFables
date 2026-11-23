@@ -3,22 +3,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Tilemaps;
 
-/// <summary>
-/// Soft god-rays: tall, glowing light beams slanting down through the scene.
-///
-/// They are fake (additive beam meshes), not real volumetric light, which is exactly how
-/// stylised games do it. Each beam turns to face the camera around its own axis, so it
-/// always looks like a solid shaft of light from your tilted camera.
-///
-/// Beams spawn only over cells that actually have a tile painted on them.
-///
-/// Setup:
-///   1. Put LightRayBeam.shader anywhere under Assets/.
-///   2. Make an empty GameObject, add this script, and place it at GROUND height (Y).
-///   3. Drag the shader into "Beam Shader" (this also keeps it in builds). Press Play.
-///
-/// Works best together with Bloom (already in your Volume): the beams glow softly.
-/// </summary>
 public class LightRays : MonoBehaviour
 {
     [Header("Look (live)")]
@@ -88,7 +72,7 @@ public class LightRays : MonoBehaviour
     {
         public Transform t;
         public MeshRenderer mr;
-        public Vector3 center;   // middle of the beam at rest
+        public Vector3 center;
         public float width;
         public float length;
         public float phase;
@@ -113,8 +97,6 @@ public class LightRays : MonoBehaviour
     Vector3 dir = Vector3.down;
     float rebuildAt = -1f;
     bool warnedCam;
-
-    // ------------------------------------------------------------------
 
     void Start()
     {
@@ -141,7 +123,6 @@ public class LightRays : MonoBehaviour
         if (mpb == null) mpb = new MaterialPropertyBlock();
         ClearRays();
 
-        // ---- material
         if (mat == null)
         {
             Shader sh = beamShader != null ? beamShader : Shader.Find("LightRays/Beam");
@@ -155,7 +136,6 @@ public class LightRays : MonoBehaviour
 
         if (quad == null) quad = MakeQuad();
 
-        // ---- where to spawn
         var tilePool = new List<(Tilemap map, Vector3Int cell)>();
         if (fitToTilemaps) CollectTiles(tilePool);
         bool useTiles = fitToTilemaps && tilePool.Count > 0;
@@ -165,7 +145,7 @@ public class LightRays : MonoBehaviour
 
         dir = GetDirection();
         float groundY = transform.position.y;
-        float length = height / Mathf.Max(0.05f, -dir.y); // distance along the beam from top to ground
+        float length = height / Mathf.Max(0.05f, -dir.y);
 
         root = new GameObject("LightRayBeams").transform;
         root.SetParent(transform, false);
@@ -226,8 +206,6 @@ public class LightRays : MonoBehaviour
         root = null;
     }
 
-    // ------------------------------------------------------------------
-
     void Update()
     {
         if (rebuildAt > 0f && Time.unscaledTime >= rebuildAt) Build();
@@ -237,7 +215,6 @@ public class LightRays : MonoBehaviour
     {
         if (mat == null || rays.Count == 0) return;
 
-        // live look
         mat.SetColor(ColorId, rayColor);
         mat.SetFloat(IntensityId, intensity);
         mat.SetFloat(EdgeId, edgeSoftness);
@@ -260,10 +237,8 @@ public class LightRays : MonoBehaviour
         {
             if (r.t == null) continue;
 
-            // drift sideways
             Vector3 pos = r.center + side * (Mathf.Sin(time * swaySpeed + r.phase) * swayDistance);
 
-            // Turn around the beam's own axis so its flat face always points at the camera
             Vector3 y = dir;
             Vector3 away = pos - cam.transform.position;
             Vector3 z = away - Vector3.Dot(away, y) * y;
@@ -273,9 +248,7 @@ public class LightRays : MonoBehaviour
             r.t.SetPositionAndRotation(pos, Quaternion.LookRotation(z, y));
             r.t.localScale = new Vector3(r.width * widthMultiplier, r.length, 1f);
 
-            // slow breathing brightness
             float breathe = 1f - pulse + pulse * (0.5f + 0.5f * Mathf.Sin(time * pulseSpeed + r.phase * 1.7f));
-            // clouds: no direct sun on the beam's ground point = no light shaft
             float cloudMul = 1f;
             if (clouds != null && cloudDimming > 0f)
             {
@@ -288,8 +261,6 @@ public class LightRays : MonoBehaviour
             r.mr.SetPropertyBlock(mpb);
         }
     }
-
-    // ------------------------------------------------------------------
 
     Vector3 GetDirection()
     {
@@ -306,11 +277,10 @@ public class LightRays : MonoBehaviour
             if (sun != null) d = sun.transform.forward;
         }
 
-        d.y = Mathf.Min(d.y, -0.25f); // must travel downward, and not too flat
+        d.y = Mathf.Min(d.y, -0.25f);
         return d.normalized;
     }
 
-    // Every cell that actually has a tile painted on it.
     void CollectTiles(List<(Tilemap map, Vector3Int cell)> list)
     {
         Tilemap[] maps = (tilemaps != null && tilemaps.Length > 0)
@@ -325,7 +295,6 @@ public class LightRays : MonoBehaviour
         }
     }
 
-    // Random world point inside one cell (works even if the tilemap is rotated onto the floor).
     static Vector3 RandomPointInCell(Tilemap m, Vector3Int cell, float u, float v)
     {
         Vector3 o = m.CellToWorld(cell);
@@ -334,8 +303,6 @@ public class LightRays : MonoBehaviour
         return o + ex * u + ey * v;
     }
 
-    // A 1x1 quad. uv.y runs 0 at the top end of the beam to 1 at the ground end.
-    // Local +Y points down the beam (toward the ground).
     static Mesh MakeQuad()
     {
         var m = new Mesh { name = "LightRayQuad" };

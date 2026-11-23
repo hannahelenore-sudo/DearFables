@@ -7,15 +7,6 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// The trinket bar on the right side of the screen (game scene AND card scene).
-/// - Shows the trinkets you own (max 5) and Sun Power / Wind Power / Movement Speed.
-/// - Opens by itself when the shop opens. Click the little tab to open/close it.
-/// - Drag a trinket up/down to change the order its effects trigger (top to bottom, like Balatro jokers).
-/// - Click a trinket to select it; while the shop is open a SELL button appears.
-/// Build it with  Tools > Shop > Create Trinket Sidebar.
-/// It survives scene loads. If a scene contains a second copy, the copy deletes itself.
-/// </summary>
 public class TrinketSidebar : MonoBehaviour
 {
     public enum SpeedStat { Walk, Run }
@@ -31,8 +22,6 @@ public class TrinketSidebar : MonoBehaviour
         [NonSerialized] public Vector3 baseScale = Vector3.one;
         [NonSerialized] public Coroutine flash;
     }
-
-    // ---------------- Setup (filled by the builder) ----------------
 
     [Header("Panel")]
     [Tooltip("The whole bar (panel + tab). It slides in and out.")]
@@ -70,8 +59,6 @@ public class TrinketSidebar : MonoBehaviour
     public TMP_Text infoDescription;
     public TMP_Text infoHint;
     public Button sellButton;
-
-    // ---------------- Behaviour ----------------
 
     [Header("Behaviour")]
     public bool persistAcrossScenes = true;
@@ -112,11 +99,8 @@ public class TrinketSidebar : MonoBehaviour
     public AudioClip statUpSound;
     public AudioClip statDownSound;
 
-    // ---------------- Static API ----------------
-
     public static TrinketSidebar Instance { get; private set; }
 
-    /// <summary>True while the mouse is over the bar (or dragging a trinket). Use it to stop clicks leaking into the world.</summary>
     public static bool IsPointerOver
     {
         get { return (Instance != null && Instance.PointerInside()) || ActiveBuffsSidebar.IsPointerOver; }
@@ -124,35 +108,29 @@ public class TrinketSidebar : MonoBehaviour
 
     public static bool ReorderLocked { get; private set; }
 
-    /// <summary>Makes the trinket at this position bounce and show a popup ("+3 Mult"). Called by DeckManager.</summary>
     public static void Pulse(int index, string label)
     {
         if (Instance != null) Instance.PulseInternal(index, label);
     }
 
-    /// <summary>Call before scoring: locks the order and (optionally) slides the bar open.</summary>
     public static void BeginScoring()
     {
         ReorderLocked = true;
         if (Instance != null) Instance.OnScoringStart();
     }
 
-    /// <summary>Call when the trinkets are done triggering.</summary>
     public static void EndScoring()
     {
         ReorderLocked = false;
         if (Instance != null) Instance.OnScoringEnd();
     }
 
-    /// <summary>Plays the "can't do that" sound and wiggles the bar (used when the shop is full).</summary>
     public static void FlashFull()
     {
         if (Instance == null) return;
         Instance.PlaySFX(Instance.errorSound);
         for (int i = 0; i < Instance.views.Count; i++) Instance.views[i].PlayJuice(false);
     }
-
-    // ---------------- State ----------------
 
     private Canvas canvas;
     private bool duplicate;
@@ -179,10 +157,6 @@ public class TrinketSidebar : MonoBehaviour
     {
         get { return canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null; }
     }
-
-    // -------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------
 
     private void Awake()
     {
@@ -215,8 +189,8 @@ public class TrinketSidebar : MonoBehaviour
         if (slideRoot != null) slideRoot.localScale = new Vector3(panelScale, panelScale, 1f);
         if (statsLiveInBuffBar)
         {
-            if (legacyRuntimeLayout) RemoveStatsArea(); // old bars only: hides the stats and shortens the bar now
-            else statsRemoved = true;                    // new bars: the builder already did it
+            if (legacyRuntimeLayout) RemoveStatsArea();
+            else statsRemoved = true;
         }
 
         open = startOpen;
@@ -302,7 +276,6 @@ public class TrinketSidebar : MonoBehaviour
         canvas.enabled = IsVisibleIn(SceneManager.GetActiveScene().name);
     }
 
-    /// <summary>True if the bar should be shown in the scene with this name. Also used by the Active Buffs bar.</summary>
     public bool IsVisibleIn(string sceneName)
     {
         if (hideInScenes != null)
@@ -318,16 +291,11 @@ public class TrinketSidebar : MonoBehaviour
         return true;
     }
 
-    // The bar needs an EventSystem for clicking and dragging
     private static void EnsureEventSystem()
     {
         if (UnityEngine.Object.FindAnyObjectByType<EventSystem>() == null)
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
     }
-
-    // -------------------------------------------------------------------
-    // Open / close
-    // -------------------------------------------------------------------
 
     public void Toggle()
     {
@@ -350,7 +318,6 @@ public class TrinketSidebar : MonoBehaviour
         if (toggleArrow != null) toggleArrow.text = open ? ">" : "<";
     }
 
-    // How far the bar must move right to be hidden (the tab stays visible). Takes the scale into account.
     private float ClosedX
     {
         get { return slideRoot != null ? slideRoot.rect.width * slideRoot.localScale.x : 0f; }
@@ -407,10 +374,6 @@ public class TrinketSidebar : MonoBehaviour
         if (openedByScoring) SetOpen(false);
         openedByScoring = false;
     }
-
-    // -------------------------------------------------------------------
-    // Inventory -> views
-    // -------------------------------------------------------------------
 
     private TrinketItemView GetView()
     {
@@ -515,10 +478,6 @@ public class TrinketSidebar : MonoBehaviour
         }
     }
 
-    // -------------------------------------------------------------------
-    // Hover / select / sell
-    // -------------------------------------------------------------------
-
     internal void OnItemHover(TrinketItemView v, bool enter)
     {
         if (enter) hovered = v;
@@ -556,7 +515,6 @@ public class TrinketSidebar : MonoBehaviour
         Deselect();
     }
 
-    /// <summary>Removes the selected trinket. Only works while the shop is open.</summary>
     public void SellSelected()
     {
         if (selected == null || !TrinketShopUI.IsAnyShopOpen) return;
@@ -567,16 +525,12 @@ public class TrinketSidebar : MonoBehaviour
         TrinketData sold = TrinketInventory.Owned[index];
         Deselect();
         TrinketInventory.RemoveAt(index);
-        BatteryManager.Add(sold.SellValue); // Balatro: selling gives half the price
+        BatteryManager.Add(sold.SellValue);
         PlaySFX(sellSound);
 
         TrinketShopUI shop = TrinketShopUI.OpenShop;
         if (shop != null) shop.NotifySold(sold);
     }
-
-    // -------------------------------------------------------------------
-    // Drag to reorder
-    // -------------------------------------------------------------------
 
     internal bool TryBeginDrag(TrinketItemView v)
     {
@@ -600,7 +554,6 @@ public class TrinketSidebar : MonoBehaviour
         Vector2 local;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(slideRoot, e.position, Cam, out local)) return;
 
-        // local is relative to the panel's pivot; children are anchored to its centre
         Vector2 pos = local - slideRoot.rect.center;
         float frameX = FramePos(0).x;
         pos.x = Mathf.Clamp(pos.x, frameX - 60f, frameX + 60f);
@@ -634,10 +587,6 @@ public class TrinketSidebar : MonoBehaviour
         }
         return best;
     }
-
-    // -------------------------------------------------------------------
-    // Trigger animation (called while scoring)
-    // -------------------------------------------------------------------
 
     private void PulseInternal(int index, string label)
     {
@@ -693,7 +642,6 @@ public class TrinketSidebar : MonoBehaviour
             time += Time.unscaledDeltaTime;
             float x = Mathf.Clamp01(time / duration);
 
-            // pop in with a little overshoot, then drift up and fade
             float pop = Mathf.Clamp01(x / 0.15f);
             const float c1 = 1.70158f;
             const float c3 = c1 + 1f;
@@ -708,12 +656,6 @@ public class TrinketSidebar : MonoBehaviour
         if (go != null) Destroy(go);
     }
 
-    // -------------------------------------------------------------------
-    // Stats
-    // -------------------------------------------------------------------
-
-    // Hides the stat rows and cuts the empty space they leave from the bottom of the bar.
-    // (The numbers are shown in the Active Buffs bar now.)
     private void RemoveStatsArea()
     {
         statsRemoved = true;
@@ -721,7 +663,6 @@ public class TrinketSidebar : MonoBehaviour
 
         float oldHeight = slideRoot.rect.height;
 
-        // 1) Hide the stats: the whole holder if they sit in their own object, otherwise each icon and number
         List<Transform> parts = new List<Transform>();
         AddStatParts(parts, sunPower);
         AddStatParts(parts, windPower);
@@ -731,25 +672,21 @@ public class TrinketSidebar : MonoBehaviour
         if (holder != null && IsSafeToHide(holder)) holder.gameObject.SetActive(false);
         else for (int i = 0; i < parts.Count; i++) parts[i].gameObject.SetActive(false);
 
-        // 2) Make the bar shorter
         float cut = removedStatsHeight > 0f ? removedStatsHeight : EstimateStatsHeight();
         if (cut <= 1f) return;
 
         slideRoot.sizeDelta = new Vector2(slideRoot.sizeDelta.x, slideRoot.sizeDelta.y - cut);
 
-        // Things anchored to the middle would end up too low / too high: move them so they keep their distance from the top.
-        // The slots (frames) are moved the same way, since the trinkets sit on them.
         for (int i = 0; i < slideRoot.childCount; i++)
         {
             RectTransform c = slideRoot.GetChild(i) as RectTransform;
             if (c == null || !c.gameObject.activeSelf) continue;
-            if (toggleButton != null && toggleButton.transform.IsChildOf(c)) continue; // the tab stays level with the middle
-            if (infoCard != null && infoCard.IsChildOf(c)) continue;                   // the info card follows the trinket
-            if (!Mathf.Approximately(c.anchorMin.y, c.anchorMax.y)) continue;         // stretched things resize by themselves
+            if (toggleButton != null && toggleButton.transform.IsChildOf(c)) continue;
+            if (infoCard != null && infoCard.IsChildOf(c)) continue;
+            if (!Mathf.Approximately(c.anchorMin.y, c.anchorMax.y)) continue;
 
             if (Mathf.Approximately(c.anchorMin.y, 0.5f) && c.rect.height >= oldHeight * 0.9f)
             {
-                // a background plate as tall as the bar: shrink it too
                 c.sizeDelta = new Vector2(c.sizeDelta.x, c.sizeDelta.y - cut);
             }
             else
@@ -781,7 +718,6 @@ public class TrinketSidebar : MonoBehaviour
         return null;
     }
 
-    // Only hide a holder that has nothing else in it (not the panel, the slots, the tab...)
     private bool IsSafeToHide(Transform holder)
     {
         if (holder == slideRoot || slideRoot.IsChildOf(holder)) return false;
@@ -794,7 +730,6 @@ public class TrinketSidebar : MonoBehaviour
         return true;
     }
 
-    // Free room under the last slot, minus a margin as big as the one above the first slot
     private float EstimateStatsHeight()
     {
         if (frames == null || frames.Length == 0) return 0f;
@@ -831,7 +766,6 @@ public class TrinketSidebar : MonoBehaviour
             player = UnityEngine.Object.FindAnyObjectByType<PlayerMovement>();
         }
 
-        // In scenes without a player (the card scene) the last known value is kept
         if (player != null) lastSpeed = speedShows == SpeedStat.Run ? player.runSpeed : player.walkSpeed;
         return lastSpeed;
     }
@@ -876,10 +810,6 @@ public class TrinketSidebar : MonoBehaviour
         row.flash = null;
     }
 
-    // -------------------------------------------------------------------
-    // Info card
-    // -------------------------------------------------------------------
-
     private void UpdateInfoCard()
     {
         if (infoCard == null) return;
@@ -909,7 +839,6 @@ public class TrinketSidebar : MonoBehaviour
         {
             sellButton.gameObject.SetActive(isSelected && shop);
 
-            // Show what you get: "SELL +2"
             TMP_Text sellLabel = sellButton.GetComponentInChildren<TMP_Text>(true);
             if (sellLabel != null && target.data != null) sellLabel.text = "SELL +" + target.data.SellValue;
         }
@@ -919,7 +848,6 @@ public class TrinketSidebar : MonoBehaviour
             infoHint.text = "Sell trinkets at the shop";
         }
 
-        // Sits to the left of the tab, level with the trinket
         float tabWidth = ToggleRect != null ? ToggleRect.rect.width : 0f;
         float x = -(slideRoot.rect.width * 0.5f + tabWidth + 14f + infoCard.rect.width * 0.5f);
         float limit = slideRoot.rect.height * 0.5f - infoCard.rect.height * 0.5f;
@@ -929,10 +857,6 @@ public class TrinketSidebar : MonoBehaviour
         p.y = Mathf.Lerp(p.y, y, 1f - Mathf.Exp(-20f * Time.unscaledDeltaTime));
         infoCard.anchoredPosition = p;
     }
-
-    // -------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------
 
     private bool Over(RectTransform r)
     {

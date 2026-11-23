@@ -11,43 +11,28 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>
-/// Carries the "this card game was started by the StarQuest NPC" flag from GameScene
-/// into the CardGame scene. The tutorial only runs when this flag is set.
-/// </summary>
 public static class CardGameTutorialGate
 {
-    /// <summary>Scene that hosts the card game.</summary>
     public const string CardGameSceneName = "CardGame";
 
-    /// <summary>How long (seconds) an NPC "hit / touch" counts as the cause of the next battle.</summary>
     public const float EngageWindow = 4f;
 
     public static bool Pending;
     static float lastNpcEngageTime = -999f;
 
-    /// <summary>True once the player has finished a card game that ran the tutorial (kept for the play session).
-    /// CardGameTutorialUnlock in the game scene reads this to open its objects.</summary>
     public static bool Completed { get; private set; }
 
-    // True from the moment the tutorial takes the flag until the card game scene closes.
     static bool activeTutorial;
-    // True once a tutorial fight has been triggered (finished OR skipped). From then on every card game is a normal one.
     static bool tutorialUsed;
     public static bool TutorialUsed { get { return tutorialUsed; } }
-    // Editor testing: the tutorial forces itself on (see CardGameTutorial.forceRunInEditor).
     static bool forcedInEditor;
 
-    /// <summary>
-    /// True when the current card game fight is a tutorial fight. Safe to read from any script at any time
-    /// (Awake / Start, in any order) because, unlike Consume(), it never clears the flag.
-    /// </summary>
     public static bool IsTutorialFight
     {
         get
         {
-            if (activeTutorial || forcedInEditor) return true; // the tutorial fight itself
-            if (tutorialUsed) return false;                    // tutorial already happened: always a normal fight
+            if (activeTutorial || forcedInEditor) return true;
+            if (tutorialUsed) return false;
             return Pending || Time.unscaledTime - lastNpcEngageTime <= EngageWindow;
         }
     }
@@ -67,7 +52,6 @@ public static class CardGameTutorialGate
 
     public static void MarkCompleted() { Completed = true; }
 
-    /// <summary>Call from your "New Game" button.</summary>
     public static void ResetCompleted() { Completed = false; tutorialUsed = false; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -81,7 +65,6 @@ public static class CardGameTutorialGate
 
     static void OnSceneUnloaded(Scene scene)
     {
-        // The tutorial fight is over once the card game scene closes
         if (scene.name == CardGameSceneName)
         {
             activeTutorial = false;
@@ -91,8 +74,6 @@ public static class CardGameTutorialGate
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // The card game just opened. If the StarQuest NPC was hit / touched a moment ago,
-        // that NPC is what started it.
         if (!tutorialUsed && scene.name == CardGameSceneName &&
             Time.unscaledTime - lastNpcEngageTime <= EngageWindow)
         {
@@ -100,10 +81,8 @@ public static class CardGameTutorialGate
         }
     }
 
-    /// <summary>Call whenever the StarQuest NPC is hit or touched by the player.</summary>
     public static void NoteStarQuestEngaged() { if (!tutorialUsed) lastNpcEngageTime = Time.unscaledTime; }
 
-    /// <summary>Call this directly from your own battle-start code to be exact.</summary>
     public static void MarkFromStarQuest() { if (!tutorialUsed) Pending = true; }
 
     public static bool Consume()
@@ -114,7 +93,6 @@ public static class CardGameTutorialGate
         return p;
     }
 
-    /// <summary>The tutorial fight has started. Whether it is finished or skipped, the NEXT card game is a normal one.</summary>
     public static void MarkTutorialTriggered()
     {
         tutorialUsed = true;
@@ -123,14 +101,6 @@ public static class CardGameTutorialGate
     }
 }
 
-/// <summary>
-/// Step-by-step tutorial for the card game. Everything on screen is dimmed except the
-/// components being explained. Sections play once each, in this order of availability:
-///   1. After the opening sequence (enemy + score)
-///   2. When the roll / player-advantage screen opens
-///   3. When the card-system (hand) screen opens
-/// All text and targets are editable in the inspector.
-/// </summary>
 [DisallowMultipleComponent]
 public class CardGameTutorial : MonoBehaviour
 {
@@ -211,7 +181,6 @@ public class CardGameTutorial : MonoBehaviour
     [Header("Content")]
     public Section[] sections;
 
-    // runtime
     GameObject overlayRoot;
     Canvas overlayCanvas;
     TutorialSpotlightGraphic spotlight;
@@ -225,18 +194,15 @@ public class CardGameTutorial : MonoBehaviour
     bool tutorialRun;
     static Sprite whiteSprite;
 
-    // ───────────────────────────────────────────── lifecycle
-
     void Awake()
     {
-        // Lets BattleManager know early that this is a tutorial fight (editor testing)
         if (onlyWhenStartedFromStarQuest && Application.isEditor && forceRunInEditor)
             CardGameTutorialGate.ForceTutorialInEditor();
     }
 
     void Start()
     {
-        bool alreadyUsed = CardGameTutorialGate.TutorialUsed; // read BEFORE Consume() marks it
+        bool alreadyUsed = CardGameTutorialGate.TutorialUsed;
         bool fromNpc = CardGameTutorialGate.Consume();
         bool run = !alreadyUsed && (!onlyWhenStartedFromStarQuest || fromNpc ||
                    (Application.isEditor && forceRunInEditor));
@@ -246,7 +212,7 @@ public class CardGameTutorial : MonoBehaviour
             return;
         }
 
-        CardGameTutorialGate.MarkTutorialTriggered(); // from now on every other card game is normal
+        CardGameTutorialGate.MarkTutorialTriggered();
 
         tutorialRun = true;
         startTime = Time.unscaledTime;
@@ -255,8 +221,6 @@ public class CardGameTutorial : MonoBehaviour
         StartCoroutine(WatchForBattleEnd());
     }
 
-    // Runs next to the tutorial (it keeps going after the tutorial itself has finished).
-    // When the fight ends, remember it so the game scene can open its objects.
     IEnumerator WatchForBattleEnd()
     {
         if (battleManager == null)
@@ -296,8 +260,6 @@ public class CardGameTutorial : MonoBehaviour
 
     void OnDisable() { Resume(); InputLock.Pop(this); }
     void OnDestroy() { Resume(); InputLock.Pop(this); }
-
-    // ───────────────────────────────────────────── flow
 
     IEnumerator Run()
     {
@@ -374,7 +336,7 @@ public class CardGameTutorial : MonoBehaviour
     {
         overlayRoot.SetActive(true);
         Pause();
-        InputLock.Push(this); // every game button is locked while a tutorial step is on screen
+        InputLock.Push(this);
 
         for (int i = 0; i < s.steps.Length && !skipRequested; i++)
         {
@@ -384,7 +346,6 @@ public class CardGameTutorial : MonoBehaviour
 
             ShowStep(step, i + 1, s.steps.Length, last);
 
-            // Let the typewriter run; clicking Next while typing completes the line first.
             float shown = 0f;
             finishedTyping = false;
             bodyText.maxVisibleCharacters = 0;
@@ -404,7 +365,6 @@ public class CardGameTutorial : MonoBehaviour
                 yield return null;
                 if (advanceRequested && !finishedTyping)
                 {
-                    // first press only finishes the line
                     finishedTyping = true;
                     bodyText.maxVisibleCharacters = int.MaxValue;
                     advanceRequested = false;
@@ -418,8 +378,6 @@ public class CardGameTutorial : MonoBehaviour
         Resume();
     }
 
-    // Space/Enter ("Submit") act on the selected UI element. Keep that on our button so a
-    // key press can never trigger a game button hidden under the dim.
     void KeepNextSelected()
     {
         var es = EventSystem.current;
@@ -444,8 +402,6 @@ public class CardGameTutorial : MonoBehaviour
         Time.timeScale = prevTimeScale <= 0f ? 1f : prevTimeScale;
         paused = false;
     }
-
-    // ───────────────────────────────────────────── per-step display
 
     void ShowStep(Step step, int index, int count, bool last)
     {
@@ -518,8 +474,6 @@ public class CardGameTutorial : MonoBehaviour
         return sum;
     }
 
-    // ───────────────────────────────────────────── screen-space bounds of a target
-
     static bool TryGetScreenRect(Transform t, Camera worldCam, out Rect rect)
     {
         rect = default;
@@ -537,7 +491,6 @@ public class CardGameTutorial : MonoBehaviour
 
         var cornersBuf = new Vector3[4];
 
-        // 1) UI graphics (Image, TextMeshProUGUI, ...)
         foreach (var g in t.GetComponentsInChildren<Graphic>(false))
         {
             if (!g.enabled || (g.canvasRenderer != null && g.canvasRenderer.cull)) continue;
@@ -563,7 +516,6 @@ public class CardGameTutorial : MonoBehaviour
             for (int i = 0; i < 4; i++) Add(ToScreen(cam, cornersBuf[i]));
         }
 
-        // 2) World renderers (SpriteRenderer, MeshRenderer, 3D TextMeshPro)
         Camera wc = worldCam != null ? worldCam : Camera.main;
         foreach (var r in t.GetComponentsInChildren<Renderer>(false))
         {
@@ -581,7 +533,6 @@ public class CardGameTutorial : MonoBehaviour
             }
         }
 
-        // 3) Fallback: the object's own rect (e.g. an empty layout container)
         if (!any)
         {
             var rt = t as RectTransform;
@@ -616,8 +567,6 @@ public class CardGameTutorial : MonoBehaviour
         return RectTransformUtility.WorldToScreenPoint(cam, world);
     }
 
-    // ───────────────────────────────────────────── reflection helper
-
     static bool TryReadBool(object target, string member, out bool value)
     {
         value = false;
@@ -633,8 +582,6 @@ public class CardGameTutorial : MonoBehaviour
         }
         return false;
     }
-
-    // ───────────────────────────────────────────── UI construction
 
     static Sprite WhiteSprite()
     {
@@ -664,7 +611,6 @@ public class CardGameTutorial : MonoBehaviour
 
         overlayRoot.AddComponent<GraphicRaycaster>();
 
-        // Dim layer with cut-out holes. Blocks every click on the game underneath.
         var dimGo = new GameObject("Dim", typeof(RectTransform), typeof(CanvasRenderer));
         dimGo.transform.SetParent(overlayRoot.transform, false);
         var dimRt = dimGo.GetComponent<RectTransform>();
@@ -674,7 +620,6 @@ public class CardGameTutorial : MonoBehaviour
         spotlight = dimGo.AddComponent<TutorialSpotlightGraphic>();
         spotlight.raycastTarget = true;
 
-        // Dialogue panel
         var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         panelGo.transform.SetParent(overlayRoot.transform, false);
         panel = panelGo.GetComponent<RectTransform>();
@@ -686,7 +631,6 @@ public class CardGameTutorial : MonoBehaviour
         outline.effectColor = frameColor;
         outline.effectDistance = new Vector2(3f, -3f);
 
-        // Portrait
         var pGo = new GameObject("Portrait", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         pGo.transform.SetParent(panel, false);
         var pRt = pGo.GetComponent<RectTransform>();
@@ -698,21 +642,18 @@ public class CardGameTutorial : MonoBehaviour
         portraitImage.preserveAspect = true;
         portraitImage.raycastTarget = false;
 
-        // Speaker
         speakerText = MakeText("Speaker", panel, 34, FontStyles.Bold, frameColor);
         var sRt = speakerText.rectTransform;
         sRt.anchorMin = new Vector2(0f, 1f); sRt.anchorMax = new Vector2(1f, 1f);
         sRt.pivot = new Vector2(0f, 1f);
         sRt.offsetMin = new Vector2(230f, -62f); sRt.offsetMax = new Vector2(-220f, -16f);
 
-        // Body
         bodyText = MakeText("Body", panel, 30, FontStyles.Normal, Color.white);
         bodyText.alignment = TextAlignmentOptions.TopLeft;
         var bRt = bodyText.rectTransform;
         bRt.anchorMin = Vector2.zero; bRt.anchorMax = Vector2.one;
         bRt.offsetMin = new Vector2(230f, 70f); bRt.offsetMax = new Vector2(-30f, -64f);
 
-        // Counter
         counterText = MakeText("Counter", panel, 24, FontStyles.Normal, new Color(1f, 1f, 1f, 0.55f));
         counterText.alignment = TextAlignmentOptions.TopRight;
         var cRt = counterText.rectTransform;
@@ -721,7 +662,6 @@ public class CardGameTutorial : MonoBehaviour
         cRt.sizeDelta = new Vector2(180f, 36f);
         cRt.anchoredPosition = new Vector2(-24f, -18f);
 
-        // Next button
         var nextBtn = MakeButton("Next", panel, new Vector2(400f, 56f), frameColor, Color.black, out nextLabelText);
         var nRt = nextBtn.GetComponent<RectTransform>();
         nRt.anchorMin = nRt.anchorMax = new Vector2(1f, 0f);
@@ -731,7 +671,6 @@ public class CardGameTutorial : MonoBehaviour
         nextBtn.navigation = new Navigation { mode = Navigation.Mode.None };
         nextButton = nextBtn;
 
-        // Skip button
         var skipBtn = MakeButton("Skip", panel, new Vector2(220f, 44f), new Color(1f, 1f, 1f, 0.12f), Color.white,
             out TextMeshProUGUI skipText);
         skipText.fontSize = 22;

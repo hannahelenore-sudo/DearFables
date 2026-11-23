@@ -92,10 +92,6 @@ public class PlayerMovement : MonoBehaviour
     public string idleLeft = "IdleLeft";
     public string idleRight = "IdleRight";
 
-    /// <summary>
-    /// While true the player ignores all input (walk, run, mouse-drag, jump, dash) and just stands idle.
-    /// The shop sets this while you talk to the shopkeeper.
-    /// </summary>
     public bool InputLocked { get; set; }
 
     private Rigidbody rb;
@@ -113,7 +109,6 @@ public class PlayerMovement : MonoBehaviour
     private float currentSpeed = 0f;
     private string currentAnimation = "";
 
-    // Jump / dash state
     private bool isGrounded;
     private bool isDashJumping;
     private float dashTimer;
@@ -121,7 +116,6 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 dashDirection;
     private float regenTimer;
 
-    // Dust (plain sprites, pooled)
     private sealed class Puff
     {
         public Transform t;
@@ -159,7 +153,6 @@ public class PlayerMovement : MonoBehaviour
     {
         isGrounded = CheckGrounded();
 
-        // Landed after a dash jump
         if (isDashJumping && isGrounded && rb != null && rb.linearVelocity.y <= 0.01f)
             isDashJumping = false;
 
@@ -183,7 +176,6 @@ public class PlayerMovement : MonoBehaviour
         UpdateAnimation();
     }
 
-    // Cancels everything the player was doing (used while InputLocked)
     void StopAllActions()
     {
         moveDirection = Vector3.zero;
@@ -212,7 +204,7 @@ public class PlayerMovement : MonoBehaviour
             }
 
             moveDirection = keyboardInput.normalized;
-            currentSpeed = LimitSpeed(IsRunHeld() ? runSpeed : walkSpeed); // Shift = run
+            currentSpeed = LimitSpeed(IsRunHeld() ? runSpeed : walkSpeed);
             isDragging = false;
         }
         else
@@ -220,7 +212,6 @@ public class PlayerMovement : MonoBehaviour
             moveDirection = Vector3.zero;
             currentSpeed = 0f;
 
-            // Clicking the trinket bar must not start a mouse-drag walk
             if (Input.GetMouseButtonDown(0) && !TrinketSidebar.IsPointerOver)
             {
                 mouseStart = Input.mousePosition;
@@ -275,12 +266,10 @@ public class PlayerMovement : MonoBehaviour
             SpendStamina(dashCost);
         }
 
-        // Dash the way you're moving, or the way you're facing if standing still
         dashDirection = moveDirection.sqrMagnitude > 0.01f ? moveDirection : lastFacing;
         dashTimer = dashDuration;
         dashCooldownTimer = dashDuration + dashCooldown;
 
-        // Burst of dust when the dash starts
         if (sprintDust && dustOnDash && isGrounded)
         {
             for (int i = 0; i < dashDustCount; i++)
@@ -303,7 +292,6 @@ public class PlayerMovement : MonoBehaviour
 
         if (dashTimer > 0f)
         {
-            // Dash jump: bigger jump, keeps dash direction + speed until you land
             isDashJumping = true;
             dashTimer = 0f;
             velocity.y = dashJumpVelocity;
@@ -314,7 +302,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         rb.linearVelocity = velocity;
-        isGrounded = false; // in the air now, so no footsteps this frame
+        isGrounded = false;
     }
 
     void SetupFootsteps()
@@ -326,7 +314,7 @@ public class PlayerMovement : MonoBehaviour
             stepSource = gameObject.AddComponent<AudioSource>();
             stepSource.playOnAwake = false;
             stepSource.loop = false;
-            stepSource.spatialBlend = 0f; // 2D sound, same volume everywhere
+            stepSource.spatialBlend = 0f;
         }
     }
 
@@ -335,8 +323,6 @@ public class PlayerMovement : MonoBehaviour
         if (stepSource == null || footstepClips == null || footstepClips.Length == 0) return;
         if (Time.timeScale <= 0f) return;
 
-        // Steps only play while walking/running on the ground:
-        // not in the air, not during a dash or dash jump, not while pushing against a wall.
         bool steppingOnGround = isGrounded
             && !isDashJumping
             && dashTimer <= 0f
@@ -346,7 +332,7 @@ public class PlayerMovement : MonoBehaviour
 
         if (!steppingOnGround)
         {
-            stepTimer = 0f; // so the first step plays right when you start walking
+            stepTimer = 0f;
             return;
         }
 
@@ -365,7 +351,6 @@ public class PlayerMovement : MonoBehaviour
 
     void PlayFootstep()
     {
-        // Pick a random clip, but never the same one twice in a row
         int index = Random.Range(0, footstepClips.Length);
         if (footstepClips.Length > 1 && index == lastStepIndex)
             index = (index + 1 + Random.Range(0, footstepClips.Length - 1)) % footstepClips.Length;
@@ -377,9 +362,6 @@ public class PlayerMovement : MonoBehaviour
         stepSource.PlayOneShot(footstepClips[index], footstepVolume);
     }
 
-    // ---------------- Stamina ----------------
-
-    // Running needs stamina: when exhausted you can only walk
     float LimitSpeed(float speed)
     {
         if (useStamina && speed > walkSpeed + 0.01f && PlayerStamina.Exhausted)
@@ -415,18 +397,13 @@ public class PlayerMovement : MonoBehaviour
             PlayerStamina.Regen(staminaRegenPerSecond * dt, recoverThreshold);
     }
 
-    // ---------------- Sprint dust ----------------
-
     void SetupDust()
     {
-        // Not parented to the player, so the puffs stay where they were left (a real trail)
         dustRoot = new GameObject("SprintDust").transform;
 
         Texture2D tex = dustTexture != null ? dustTexture : CreateSoftPuffTexture();
-        // pixelsPerUnit = width -> the puff sprite is exactly 1 unit wide, so scale = size in meters
         dustSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), tex.width);
 
-        // Sort relative to the tallest sprite under the player (the character)
         float best = 0f;
         foreach (SpriteRenderer sr in GetComponentsInChildren<SpriteRenderer>())
         {
@@ -445,7 +422,6 @@ public class PlayerMovement : MonoBehaviour
     {
         if (dustRoot == null) return;
 
-        // Remember which way we're running so the dust goes behind us
         Vector3 h = rb != null
             ? new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z)
             : moveDirection;
@@ -494,17 +470,14 @@ public class PlayerMovement : MonoBehaviour
         p.life = Random.Range(dustLifetime.x, dustLifetime.y);
         p.age = 0f;
 
-        // Lifted by half the puff size so it isn't cut in half by the ground
         float footY = col != null ? col.bounds.min.y : transform.position.y;
         Vector3 pos = new Vector3(transform.position.x, footY + dustHeight + p.size * 0.5f, transform.position.z);
         pos += back * dustBackOffset + Random.insideUnitSphere * 0.05f;
         p.t.position = pos;
 
-        // Drift backwards with a random spread, and a little upwards
         Vector3 dir = Quaternion.AngleAxis(Random.Range(-dustSpread, dustSpread), Vector3.up) * back;
         p.vel = dir * Random.Range(dustSpeed * 0.5f, dustSpeed) + Vector3.up * Random.Range(0.05f, 0.25f);
 
-        // Draw on the player's layer, relative to the player's sprite
         if (sortReference != null)
         {
             p.sr.sortingLayerID = sortReference.sortingLayerID;
@@ -551,12 +524,11 @@ public class PlayerMovement : MonoBehaviour
 
             float t = p.age / p.life;
 
-            p.vel *= Mathf.Max(0f, 1f - 2.5f * dt); // slows down like a puff of air
+            p.vel *= Mathf.Max(0f, 1f - 2.5f * dt);
             p.t.position += p.vel * dt;
-            p.t.localScale = Vector3.one * Mathf.Lerp(p.size * 0.6f, p.size * 1.5f, t); // grows as it fades
+            p.t.localScale = Vector3.one * Mathf.Lerp(p.size * 0.6f, p.size * 1.5f, t);
             if (cam != null) p.t.rotation = cam.transform.rotation;
 
-            // Fade in quickly, then fade out
             float fade = t < 0.15f ? t / 0.15f : 1f - (t - 0.15f) / 0.85f;
             Color c = dustColor;
             c.a *= Mathf.Clamp01(fade);
@@ -564,7 +536,6 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    // Generates a soft round puff so no image asset is needed
     static Texture2D CreateSoftPuffTexture()
     {
         const int size = 64;
@@ -591,8 +562,6 @@ public class PlayerMovement : MonoBehaviour
         if (dustRoot != null) Destroy(dustRoot.gameObject);
     }
 
-    // ---------------- Physics / animation ----------------
-
     void FixedUpdate()
     {
         if (rb == null) return;
@@ -606,7 +575,6 @@ public class PlayerMovement : MonoBehaviour
         else
             horizontalVelocity = moveDirection * currentSpeed;
 
-        // Keep the vertical velocity so gravity and jumps still work
         rb.linearVelocity = new Vector3(horizontalVelocity.x, rb.linearVelocity.y, horizontalVelocity.z);
     }
 

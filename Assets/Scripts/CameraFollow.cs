@@ -44,7 +44,6 @@ public class CameraFollow : MonoBehaviour
         Vector3 offset = cameraRotation * Vector3.back * distance;
         Vector3 targetPosition = player.position + offset;
 
-        // Snap camera into position when the game starts
         if (!isInitialized)
         {
             transform.position = targetPosition;
@@ -53,7 +52,6 @@ public class CameraFollow : MonoBehaviour
             return;
         }
 
-        // Sneak peek: shifts the point the camera is following toward the mouse corner
         UpdatePeek();
         if (peekOffset.sqrMagnitude > 0.0000001f)
         {
@@ -65,7 +63,6 @@ public class CameraFollow : MonoBehaviour
             targetPosition += right * peekOffset.x + forward * peekOffset.y;
         }
 
-        // Slight smooth drag after starting
         transform.position = Vector3.SmoothDamp(
             transform.position,
             targetPosition,
@@ -75,10 +72,6 @@ public class CameraFollow : MonoBehaviour
 
         transform.rotation = cameraRotation;
     }
-
-    // ------------------------------------------------------------------
-    // Sneak peek
-    // ------------------------------------------------------------------
 
     private void UpdatePeek()
     {
@@ -92,7 +85,6 @@ public class CameraFollow : MonoBehaviour
 
     private Vector2 GetPeekTarget()
     {
-        // Mouse gone / unusable -> back to normal
         if (!Application.isFocused) return Vector2.zero;
         if (Cursor.lockState == CursorLockMode.Locked || !Cursor.visible) return Vector2.zero;
         if (Screen.width <= 0 || Screen.height <= 0) return Vector2.zero;
@@ -100,14 +92,12 @@ public class CameraFollow : MonoBehaviour
         Vector3 mouse = Input.mousePosition;
         if (mouse.x < 0f || mouse.y < 0f || mouse.x > Screen.width || mouse.y > Screen.height) return Vector2.zero;
 
-        // -1 (far left / bottom) .. 0 (middle) .. +1 (far right / top)
         float nx = (mouse.x / Screen.width - 0.5f) * 2f;
         float ny = (mouse.y / Screen.height - 0.5f) * 2f;
 
         return new Vector2(Response(nx) * maxPeekOffset.x, Response(ny) * maxPeekOffset.y);
     }
 
-    // Turns "how far the mouse is from the middle" into a peek strength from -1 to +1
     private float Response(float v)
     {
         float amount = Mathf.InverseLerp(deadZone, 1f, Mathf.Abs(v));

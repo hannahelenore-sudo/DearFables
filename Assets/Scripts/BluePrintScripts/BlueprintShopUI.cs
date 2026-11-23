@@ -4,14 +4,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// The Blueprint Shop screen. Two states:
-///  - Nothing built: pick a Solar Panel or a Windmill (costs batteries). You can only have one.
-///  - Built: three upgrades (Power / Stability / Mult) and a Destroy button (costs batteries, resets the upgrades).
-/// Open it with Open() - ShopInteractable does this. Needs an EventSystem in the scene.
-/// If you leave the UI fields empty it builds its own UI at runtime; use Tools > Shop > Create Blueprint Shop UI
-/// to build it in the editor so you can restyle it.
-/// </summary>
 public class BlueprintShopUI : ShopPanelBase
 {
     [Serializable]
@@ -123,10 +115,6 @@ public class BlueprintShopUI : ShopPanelBase
     private TMP_Text destroyLabel;
     private bool destroyArmed;
 
-    // -------------------------------------------------------------------
-    // Setup
-    // -------------------------------------------------------------------
-
     private void Awake()
     {
         IsAnyShopOpen = false;
@@ -169,10 +157,6 @@ public class BlueprintShopUI : ShopPanelBase
     {
         if (IsOpen && Input.GetKeyDown(KeyCode.Escape)) Close();
     }
-
-    // -------------------------------------------------------------------
-    // Open / close
-    // -------------------------------------------------------------------
 
     public override void Open()
     {
@@ -236,10 +220,6 @@ public class BlueprintShopUI : ShopPanelBase
         panelRoot.transform.localScale = baseScale;
     }
 
-    // -------------------------------------------------------------------
-    // Buying
-    // -------------------------------------------------------------------
-
     private void BuildStructure(StructureType type)
     {
         if (!IsOpen || StructureProgress.IsBuilt) return;
@@ -287,7 +267,6 @@ public class BlueprintShopUI : ShopPanelBase
     {
         if (!IsOpen || !StructureProgress.IsBuilt) return;
 
-        // First click only arms it, so it can't be done by accident
         if (!destroyArmed)
         {
             destroyArmed = true;
@@ -319,10 +298,6 @@ public class BlueprintShopUI : ShopPanelBase
         BatteryHUD.FlashCantAfford();
         if (shopkeeper != null) shopkeeper.SayRandom(brokeLines, null);
     }
-
-    // -------------------------------------------------------------------
-    // Refreshing the screen
-    // -------------------------------------------------------------------
 
     private void Refresh(bool animate)
     {
@@ -449,10 +424,6 @@ public class BlueprintShopUI : ShopPanelBase
         GameSFX.Play(clip, sfxVolume, pitch);
     }
 
-    // -------------------------------------------------------------------
-    // UI builder (runs automatically if no panel is assigned, or from the editor menu)
-    // -------------------------------------------------------------------
-
     public void BuildUI()
     {
         Color wood = new Color(0.30f, 0.22f, 0.16f, 1f);
@@ -473,14 +444,12 @@ public class BlueprintShopUI : ShopPanelBase
         titleText = AddText(panel, "Title", "Blueprint Shop", 44, new Color(1f, 0.93f, 0.7f), FontStyles.Bold,
             new Vector2(0f, 280f), new Vector2(700f, 70f), false);
 
-        // Choose view
         RectTransform choose = NewUI("ChooseView", panel);
         Stretch(choose);
         chooseView = choose.gameObject;
         solarOption = BuildOption(choose, "SolarOption", new Vector2(-260f, 40f), new Vector2(440f, 400f), paper, ink);
         windOption = BuildOption(choose, "WindOption", new Vector2(260f, 40f), new Vector2(440f, 400f), paper, ink);
 
-        // Upgrade view
         RectTransform upgrades = NewUI("UpgradeView", panel);
         Stretch(upgrades);
         upgradeView = upgrades.gameObject;
@@ -489,7 +458,6 @@ public class BlueprintShopUI : ShopPanelBase
         for (int i = 0; i < 3; i++)
             upgradeOptions[i] = BuildOption(upgrades, "Upgrade" + i, new Vector2(xs[i], 40f), new Vector2(320f, 340f), paper, ink);
 
-        // Destroy button
         RectTransform destroyRt = NewUI("DestroyButton", panel);
         Place(destroyRt, new Vector2(-380f, -170f), new Vector2(280f, 46f));
         Image destroyImg = AddImage(destroyRt, new Color(0.65f, 0.25f, 0.2f));
@@ -497,7 +465,6 @@ public class BlueprintShopUI : ShopPanelBase
         destroyButton.targetGraphic = destroyImg;
         AddText(destroyRt, "Label", "Destroy", 24, Color.white, FontStyles.Bold, Vector2.zero, new Vector2(270f, 44f), false);
 
-        // Close button
         RectTransform closeRt = NewUI("CloseButton", panel);
         Place(closeRt, new Vector2(500f, 285f), new Vector2(60f, 60f));
         Image closeImg = AddImage(closeRt, new Color(0.65f, 0.25f, 0.2f));
@@ -505,7 +472,6 @@ public class BlueprintShopUI : ShopPanelBase
         closeButton.targetGraphic = closeImg;
         AddText(closeRt, "Label", "X", 32, Color.white, FontStyles.Bold, Vector2.zero, new Vector2(56f, 56f), false);
 
-        // Shopkeeper dialogue strip
         RectTransform box = NewUI("DialogueBox", panel);
         Place(box, new Vector2(0f, -250f), new Vector2(1000f, 100f));
         AddImage(box, new Color(0.15f, 0.10f, 0.07f, 0.95f));

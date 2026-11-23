@@ -10,14 +10,8 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-#pragma warning disable 618 // TMP word-wrap properties are marked obsolete in newer versions, they still work
+#pragma warning disable 618
 
-// =====================================================================================
-//  QuestLog: a tiny quest list. Call it from your dialogue / NPC scripts:
-//      QuestLog.Add("deliver_letter", "Deliver the Letter", "Bring the letter to the shopkeeper.");
-//      QuestLog.Complete("deliver_letter");
-//  (Kept so your existing scripts still compile. The new menu has no Quests page.)
-// =====================================================================================
 public static class QuestLog
 {
     [Serializable]
@@ -33,7 +27,6 @@ public static class QuestLog
 
     public static IReadOnlyList<Quest> All { get { return quests; } }
 
-    /// <summary>Used by SaveSystem when loading.</summary>
     public static void ReplaceAll(IEnumerable<Quest> list)
     {
         quests.Clear();
@@ -71,7 +64,6 @@ public static class QuestLog
     private static void ResetStatics() { quests.Clear(); }
 }
 
-// Mouse hover / click for one menu entry
 public class GameMenuItemHover : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
 {
     public Action onEnter;
@@ -80,14 +72,10 @@ public class GameMenuItemHover : MonoBehaviour, IPointerEnterHandler, IPointerCl
     public void OnPointerClick(PointerEventData eventData) { if (onClick != null) onClick(); }
 }
 
-/// <summary>
-/// The little chubby star with a face (flat 2D, drawn once in code). If you add your own picture called
-/// "Star" to Resources/MenuUI it is used instead.
-/// </summary>
 public static class StarFrames
 {
     private const int Size = 128, Super = 2, Around = 40, Rings = 6, Points = 5;
-    private const float Puff = 0.45f;  // how thick the star is (1 = as thick as it is wide)
+    private const float Puff = 0.45f;
 
     private static Sprite cache;
 
@@ -106,8 +94,8 @@ public static class StarFrames
 
     private static float Radius(float th)
     {
-        float t = Mathf.Max(0f, (1f + Mathf.Cos(Points * (th - Mathf.PI * 0.5f))) * 0.5f);   // a tip points straight up
-        return 0.58f + 0.42f * Mathf.Pow(t, 0.9f);                                            // short, chubby tips
+        float t = Mathf.Max(0f, (1f + Mathf.Cos(Points * (th - Mathf.PI * 0.5f))) * 0.5f);
+        return 0.58f + 0.42f * Mathf.Pow(t, 0.9f);
     }
 
     private static Vector3 Pt(int side, float phi, float th)
@@ -142,7 +130,7 @@ public static class StarFrames
                         Vector3 dPhi = Pt(side, Mathf.Min(phi + 0.02f, Mathf.PI * 0.5f), th) - Pt(side, phi - 0.02f, th);
                         Vector3 dTh = Pt(side, phi, th + 0.01f) - Pt(side, phi, th - 0.01f);
                         nr = Vector3.Cross(dPhi, dTh).normalized;
-                        if (Vector3.Dot(nr, p) < 0f) nr = -nr;   // always point away from the middle
+                        if (Vector3.Dot(nr, p) < 0f) nr = -nr;
                     }
                     pos[Index(side, r, k)] = p;
                     nrm[Index(side, r, k)] = nr;
@@ -169,9 +157,9 @@ public static class StarFrames
 
         Vector3 light = new Vector3(-0.45f, 0.55f, 0.70f).normalized;
         Vector3 half = (light + new Vector3(0f, 0f, 1f)).normalized;
-        Color baseColor = new Color(1f, 0.745f, 0.137f, 1f);    // the golden yellow of your little star
+        Color baseColor = new Color(1f, 0.745f, 0.137f, 1f);
         Color shadeColor = new Color(0.90f, 0.55f, 0.08f, 1f);
-        int faceLimit = (Rings + 1) * Around;                    // vertices of the front side carry the face
+        int faceLimit = (Rings + 1) * Around;
 
         int S = Size * Super;
         float scale = S * 0.5f * 0.92f;
@@ -201,14 +189,13 @@ public static class StarFrames
                 rn[i] = nr;
 
                 float diff = Mathf.Max(0f, Vector3.Dot(nr, light));
-                float shade = flat ? 1f : Mathf.Clamp01(0.62f + 0.50f * diff);   // flat = plain cartoon colour
+                float shade = flat ? 1f : Mathf.Clamp01(0.62f + 0.50f * diff);
                 float spec = flat ? 0f : Mathf.Pow(Mathf.Max(0f, Vector3.Dot(nr, half)), 22f) * 0.25f;
                 Color col = Color.Lerp(shadeColor, baseColor, shade);
                 vc[i] = new Color(col.r + spec, col.g + spec, col.b + spec, 1f);
                 sp[i] = new Vector2(S * 0.5f + p.x * scale, S * 0.5f + p.y * scale);
             }
 
-            // far triangles first, near ones painted over them; faces turned away are skipped
             int count = 0;
             for (int t = 0; t < triCount; t++)
             {
@@ -231,7 +218,6 @@ public static class StarFrames
 
             AddOutline(hi, S);
 
-            // shrink 2x2 -> 1 for smooth edges
             for (int y = 0; y < Size; y++)
             {
                 for (int x = 0; x < Size; x++)
@@ -265,15 +251,13 @@ public static class StarFrames
 
     private static Vector3 Rotate(Vector3 v, float sy, float cy, float sx, float cx)
     {
-        float x = v.x * cy + v.z * sy;          // spin around the vertical axis
+        float x = v.x * cy + v.z * sy;
         float z = -v.x * sy + v.z * cy;
-        float y = v.y * cx - z * sx;            // lean toward the viewer
+        float y = v.y * cx - z * sx;
         z = v.y * sx + z * cx;
         return new Vector3(x, y, z);
     }
 
-    // The little face painted on the front of the star: eyes, a smile and blushing cheeks.
-    // u / v are positions on the star's front (0,0 = middle, 1 = the tip).
     private static Color ApplyFace(float u, float v, Color col)
     {
         float cx = (Mathf.Abs(u) - 0.36f) / 0.10f, cy = (v + 0.12f) / 0.065f;
@@ -292,7 +276,6 @@ public static class StarFrames
         return col;
     }
 
-    // dark brown outline all the way around the star, like in your drawing
     private static void AddOutline(Color32[] buf, int S)
     {
         List<int> edge = new List<int>();
@@ -361,17 +344,6 @@ public static class StarFrames
     }
 }
 
-/// <summary>
-/// Hand-drawn cloud menu: STATS / SAVE-LOAD / SETTINGS / MAIN MENU.
-/// Builds its own UI at runtime and survives scene changes, so there is nothing to set up.
-///
-/// ART: put the PNGs in  Assets/Resources/MenuUI/  and set each one's Texture Type to
-///      "Sprite (2D and UI)":  Menu, StatsF, SaveLoadF, Settings, Main_Menu, Stats, SaveLoad,
-///      Sun_Icon, Wind_Icon.   (Optional: Speed_Icon sprite, and a TMP font asset named MenuFont.)
-///
-/// Open with Esc (or Start on a gamepad) or the MENU button. While open the game is paused.
-/// Up/Down (or W/S) or the mouse pick an entry, Enter / click opens it, Esc / right-click goes back.
-/// </summary>
 public class GameMenu : MonoBehaviour
 {
     public static GameMenu Instance { get; private set; }
@@ -386,7 +358,6 @@ public class GameMenu : MonoBehaviour
     public Key openKey = Key.Escape;
     public bool showOpenButton = false;
 
-    // ---------------------------------------------------------------- look
     private static readonly Color Navy = new Color(47f / 255f, 51f / 255f, 105f / 255f, 1f);
     private static readonly Color CardBlue = new Color(170f / 255f, 230f / 255f, 251f / 255f, 1f);
     private static readonly Color BoxFill = new Color(0.95f, 0.99f, 1f, 1f);
@@ -396,12 +367,10 @@ public class GameMenu : MonoBehaviour
     private const string ResPath = "MenuUI/";
     private const string VolumeKey = "menu_master_volume";
 
-    // cloud stack: these pieces interlock into a 1100 x 1080 block pinned to the right edge
     private const float CloudW = 1100f;
     private static readonly string[] CloudSprites = { "StatsF", "SaveLoadF", "Settings", "Main_Menu" };
     private static readonly float[] CloudH = { 508f, 579f, 353f, 300f };
     private static readonly float[] CloudY = { 0f, 80f, 561f, 780f };
-    // where each label sits, in its own cloud's coordinates (x from left, y down from the cloud's top)
     private static readonly Vector2[] LabelPos = { new Vector2(452f, 121f), new Vector2(560f, 375f), new Vector2(640f, 139f), new Vector2(600f, 170f) };
     private static readonly Vector2 CharacterRest = new Vector2(295f, 0f);
     private static readonly Vector2 DecorStarRest = new Vector2(200f, 300f);
@@ -411,15 +380,13 @@ public class GameMenu : MonoBehaviour
 
     private static readonly string[] EntryNames = { "Stats", "Save/Load", "Settings", "Main Menu", "Continue", "New Game", "Quit", "Load" };
     private static readonly Entry[] GameEntries = { Entry.Stats, Entry.SaveLoad, Entry.Settings, Entry.MainMenu };
-    // Title screen: a plain text list on the left (Continue / New Game / Options / Load / Exit), the selected one is bigger with a blue brush stroke
     private static readonly Entry[] TitleEntries = { Entry.Continue, Entry.NewGame, Entry.Settings, Entry.Load, Entry.Quit };
     private static readonly string[] TitleNames = { "CONTINUE", "NEW GAME", "OPTIONS", "LOAD", "EXIT" };
-    private const float TitleX = 92f;       // left edge of the list (reference pixels)
-    private const float TitleY = 610f;      // centre of the first entry, from the top
-    private const float TitleStep = 80f;    // distance between entries
+    private const float TitleX = 92f;
+    private const float TitleY = 610f;
+    private const float TitleStep = 80f;
     private const float TitleFontSize = 54f;
 
-    // ---------------------------------------------------------------- state
     private bool isOpen;
     private float openT;
     private float pageT = 1f;
@@ -430,9 +397,8 @@ public class GameMenu : MonoBehaviour
     private bool sceneAllowed;
     private float prevTimeScale = 1f;
     private bool confirmYes;
-    private int continueSlot;   // title screen: the newest save (0 = there is none, Continue is greyed out)
+    private int continueSlot;
 
-    // ---------------------------------------------------------------- ui refs
     private GameObject buttonRoot;
     private GameObject menuRoot;
     private CanvasGroup menuGroup;
@@ -458,10 +424,6 @@ public class GameMenu : MonoBehaviour
     private bool[] saveArmed = new bool[SaveSystem.SlotCount];
 
     private TMP_FontAsset customFont;
-
-    // =====================================================================
-    //  Setup
-    // =====================================================================
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics() { Instance = null; spriteCache = null; swipeSprite = null; warned.Clear(); }
@@ -516,14 +478,12 @@ public class GameMenu : MonoBehaviour
         for (int i = 0; i < activeScenes.Length; i++)
             if (activeScenes[i] == scene.name) sceneAllowed = true;
 
-        // never carry an open menu (or its pause) into another scene
         if (isOpen) { bool t = titleMode; titleMode = false; Close(); titleMode = t; }
         isOpen = false;
         RestoreTime();
         openT = 0f;
         menuRoot.SetActive(false);
 
-        // the title screen gets its own always-open version of the menu
         bool wantTitle = scene.name == mainMenuScene;
         if (wantTitle) sceneAllowed = true;
         SetMode(wantTitle);
@@ -535,12 +495,10 @@ public class GameMenu : MonoBehaviour
         titleMode = title;
         entries = title ? TitleEntries : GameEntries;
 
-        // on the title screen the game's own title art must stay visible
         dim.color = title ? new Color(0f, 0f, 0f, 0f) : DimColor;
         characterRT.gameObject.SetActive(!title);
         decorStar.gameObject.SetActive(!title);
 
-        // the old Play / Quit buttons of the scene are replaced by this menu
         if (title)
         {
             GameObject oldStart = GameObject.Find("START");
@@ -555,10 +513,6 @@ public class GameMenu : MonoBehaviour
         page = Page.Main;
         SetSelected(0, true);
     }
-
-    // =====================================================================
-    //  Input + animation
-    // =====================================================================
 
     private void Update()
     {
@@ -595,8 +549,8 @@ public class GameMenu : MonoBehaviour
         bool confirm = (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
                     || (pad != null && pad.buttonSouth.wasPressedThisFrame);
 
-        int move = 0;   // up / down
-        int side = 0;   // left / right
+        int move = 0;
+        int side = 0;
         if (kb != null)
         {
             if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame) move = -1;
@@ -657,7 +611,6 @@ public class GameMenu : MonoBehaviour
 
         float e = Ease(openT);
 
-        // cards / panels rise in from below
         pageRoot.anchoredPosition = new Vector2(0f, -(1f - Ease(pageT)) * 700f);
 
         if (titleMode)
@@ -668,7 +621,6 @@ public class GameMenu : MonoBehaviour
 
         if (page != Page.Main && page != Page.Confirm) return;
 
-        // the character slides in from the left, the clouds from the right one after another
         characterRT.anchoredPosition = CharacterRest + new Vector2(-(1f - e) * 700f, 0f);
         float bob = Mathf.Sin(Time.unscaledTime * 2f) * 10f;
         decorStar.anchoredPosition = DecorStarRest + new Vector2(-(1f - e) * 700f, bob);
@@ -694,17 +646,13 @@ public class GameMenu : MonoBehaviour
             selStar.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(Time.unscaledTime * 3f) * 10f);
     }
 
-    // =====================================================================
-    //  Open / close / navigation
-    // =====================================================================
-
     public void Open()
     {
         if (isOpen || !sceneAllowed) return;
 
         if (!titleMode)
         {
-            if (Time.timeScale == 0f) return; // something else (dialogue, cutscene...) already paused the game
+            if (Time.timeScale == 0f) return;
 
             prevTimeScale = Time.timeScale;
             Time.timeScale = 0f;
@@ -720,7 +668,7 @@ public class GameMenu : MonoBehaviour
     public void Close()
     {
         if (!isOpen) return;
-        if (titleMode) return; // the title menu cannot be closed
+        if (titleMode) return;
         isOpen = false;
         RestoreTime();
     }
@@ -755,9 +703,8 @@ public class GameMenu : MonoBehaviour
     {
         if (!force && index == selected) return;
         selected = index;
-        if (titleMode) return;   // the title list follows `selected` by itself (see AnimateTitle)
+        if (titleMode) return;
 
-        // the little star hops onto the highlighted entry
         if (selStar != null && labels[index] != null)
         {
             selStar.SetParent(labels[index].rectTransform, false);
@@ -783,11 +730,9 @@ public class GameMenu : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------------- title list helpers
-
     private bool EntryEnabled(Entry e)
     {
-        return e != Entry.Continue || continueSlot > 0;   // Continue needs a save
+        return e != Entry.Continue || continueSlot > 0;
     }
 
     private void MoveSelection(int dir)
@@ -800,7 +745,6 @@ public class GameMenu : MonoBehaviour
         }
     }
 
-    // Continue = the newest save (by its saved-at time; if that can't be read, the first slot that has a save)
     private void RefreshContinue()
     {
         continueSlot = 0;
@@ -825,7 +769,7 @@ public class GameMenu : MonoBehaviour
     {
         if (continueSlot <= 0 || !SaveSystem.HasSave(continueSlot)) return;
         int slot = continueSlot;
-        Close();   // (does nothing on the title screen, kept so the pause state is always clean)
+        Close();
         if (!SaveSystem.Load(slot))
         {
             ShowPage(Page.SaveLoad);
@@ -843,7 +787,6 @@ public class GameMenu : MonoBehaviour
             TextMeshProUGUI t = titleLabels[i];
             RectTransform lr = t.rectTransform;
 
-            // the entries slide in from the left one after another
             float ei = Ease(openT * 1.5f - i * 0.12f);
             lr.anchoredPosition = new Vector2(TitleX - (1f - ei) * 420f, -(TitleY + i * TitleStep));
 
@@ -855,7 +798,6 @@ public class GameMenu : MonoBehaviour
             t.color = Color.Lerp(t.color, target, k);
         }
 
-        // the blue brush stroke glides to the selected entry
         if (titleSwipe != null && selected < titleLabels.Length)
         {
             Vector2 p = titleSwipe.anchoredPosition;
@@ -872,7 +814,6 @@ public class GameMenu : MonoBehaviour
 
     private static Sprite swipeSprite;
 
-    // A soft blue brush stroke: solid on the left, fading out to the right with a ragged, bristly end
     private static Sprite SwipeSprite()
     {
         if (swipeSprite != null) return swipeSprite;
@@ -883,8 +824,8 @@ public class GameMenu : MonoBehaviour
             for (int y = 0; y < H; y++)
             {
                 float v = (y + 0.5f) / H;
-                float edge = Mathf.SmoothStep(0f, 1f, Mathf.Min(v, 1f - v) / 0.22f);              // soft top and bottom
-                float end = Mathf.Lerp(0.62f, 1f, Mathf.PerlinNoise(y * 0.3f, 7.3f));             // every bristle ends somewhere else
+                float edge = Mathf.SmoothStep(0f, 1f, Mathf.Min(v, 1f - v) / 0.22f);
+                float end = Mathf.Lerp(0.62f, 1f, Mathf.PerlinNoise(y * 0.3f, 7.3f));
                 for (int x = 0; x < W; x++)
                 {
                     float u = x / (float)W;
@@ -912,7 +853,6 @@ public class GameMenu : MonoBehaviour
         titleRoot = NewRect("TitleList", canvasRect);
         Stretch(titleRoot);
 
-        // the brush stroke goes first so it is drawn behind the text
         Image swipe = NewImage("Swipe", titleRoot, Color.white);
         swipe.sprite = SwipeSprite();
         swipe.enabled = swipe.sprite != null;
@@ -930,7 +870,6 @@ public class GameMenu : MonoBehaviour
                 new Vector2(TitleX, -(TitleY + i * TitleStep)), new Vector2(640f, 76f));
             t.enableWordWrapping = false;
 
-            // white letters with a navy edge
             t.outlineColor = new Color32(47, 51, 105, 255);
             t.outlineWidth = 0.22f;
 
@@ -973,10 +912,6 @@ public class GameMenu : MonoBehaviour
 
         BuildPage();
     }
-
-    // =====================================================================
-    //  Layout helpers
-    // =====================================================================
 
     private static void Stretch(RectTransform r)
     {
@@ -1044,7 +979,6 @@ public class GameMenu : MonoBehaviour
     private static Dictionary<string, Sprite> spriteCache;
     private static readonly HashSet<string> warned = new HashSet<string>();
 
-    // "Main_Menu", "Main Menu" and "main-menu" all count as the same name
     private static string Norm(string s)
     {
         StringBuilder sb = new StringBuilder();
@@ -1083,7 +1017,6 @@ public class GameMenu : MonoBehaviour
         o.useGraphicAlpha = false;
     }
 
-    // A hand-drawn style button: light fill, navy outline, navy text. Position is from the parent's top-left (y goes DOWN).
     private Button MakeBoxButton(Transform parent, string label, Vector2 pos, Vector2 size, float fontSize, Action onClick, bool enabled, out TextMeshProUGUI text)
     {
         Image img = NewImage("Button_" + label, parent, BoxFill);
@@ -1111,7 +1044,6 @@ public class GameMenu : MonoBehaviour
         return btn;
     }
 
-    // Text placed on a card in the card's own pixel space. pos = left-centre of the text, y goes DOWN.
     private TextMeshProUGUI CardText(Transform parent, string text, float size, Vector2 pos, Vector2 box,
         TextAlignmentOptions align, FontStyles style, float clockwiseDegrees, bool fit)
     {
@@ -1131,7 +1063,6 @@ public class GameMenu : MonoBehaviour
         return t;
     }
 
-    // The big hand-drawn cards sit at the bottom of the screen; children are placed in the PNG's own pixel coordinates.
     private RectTransform NewCard(string spriteName, Vector2 native, out RectTransform content)
     {
         RectTransform card = NewRect("Card", pageRoot);
@@ -1141,17 +1072,13 @@ public class GameMenu : MonoBehaviour
 
         Image img = card.gameObject.AddComponent<Image>();
         img.sprite = LoadSprite(spriteName);
-        img.color = img.sprite != null ? Color.white : CardBlue; // plain blue rectangle if the art is missing
+        img.color = img.sprite != null ? Color.white : CardBlue;
         img.raycastTarget = false;
 
         content = NewRect("Content", card);
         SetAnchored(content, new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, native);
         return card;
     }
-
-    // =====================================================================
-    //  Building the UI
-    // =====================================================================
 
     private static Image NewStar(string name, Transform parent)
     {
@@ -1160,10 +1087,10 @@ public class GameMenu : MonoBehaviour
         img.raycastTarget = false;
         img.preserveAspect = true;
 
-        Sprite sprite = LoadSprite("Star", true);   // your own picture, if you added one
+        Sprite sprite = LoadSprite("Star", true);
         if (sprite == null) sprite = StarFrames.Get();
         if (sprite != null) img.sprite = sprite;
-        else img.enabled = false; // star could not be built, the menu still works without it
+        else img.enabled = false;
         return img;
     }
 
@@ -1183,12 +1110,10 @@ public class GameMenu : MonoBehaviour
         menuGroup = menuRoot.AddComponent<CanvasGroup>();
         RectTransform canvasRect = (RectTransform)canvas.transform;
 
-        // dark overlay over the paused game (also blocks clicks to whatever is underneath)
         dim = NewImage("Dim", canvasRect, DimColor);
         dim.raycastTarget = true;
         Stretch(dim.rectTransform);
 
-        // ---------------- main page: character + clouds
         mainRoot = NewRect("Main", canvasRect);
         Stretch(mainRoot);
 
@@ -1216,7 +1141,6 @@ public class GameMenu : MonoBehaviour
             cloudRTs[i] = cloud.rectTransform;
             cloudImgs[i] = cloud;
         }
-        // labels are added after all clouds so a later cloud never covers an earlier label
         for (int i = 0; i < 4; i++)
         {
             int index = i;
@@ -1224,7 +1148,7 @@ public class GameMenu : MonoBehaviour
             t.raycastTarget = true;
             SetAnchored(t.rectTransform, new Vector2(0f, 1f), new Vector2(0.5f, 0.5f),
                 new Vector2(LabelPos[i].x, -LabelPos[i].y), new Vector2(620f, 150f));
-            t.transform.SetParent(clouds, true);   // draw above every cloud
+            t.transform.SetParent(clouds, true);
             t.rectTransform.anchoredPosition = new Vector2(LabelPos[i].x, -(LabelPos[i].y + CloudY[i]));
             t.enableWordWrapping = false;
 
@@ -1239,19 +1163,15 @@ public class GameMenu : MonoBehaviour
             labels[i] = t;
         }
 
-        // the star that marks the highlighted entry
         Image sel = NewStar("SelectedStar", clouds);
         selStar = sel.rectTransform;
         SetAnchored(selStar, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(100f, 100f));
 
-        // ---------------- title screen: the plain text list
         BuildTitleList(canvasRect);
 
-        // ---------------- other pages are built into here
         pageRoot = NewRect("Page", canvasRect);
         Stretch(pageRoot);
 
-        // ---------------- back button (top corner), shown on the sub pages
         RectTransform backRoot = NewRect("BackButton", canvasRect);
         Stretch(backRoot);
         TextMeshProUGUI backLabel;
@@ -1259,10 +1179,6 @@ public class GameMenu : MonoBehaviour
         backButtonObj = backRoot.gameObject;
         backButtonObj.SetActive(false);
     }
-
-    // =====================================================================
-    //  Pages
-    // =====================================================================
 
     private void BuildPage()
     {
@@ -1285,13 +1201,11 @@ public class GameMenu : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------------- stats
     private void BuildStatsPage()
     {
         RectTransform content;
         NewCard("Stats", new Vector2(1980f, 1039f), out content);
 
-        // the ruled lines of the card sink slightly to the right, so the text sinks with them
         Func<float, float, float> Y = (x, y) => y + 0.0105f * (x - 700f);
         const float tilt = 0.6f;
 
@@ -1299,7 +1213,6 @@ public class GameMenu : MonoBehaviour
         string wind = SidebarValue("windPower") ?? "-";
         string speed = SidebarValue("moveSpeed") ?? "-";
 
-        // ---- the three numbers across the top
         PlaceIcon(content, LoadSprite("Sun_Icon"), new Vector2(440f, Y(440f, 300f)), new Vector2(92f, 92f), tilt);
         CardText(content, sun, 78f, new Vector2(525f, Y(525f, 300f)), new Vector2(150f, 100f), TextAlignmentOptions.Left, FontStyles.Bold, tilt, true);
 
@@ -1311,7 +1224,6 @@ public class GameMenu : MonoBehaviour
         else CardText(content, "SPD", 34f, new Vector2(945f, Y(945f, 300f)), new Vector2(110f, 80f), TextAlignmentOptions.Left, FontStyles.Bold | FontStyles.Italic, tilt, false);
         CardText(content, speed, 58f, new Vector2(1060f, Y(1060f, 300f)), new Vector2(200f, 90f), TextAlignmentOptions.Left, FontStyles.Bold, tilt, true);
 
-        // ---- the written rows
         CardText(content, "<b>Moods:</b>  " + (MoodNames() ?? "None"), 50f, new Vector2(425f, Y(425f, 408f)), new Vector2(840f, 66f), TextAlignmentOptions.Left, FontStyles.Normal, tilt, true);
         CardText(content, "<b>Boons:</b>  " + (BoonNames() ?? "None"), 50f, new Vector2(425f, Y(425f, 546f)), new Vector2(540f, 66f), TextAlignmentOptions.Left, FontStyles.Normal, tilt, true);
         CardText(content, "<b>Blueprints:</b>  " + (BlueprintNames() ?? "None"), 50f, new Vector2(985f, Y(985f, 546f)), new Vector2(610f, 66f), TextAlignmentOptions.Left, FontStyles.Normal, tilt, true);
@@ -1329,12 +1241,10 @@ public class GameMenu : MonoBehaviour
         img.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -clockwiseDegrees);
     }
 
-    // ---------------------------------------------------------------- save / load
-    // The lines of SaveLoad.png fan out a little, so each slot row follows its own line.
     private static readonly Vector2[] SlotStart = { new Vector2(656f, 222f), new Vector2(641f, 346f), new Vector2(625f, 461f), new Vector2(607f, 597f) };
-    private static readonly float[] SlotAngle = { 0.1f, 0.8f, 2.4f, 3.8f };      // degrees, clockwise
+    private static readonly float[] SlotAngle = { 0.1f, 0.8f, 2.4f, 3.8f };
     private static readonly float[] SlotHeight = { 124f, 115f, 136f, 128f };
-    private static readonly float[] SlotRight = { 1695f, 1683f, 1678f, 1663f };   // where the row ends on the card
+    private static readonly float[] SlotRight = { 1695f, 1683f, 1678f, 1663f };
 
     private void BuildSaveLoadPage()
     {
@@ -1368,7 +1278,6 @@ public class GameMenu : MonoBehaviour
             Vector2 btnSize = new Vector2(176f, 78f);
             float btnY = (SlotHeight[i] - btnSize.y) * 0.5f;
 
-            // SAVE does not exist on the title screen, there is nothing to save yet
             if (!titleMode)
             {
                 TextMeshProUGUI saveLabel;
@@ -1397,7 +1306,6 @@ public class GameMenu : MonoBehaviour
         int i = slot - 1;
         if (SaveSystem.HasSave(slot) && !saveArmed[i])
         {
-            // asking before overwriting
             for (int k = 0; k < saveArmed.Length; k++) saveArmed[k] = false;
             saveArmed[i] = true;
             saveStatus = "Press Save again to overwrite slot " + slot + ".";
@@ -1413,7 +1321,7 @@ public class GameMenu : MonoBehaviour
     private void OnLoadClicked(int slot)
     {
         if (!SaveSystem.HasSave(slot)) return;
-        Close(); // un-pauses first so the loaded game starts at normal speed
+        Close();
         if (!SaveSystem.Load(slot))
         {
             saveStatus = "Could not load slot " + slot + ".";
@@ -1421,7 +1329,6 @@ public class GameMenu : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------------- settings
     private RectTransform NewPanel(Vector2 size, out Image bg)
     {
         bg = NewImage("Panel", pageRoot, CardBlue);
@@ -1438,11 +1345,9 @@ public class GameMenu : MonoBehaviour
 
         CardText(panel, "Settings", 82f, new Vector2(60f, 90f), new Vector2(700f, 110f), TextAlignmentOptions.Left, FontStyles.Bold | FontStyles.Italic, 0f, false);
 
-        // underline like the hand-drawn cards
         Image line = NewImage("Line", panel, Navy);
         SetAnchored(line.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(50f, -160f), new Vector2(900f, 6f));
 
-        // ---- master volume
         CardText(panel, "Master volume", 48f, new Vector2(60f, 235f), new Vector2(600f, 70f), TextAlignmentOptions.Left, FontStyles.Bold, 0f, false);
 
         volumeSlider = MakeSlider(panel, new Vector2(60f, 290f), new Vector2(660f, 50f));
@@ -1451,7 +1356,6 @@ public class GameMenu : MonoBehaviour
         volumeValue.text = Mathf.RoundToInt(AudioListener.volume * 100f) + "%";
         volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
 
-        // ---- fullscreen
         TextMeshProUGUI fsLabel;
         MakeBoxButton(panel, "", new Vector2(60f, 395f), new Vector2(520f, 84f), 42f, ToggleFullscreen, true, out fsLabel);
         fullscreenLabel = fsLabel;
@@ -1517,7 +1421,6 @@ public class GameMenu : MonoBehaviour
         if (fullscreenLabel != null) fullscreenLabel.text = "Fullscreen: " + (fs ? "ON" : "OFF");
     }
 
-    // ---------------------------------------------------------------- "return to main menu?" question
     private void BuildConfirmPage()
     {
         Image bg;
@@ -1544,18 +1447,16 @@ public class GameMenu : MonoBehaviour
     public void ReturnToMainMenu()
     {
         if (!isOpen) return;
-        Close(); // un-pauses first so the next scene starts at normal speed
+        Close();
         SceneManager.LoadScene(mainMenuScene);
     }
 
-    // New Game / Quit on the title screen
     private void RunTitleAction(Entry entry)
     {
         if (entry == Entry.NewGame)
         {
-            SaveSystem.ResetProgress(); // a new game never inherits progress from a previous session
+            SaveSystem.ResetProgress();
 
-            // hide this menu so the intro video plays on its own
             isOpen = false;
             openT = 0f;
             menuRoot.SetActive(false);
@@ -1571,10 +1472,6 @@ public class GameMenu : MonoBehaviour
             else Application.Quit();
         }
     }
-
-    // =====================================================================
-    //  Reading the game's numbers for the Stats card
-    // =====================================================================
 
     private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
@@ -1594,8 +1491,6 @@ public class GameMenu : MonoBehaviour
         return null;
     }
 
-    // The scene's ActiveBuffsSidebar already works out Sun / Wind / Speed. We read the number it shows,
-    // so the card always agrees with what the player sees there.
     private static string SidebarValue(string slotField)
     {
         try
@@ -1611,7 +1506,7 @@ public class GameMenu : MonoBehaviour
             object slot = GetMember(sidebar, slotField);
             TMP_Text tmp = GetMember(slot, "valueText") as TMP_Text;
             if (tmp == null || string.IsNullOrEmpty(tmp.text)) return null;
-            string s = Regex.Replace(tmp.text, "<.*?>", "").Trim(); // drop the sidebar's green / red colour tags
+            string s = Regex.Replace(tmp.text, "<.*?>", "").Trim();
             return s.Length == 0 ? null : s;
         }
         catch (Exception) { return null; }
@@ -1646,7 +1541,6 @@ public class GameMenu : MonoBehaviour
         return names.Count == 0 ? null : string.Join(", ", names);
     }
 
-    // Tries a few likely static names. Returns null if nothing is found, which the card shows as "None".
     private static string NamesFromStatic(string[] typeNames, string[] members)
     {
         try

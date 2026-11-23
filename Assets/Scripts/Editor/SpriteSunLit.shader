@@ -1,5 +1,3 @@
-// Cult-of-the-Lamb-style lit sprite for URP (Universal Renderer, 3D Directional Light).
-// Put in Assets/Shaders/SpriteSunLit.shader
 Shader "Sprites/Sun Lit (2.5D)"
 {
     Properties
@@ -73,9 +71,8 @@ Shader "Sprites/Sun Lit (2.5D)"
             half   _SelfShadowOffset;
         CBUFFER_END
 
-        // ---- cloud shadows (set globally by CloudShadows.cs; strength 0 = off)
-        float4 _CloudParams;   // x = 1/world size of a cloud cell, y = coverage, z = softness, w = strength
-        float4 _CloudScroll;   // xy = noise-space scroll (wind), z = cloud height above ground
+        float4 _CloudParams;
+        float4 _CloudScroll;
 
         float CloudHash(float2 p)
         {
@@ -108,11 +105,9 @@ Shader "Sprites/Sun Lit (2.5D)"
             return v;
         }
 
-        // How much of the sun is blocked here by clouds (0 = none, 1 = fully shaded)
         half CloudShadowAmount(float3 positionWS, float3 toSun)
         {
             if (_CloudParams.w <= 0.0) return 0.0h;
-            // follow the ray from this point toward the sun up to the cloud layer
             float t = _CloudScroll.z / max(toSun.y, 0.12);
             float2 xz = positionWS.xz + toSun.xz * t;
             float n = CloudFbm(xz * _CloudParams.x + _CloudScroll.xy);
@@ -121,7 +116,6 @@ Shader "Sprites/Sun Lit (2.5D)"
         }
         ENDHLSL
 
-        // ------------------------------------------------------------ forward
         Pass
         {
             Name "SpriteSunLit"
@@ -162,7 +156,6 @@ Shader "Sprites/Sun Lit (2.5D)"
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 o.color = v.color * _Color * _RendererColor;
-                // sprite quads face -Z in object space
                 o.facingWS = TransformObjectToWorldNormal(float3(0, 0, -1));
                 return o;
             }
@@ -181,17 +174,14 @@ Shader "Sprites/Sun Lit (2.5D)"
                 half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
                 half4 col = tex * i.color;
 
-                // --- main light (the Directional Light = your sun)
                 float3 L = normalize(_MainLightPosition.xyz);
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS + L * _SelfShadowOffset);
                 Light sun = GetMainLight(shadowCoord);
 
                 half maxc = max(sun.color.r, max(sun.color.g, sun.color.b));
                 half3 sunHue = lerp(half3(1, 1, 1), sun.color / max(maxc, 1e-4h), _SunTint);
-                half sunStrength = saturate(maxc);              // dims at night
+                half sunStrength = saturate(maxc);
 
-                // fake normal: camera-facing billboard leaned toward the sky
-                // two-sided: always use the side facing the camera (needed for flat ground tilemaps)
                 float3 facing = normalize(i.facingWS);
                 float3 viewDir = normalize(_WorldSpaceCameraPos - i.positionWS);
                 if (dot(facing, viewDir) < 0) facing = -facing;
@@ -209,7 +199,6 @@ Shader "Sprites/Sun Lit (2.5D)"
                 half3 lighting = lerp(shade, lit, sunMask);
                 col.rgb *= lerp(half3(1, 1, 1), lighting, _SunInfluence);
 
-                // --- rim light on the edge of the silhouette that faces the sun
                 float3 lightOS = TransformWorldToObjectDir(L, false);
                 float2 d = lightOS.xy * _Flip.xy;
                 d = d / max(length(d), 1e-4);
@@ -224,7 +213,6 @@ Shader "Sprites/Sun Lit (2.5D)"
             ENDHLSL
         }
 
-        // ------------------------------------------------------- shadow caster
         Pass
         {
             Name "ShadowCaster"

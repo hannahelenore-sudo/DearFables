@@ -1,12 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// A battery lying in the world that the player collects, like a Mario coin: it pops out in an arc, bounces,
-/// then spins and bobs until you walk near it (it also gets pulled toward you when you're close).
-/// Make one with Tools > Battery > Create Battery Pickup Prefab, then swap the sprite.
-/// BatteryDropper spawns these.
-/// </summary>
 public class BatteryPickup : MonoBehaviour
 {
     [Tooltip("How many batteries it gives.")]
@@ -57,10 +51,9 @@ public class BatteryPickup : MonoBehaviour
         groundY = transform.position.y;
         baseY = groundY;
         phase = Random.value * 10f;
-        landed = true; // stays put (and bobs) unless Launch() is called
+        landed = true;
     }
 
-    /// <summary>Throws the battery into the air with this velocity (called by BatteryDropper).</summary>
     public void Launch(Vector3 initialVelocity, float groundHeight)
     {
         velocity = initialVelocity;
@@ -107,12 +100,10 @@ public class BatteryPickup : MonoBehaviour
         }
         else
         {
-            // Bob up and down on the ground
             float bob = (Mathf.Sin(Time.time * bobSpeed + phase) + 1f) * 0.5f * bobHeight;
             pos.y = baseY + bob;
         }
 
-        // Player: collect / magnet
         if (age >= collectDelay && FindPlayer())
         {
             Vector3 toPlayer = player.transform.position - pos;
@@ -128,14 +119,13 @@ public class BatteryPickup : MonoBehaviour
 
             if (landed && magnetRadius > 0f && dist <= magnetRadius)
             {
-                float pull = 1f - dist / magnetRadius; // pulls harder the closer you are
+                float pull = 1f - dist / magnetRadius;
                 pos += toPlayer.normalized * (magnetSpeed * (0.4f + pull) * dt);
             }
         }
 
         transform.position = pos;
 
-        // Looks
         if (faceCamera && Camera.main != null)
             transform.rotation = Camera.main.transform.rotation;
 
@@ -163,7 +153,6 @@ public class BatteryPickup : MonoBehaviour
         StartCoroutine(CollectEffect());
     }
 
-    // Quick pop upward and fade, then gone
     private IEnumerator CollectEffect()
     {
         SpriteRenderer sr = GetComponentInChildren<SpriteRenderer>();

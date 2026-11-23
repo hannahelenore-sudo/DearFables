@@ -1,21 +1,11 @@
 using UnityEngine;
 
-/// <summary>
-/// Flies in a straight line with a little spin and hits the first enemy it passes.
-/// What happens on a hit depends on 'kind':
-///   Card      -> starts the battle (with advantage)
-///   Tsinelas  -> stuns the enemy
-///   SmallRock -> clears the player's current Mood
-/// At the end of its range it turns into a physics object (Rigidbody + BoxCollider),
-/// falls onto the ground, settles, fades out (card + glow) and disappears.
-/// </summary>
 public class CardProjectile : MonoBehaviour
 {
     private enum State { Flying, Falling, Landed }
 
     private State state = State.Flying;
 
-    // Set by CardShooter before Launch()
     [HideInInspector] public ThrowItem kind = ThrowItem.Card;
     [HideInInspector] public float stunDuration = 2f;
 
@@ -45,7 +35,6 @@ public class CardProjectile : MonoBehaviour
     private float landedTimer;
     private float killY;
 
-    // Glow
     private SpriteRenderer glowSr;
     private float glowBaseAlpha;
     private float pulseSpeed;
@@ -76,7 +65,7 @@ public class CardProjectile : MonoBehaviour
         this.fadeTime = fadeTime;
 
         sr = GetComponent<SpriteRenderer>();
-        killY = transform.position.y - 30f; // safety: no ground collider -> card is removed
+        killY = transform.position.y - 30f;
 
         Transform g = transform.Find("Glow");
         if (g != null)
@@ -115,15 +104,12 @@ public class CardProjectile : MonoBehaviour
         glowSr.color = c;
     }
 
-    // ---------------- Flying ----------------
-
     private void UpdateFlying()
     {
         float step = Mathf.Min(speed * Time.deltaTime, maxDistance - travelled);
         Vector3 start = transform.position;
         Vector3 end = start + direction * step;
 
-        // Check the whole path travelled this frame so fast projectiles can't skip over an enemy
         foreach (EnemyChase enemy in enemies)
         {
             if (enemy == null || !enemy.isActiveAndEnabled) continue;
@@ -139,7 +125,6 @@ public class CardProjectile : MonoBehaviour
         transform.position = end;
         travelled += step;
 
-        // Face the camera and spin
         spinAngle += spinSpeed * Time.deltaTime;
         Camera cam = Camera.main;
         if (cam != null)
@@ -165,13 +150,10 @@ public class CardProjectile : MonoBehaviour
         }
     }
 
-    // ---------------- Falling (physics) ----------------
-
     private void BeginFall()
     {
         state = State.Falling;
 
-        // Thin box that matches the sprite (sizes are in local space, the scale is applied by Unity)
         BoxCollider box = gameObject.AddComponent<BoxCollider>();
         if (sr != null && sr.sprite != null)
         {
@@ -189,7 +171,6 @@ public class CardProjectile : MonoBehaviour
         mat.frictionCombine = PhysicsMaterialCombine.Maximum;
         box.material = mat;
 
-        // Never collide with the player who threw it
         if (ignoreColliders != null)
         {
             foreach (Collider c in ignoreColliders)
@@ -204,7 +185,6 @@ public class CardProjectile : MonoBehaviour
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-        // Keeps a bit of the throw, and tumbles so it lands at a natural angle
         rb.linearVelocity = direction * (speed * forwardSpeedWhenFalling);
         Vector3 axis = Random.onUnitSphere;
         rb.angularVelocity = axis * (tumbleSpeed * Mathf.Deg2Rad);
@@ -221,7 +201,6 @@ public class CardProjectile : MonoBehaviour
 
         if (transform.position.y < killY)
         {
-            // Fell through the world: the ground has no collider
             Destroy(gameObject);
             return;
         }
@@ -236,8 +215,6 @@ public class CardProjectile : MonoBehaviour
             landedTimer = 0f;
         }
     }
-
-    // ---------------- Landed ----------------
 
     private void UpdateLanded()
     {
@@ -259,7 +236,6 @@ public class CardProjectile : MonoBehaviour
             Destroy(gameObject);
     }
 
-    // Distance from point p to the segment a-b, ignoring height
     private static float FlatSegmentDistance(Vector3 a, Vector3 b, Vector3 p)
     {
         Vector2 A = new Vector2(a.x, a.z);

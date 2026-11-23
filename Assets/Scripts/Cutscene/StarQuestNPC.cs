@@ -4,12 +4,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-/// <summary>
-/// Remembers star quests for the play session (static, like BoonProgress / CardPickup), so a quest
-/// stays accepted / done after a card battle loads the overworld again.
-/// Call StarQuestProgress.ResetAll() from your "New Game" button.
-/// Anything can check it, e.g. a gate: StarQuestProgress.IsDone("StarQuest").
-/// </summary>
 public static class StarQuestProgress
 {
     private static readonly HashSet<string> accepted = new HashSet<string>();
@@ -35,11 +29,9 @@ public static class StarQuestProgress
     public static bool IsDone(string questId) { return done.Contains(questId ?? ""); }
     public static void Accept(string questId) { accepted.Add(questId ?? ""); }
 
-    /// <summary>True once the quest giver has turned into the stationary enemy (after the card game talk).</summary>
     public static bool IsEnemy(string questId) { return enemy.Contains(questId ?? ""); }
     public static void StartEnemy(string questId) { enemy.Add(questId ?? ""); }
 
-    /// <summary>True once the cutscene that plays after the card game has been shown (it only plays once).</summary>
     public static bool IsAfterGameDone(string questId) { return afterGame.Contains(questId ?? ""); }
     public static void MarkAfterGameDone(string questId) { afterGame.Add(questId ?? ""); }
 
@@ -50,22 +42,6 @@ public static class StarQuestProgress
     }
 }
 
-/// <summary>
-/// A star quest giver (a special NPCTrigger). Everything about talking (Press E prompt, distance, fonts...)
-/// works like NPCTrigger. On top of that:
-///
-///  1. First talk (or stepping into the generated zone): plays the Intro dialogue. Afterwards the quest is
-///     "accepted" and the star sprite + requirement ("2 / 5") floats above the character.
-///  2. Talking again before you have enough stars plays the Reminder dialogue, as often as you like.
-///  3. Talking with enough stars plays the Complete dialogue and ticks the star tutorial as DONE
-///     (or it ticks by itself the moment you have enough, if Tick Automatically is on).
-///  4. Right after that, the Card Game dialogue (Follow Up Id) explains the card game. Then the NPC turns into
-///     an ENEMY that stands still: add an EnemyChase component to this same object. Throwing a card at it
-///     starts the card game (the battle scene shows its sprite). Once beaten it is gone, like any enemy.
-///
-/// The four dialogues are entries on the IntroCutscene's Cutscenes list; typing their Ids here creates them for you.
-/// The inherited "Cutscene Id" / "Play Only Once" fields are not used by this NPC.
-/// </summary>
 public class StarQuestNPC : NPCTrigger
 {
     [Header("Star Quest")]
@@ -133,17 +109,9 @@ public class StarQuestNPC : NPCTrigger
     private GameObject displayRoot;
     private LabelRef displayLabel;
 
-    // -------------------------------------------------------------------
-    // State
-    // -------------------------------------------------------------------
-
     public bool Accepted { get { return StarQuestProgress.IsAccepted(questId); } }
     public bool Done { get { return StarQuestProgress.IsDone(questId); } }
     public bool HasEnoughStars { get { return PlayerProgress.TotalStars >= requiredStars; } }
-
-    // -------------------------------------------------------------------
-    // NPCTrigger hooks
-    // -------------------------------------------------------------------
 
     protected override IEnumerable<string> AllCutsceneIds()
     {
@@ -164,7 +132,7 @@ public class StarQuestNPC : NPCTrigger
 
     protected override bool CanTalk()
     {
-        if (StarQuestProgress.IsEnemy(questId)) return false; // it is an enemy now: no more talking
+        if (StarQuestProgress.IsEnemy(questId)) return false;
         if (Done) return !string.IsNullOrWhiteSpace(doneId);
         return true;
     }
@@ -174,15 +142,10 @@ public class StarQuestNPC : NPCTrigger
         StartCoroutine(WatchCutscene(id));
     }
 
-    // -------------------------------------------------------------------
-    // Unity
-    // -------------------------------------------------------------------
-
     protected override void Awake()
     {
         base.Awake();
 
-        // The enemy part stays off until the NPC has finished talking about the card game
         if (becomeEnemy)
         {
             if (enemy == null) enemy = GetComponent<EnemyChase>();
@@ -190,12 +153,10 @@ public class StarQuestNPC : NPCTrigger
 
             if (Done)
             {
-                // Loaded back after the quest (e.g. from the battle): already beaten = gone, otherwise it's an enemy again
                 if (enemy != null && enemy.WasCaught)
                 {
                     ActivateObjects();
 
-                    // Beaten in the card game: play the after-game cutscene once, THEN disappear
                     if (!string.IsNullOrWhiteSpace(afterGameId) && !StarQuestProgress.IsAfterGameDone(questId))
                     {
                         BeginAfterGame();
@@ -258,10 +219,6 @@ public class StarQuestNPC : NPCTrigger
         Gizmos.DrawWireSphere(transform.position + displayOffset, 0.25f * displayScale);
     }
 
-    // -------------------------------------------------------------------
-    // Quest flow
-    // -------------------------------------------------------------------
-
     private IEnumerator WatchCutscene(string id)
     {
         while (cutscene != null && cutscene.IsPlaying)
@@ -299,7 +256,6 @@ public class StarQuestNPC : NPCTrigger
             BecomeEnemy();
     }
 
-    // The NPC was beaten: hide it right away, play the after-card-game cutscene, then remove it
     private void BeginAfterGame()
     {
         foreach (Renderer r in GetComponentsInChildren<Renderer>(true)) r.enabled = false;
@@ -311,12 +267,10 @@ public class StarQuestNPC : NPCTrigger
 
     private IEnumerator AfterGameRoutine()
     {
-        // Remember first, so reloading the scene mid-cutscene can never play it twice
         StarQuestProgress.MarkAfterGameDone(questId);
 
         if (afterGameDelay > 0f) yield return new WaitForSecondsRealtime(afterGameDelay);
 
-        // Wait if some other dialogue is playing
         while (cutscene != null && cutscene.IsPlaying)
             yield return null;
 
@@ -331,7 +285,6 @@ public class StarQuestNPC : NPCTrigger
         Destroy(gameObject);
     }
 
-    /// <summary>Turns this NPC into a stationary enemy: a thrown card starts the card game.</summary>
     private void BecomeEnemy()
     {
         if (!becomeEnemy) return;
@@ -351,7 +304,6 @@ public class StarQuestNPC : NPCTrigger
             if (p != null) enemy.player = p.transform;
         }
 
-        // Stands still, and only a thrown card starts the fight
         enemy.moveSpeed = 0f;
         enemy.detectionRange = 0f;
         enemy.returnToStartWhenLost = false;
@@ -369,7 +321,6 @@ public class StarQuestNPC : NPCTrigger
             if (go != null && !go.activeSelf) go.SetActive(true);
     }
 
-    // Waits for any dialogue to finish, then plays the "go to the next NPC" cutscene
     private IEnumerator FollowUpRoutine()
     {
         while (cutscene != null && cutscene.IsPlaying)
@@ -377,14 +328,9 @@ public class StarQuestNPC : NPCTrigger
 
         yield return null;
 
-        // If the dialogue can't play (missing lines...), don't leave the NPC stuck
         if (!PlayId(followUpId))
             BecomeEnemy();
     }
-
-    // -------------------------------------------------------------------
-    // Zone
-    // -------------------------------------------------------------------
 
     private void CreateZone()
     {
@@ -397,10 +343,9 @@ public class StarQuestNPC : NPCTrigger
 
         StarQuestZone zone = zoneObject.AddComponent<StarQuestZone>();
         zone.npc = this;
-        zone.disappearWhenAccepted = false; // this NPC removes its own generated zone
+        zone.disappearWhenAccepted = false;
     }
 
-    /// <summary>Called by the zone while something is inside it.</summary>
     public void ZoneTriggered(Collider other)
     {
         if (Accepted) return;
@@ -409,10 +354,6 @@ public class StarQuestNPC : NPCTrigger
 
         PlayId(introId);
     }
-
-    // -------------------------------------------------------------------
-    // Star requirement above the character
-    // -------------------------------------------------------------------
 
     private void RefreshDisplay()
     {
@@ -447,7 +388,6 @@ public class StarQuestNPC : NPCTrigger
         rootRect.localScale = Vector3.one * 0.01f * displayScale;
         rootRect.position = transform.position + displayOffset;
 
-        // Icon and number sit side by side, centered
         HorizontalLayoutGroup row = displayRoot.AddComponent<HorizontalLayoutGroup>();
         row.childAlignment = TextAnchor.MiddleCenter;
         row.spacing = 15f;

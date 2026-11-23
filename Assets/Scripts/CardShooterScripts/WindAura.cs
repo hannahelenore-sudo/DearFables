@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Wind streaks that swirl around the player while the wind boost is active.
-/// Streaks in front of the player draw over it, streaks behind it draw underneath (so it looks 3D).
-/// </summary>
 public class WindAura : MonoBehaviour
 {
     public int streakCount = 10;
@@ -109,10 +105,9 @@ public class WindAura : MonoBehaviour
             float a = angle[i] * Mathf.Deg2Rad;
 
             Vector3 offset = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (baseRadius * radiusMul[i]);
-            Vector3 tangent = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)); // direction the streak flies
+            Vector3 tangent = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a));
             Vector3 pos = center + offset + Vector3.up * (charH * Mathf.Lerp(0.1f, 0.95f, height[i]));
 
-            // Point the streak along its flight direction as seen on screen
             Vector3 local = cam.transform.InverseTransformDirection(tangent);
             float flat = Mathf.Sqrt(local.x * local.x + local.y * local.y);
             float ang = Mathf.Atan2(local.y, local.x) * Mathf.Rad2Deg;
@@ -130,7 +125,6 @@ public class WindAura : MonoBehaviour
             t.rotation = cam.transform.rotation * Quaternion.Euler(0f, 0f, ang);
             t.localScale = new Vector3(len * Mathf.Lerp(0.3f, 1f, flat), len, 1f);
 
-            // Closer to the camera than the player -> in front, otherwise behind
             float depth = Vector3.Dot(offset, camFwd);
             sr.sortingOrder = depth < 0f ? baseOrder + 2 : baseOrder - 2;
         }

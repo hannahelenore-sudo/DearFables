@@ -5,13 +5,10 @@ using UnityEngine.Events;
 using UnityEngine.UI;
 using TMPro;
 
-// Legacy: only kept so old dialogue lines convert to a Speaker Name automatically.
 public enum DialogueSpeaker { Fable, Bee, Narrator }
 
-// Legacy: only kept so old "Default Characters" cutscenes convert to a cast automatically.
 public enum CastMode { DefaultCharacters, CustomCast }
 
-/// <summary>Put on a string field to get a dropdown of the names in the IntroCutscene's character list.</summary>
 public class CharacterNameAttribute : PropertyAttribute { }
 
 [System.Serializable]
@@ -31,10 +28,9 @@ public class DialogueLine
     [Tooltip("Only used when the cutscene's Tutorial Mode is ON. The Boon UI stays bright above the gray screen during this line.")]
     public bool highlightBoon;
 
-    [HideInInspector] public DialogueSpeaker speaker = DialogueSpeaker.Narrator; // legacy
+    [HideInInspector] public DialogueSpeaker speaker = DialogueSpeaker.Narrator;
 }
 
-/// <summary>One character: a name and the Image in your scene that shows them.</summary>
 [System.Serializable]
 public class CutsceneActor
 {
@@ -44,9 +40,6 @@ public class CutsceneActor
     public Image image;
 }
 
-/// <summary>
-/// One named encounter. Triggers (NPCTrigger, CardPickup, your own scripts) play it by its Id.
-/// </summary>
 [System.Serializable]
 public class CutsceneSequence
 {
@@ -66,14 +59,9 @@ public class CutsceneSequence
     public UnityEvent onStart;
     public UnityEvent onEnd;
 
-    [HideInInspector] public CastMode castMode = CastMode.CustomCast; // legacy
+    [HideInInspector] public CastMode castMode = CastMode.CustomCast;
 }
 
-/// <summary>
-/// Dialogue cutscene. Does NOTHING until PlayCutscene() is called (NPCTrigger calls it when the NPC is clicked).
-/// Flow: fade to black -> show dialogue UI -> fade in -> lines (typewriter + talk ticks) -> fade to black -> hide UI -> fade out.
-/// Advance with Space / Enter or the continue button. First press finishes the typing, second goes to the next line.
-/// </summary>
 public class IntroCutscene : MonoBehaviour
 {
     [Header("Dialogue UI")]
@@ -93,7 +81,6 @@ public class IntroCutscene : MonoBehaviour
     [Tooltip("Name box text for lines with no speaker.")]
     public string narratorNameText = "Narrator";
 
-    // Legacy fields (kept hidden so old scenes convert themselves into the Characters list)
     [HideInInspector] public Image fableImage;
     [HideInInspector] public Image beeImage;
     [HideInInspector] public string fableName = "Fable";
@@ -155,16 +142,13 @@ public class IntroCutscene : MonoBehaviour
     public UnityEvent onCutsceneStart;
     public UnityEvent onCutsceneEnd;
 
-    /// <summary>True from the moment PlayCutscene() is called until the closing fade has finished.</summary>
     public bool IsPlaying { get; private set; }
 
-    // What is playing right now
     private DialogueLine[] activeLines;
     private CutsceneSequence activeSequence;
     private bool activeTutorial;
     private string[] activeCast;
 
-    // Per-character runtime state (same index as the Characters list)
     private Vector2[] charBase = new Vector2[0];
     private Color[] charTarget = new Color[0];
     private Coroutine[] charJump = new Coroutine[0];
@@ -180,7 +164,6 @@ public class IntroCutscene : MonoBehaviour
 
     private Coroutine typewriter;
 
-    // Tutorial mode
     private Canvas dimCanvas;
     private Image dimImage;
     private Canvas highlightCanvas;
@@ -205,12 +188,6 @@ public class IntroCutscene : MonoBehaviour
     private CardShooter pausedShooter;
     private bool shooterWasEnabled;
 
-    // -------------------------------------------------------------------
-    // Setup
-    // -------------------------------------------------------------------
-
-    // Awake runs the moment this object is enabled, so it is safe for the
-    // cutscene object to start disabled and get enabled by the NPC click.
     private void OnValidate()
     {
         MigrateToRoster();
@@ -228,7 +205,6 @@ public class IntroCutscene : MonoBehaviour
             continueButton.onClick.AddListener(Advance);
         }
 
-        // Make sure nothing from the cutscene is visible until it plays
         HideCutsceneUI();
     }
 
@@ -256,8 +232,6 @@ public class IntroCutscene : MonoBehaviour
             Debug.LogWarning("IntroCutscene: couldn't find the player movement script. Assign it in the Inspector.", this);
     }
 
-    // Uses PlayerMovement.InputLocked when possible: the script keeps running, cancels walk / dash / jump / dust
-    // and plays the idle animation by itself. (Switching the script off would leave the walk animation stuck.)
     private void FreezePlayer()
     {
         if (playerMovement == null) return;
@@ -300,26 +274,16 @@ public class IntroCutscene : MonoBehaviour
         if (rb2d != null) rb2d.linearVelocity = Vector2.zero;
     }
 
-    // -------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------
-
-    /// <summary>Plays the Default Dialogue. (void, so it can be hooked to a Button / UnityEvent.)</summary>
     public void PlayCutscene()
     {
         TryPlayCutscene(null);
     }
 
-    /// <summary>Plays the cutscene with this Id. (void, so it can be hooked to a UnityEvent.)</summary>
     public void PlayCutscene(string id)
     {
         TryPlayCutscene(id);
     }
 
-    /// <summary>
-    /// Plays the cutscene with this Id (from the Cutscenes list). An empty Id plays the Default Dialogue.
-    /// Returns true if it actually started.
-    /// </summary>
     public bool TryPlayCutscene(string id)
     {
         if (IsPlaying) return false;
@@ -363,10 +327,6 @@ public class IntroCutscene : MonoBehaviour
         return FindSequence(id) != null;
     }
 
-    /// <summary>
-    /// Adds an empty cutscene with this Id (plus one placeholder line to edit) if the Cutscenes list has none.
-    /// Used by NPCTrigger in the editor so a new Id gets its entry automatically. Returns true if one was added.
-    /// </summary>
     public bool EnsureCutscene(string id)
     {
         if (string.IsNullOrWhiteSpace(id) || HasCutscene(id)) return false;
@@ -431,39 +391,29 @@ public class IntroCutscene : MonoBehaviour
         return new DialogueLine { speaker = DialogueSpeaker.Narrator, text = text, highlightBoon = highlightBoon };
     }
 
-    // -------------------------------------------------------------------
-    // Main sequence
-    // -------------------------------------------------------------------
-
     private IEnumerator PlayRoutine()
     {
         onCutsceneStart?.Invoke();
         if (activeSequence != null) activeSequence.onStart?.Invoke();
 
-        // Freeze the player right away
         FindPlayerMovement();
         FreezePlayer();
 
         if (activeTutorial)
         {
-            // Gray out the screen (boon UI stays bright) and show the dialogue on top
             BeginTutorialMode();
             ShowCutsceneUI();
             yield return FadeDim(true, fadeInDuration);
         }
         else
         {
-            // 1. Fade the game out to black
             yield return Fade(1f, fadeOutDuration);
 
-            // 2. Show the cutscene UI (hidden behind the black overlay)
             ShowCutsceneUI();
 
-            // 3. Fade back in to reveal it
             yield return Fade(0f, fadeInDuration);
         }
 
-        // 4. Start the dialogue
         currentLine = 0;
         acceptingInput = true;
         inputLockUntil = Time.unscaledTime + 0.15f;
@@ -502,10 +452,6 @@ public class IntroCutscene : MonoBehaviour
 
         FinishCutscene();
     }
-
-    // -------------------------------------------------------------------
-    // Dialogue
-    // -------------------------------------------------------------------
 
     private void ShowLine()
     {
@@ -546,7 +492,7 @@ public class IntroCutscene : MonoBehaviour
                 dialogueText.maxVisibleCharacters = 0;
 
                 float elapsed = 0f;
-                float tickTimer = talkTickInterval; // makes the first tick play right away
+                float tickTimer = talkTickInterval;
                 int lastVisible = 0;
 
                 while (dialogueText.maxVisibleCharacters < total)
@@ -558,7 +504,6 @@ public class IntroCutscene : MonoBehaviour
                     int visible = Mathf.Min(total, Mathf.FloorToInt(elapsed * charsPerSecond));
                     dialogueText.maxVisibleCharacters = visible;
 
-                    // Tick at a steady interval, only while new characters are appearing
                     if (visible > lastVisible && tickTimer >= talkTickInterval)
                     {
                         tickTimer = 0f;
@@ -594,18 +539,15 @@ public class IntroCutscene : MonoBehaviour
             continueIndicator.SetActive(true);
     }
 
-    /// <summary>Called by the continue button, Space or Enter.</summary>
     public void Advance()
     {
         if (!acceptingInput || Time.unscaledTime < inputLockUntil)
             return;
 
-        // Space can fire both our key check and the selected button in the same frame
         if (lastAdvanceFrame == Time.frameCount)
             return;
         lastAdvanceFrame = Time.frameCount;
 
-        // First press: finish the line instantly
         if (isTyping)
         {
             if (typewriter != null)
@@ -615,7 +557,6 @@ public class IntroCutscene : MonoBehaviour
             return;
         }
 
-        // Second press: go to the next line
         currentLine++;
         ShowLine();
     }
@@ -638,7 +579,6 @@ public class IntroCutscene : MonoBehaviour
     {
         if (!IsPlaying) return;
 
-        // Smoothly brighten the speaker and dim everyone else
         float t = 1f - Mathf.Exp(-lightingSpeed * Time.unscaledDeltaTime);
 
         foreach (int i in castIndices)
@@ -652,7 +592,6 @@ public class IntroCutscene : MonoBehaviour
             Advance();
     }
 
-    // Works with the old Input Manager, the new Input System, or both
     private bool AdvancePressed()
     {
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
@@ -664,10 +603,6 @@ public class IntroCutscene : MonoBehaviour
             || Input.GetKeyDown(KeyCode.KeypadEnter);
 #endif
     }
-
-    // -------------------------------------------------------------------
-    // Characters
-    // -------------------------------------------------------------------
 
     private IEnumerator JumpCharacter(RectTransform character, Vector2 originalPosition)
     {
@@ -687,15 +622,6 @@ public class IntroCutscene : MonoBehaviour
         character.anchoredPosition = originalPosition;
     }
 
-    // -------------------------------------------------------------------
-    // Show / hide
-    // -------------------------------------------------------------------
-
-    // -------------------------------------------------------------------
-    // Characters / cast
-    // -------------------------------------------------------------------
-
-    /// <summary>Moves old Fable / Bee images and old speaker settings into the Characters list (runs once).</summary>
     private void MigrateToRoster()
     {
         if (characters == null) characters = new List<CutsceneActor>();
@@ -799,7 +725,6 @@ public class IntroCutscene : MonoBehaviour
             }
         }
 
-        // No speaker picked on the line, but only one character is in the cast: that character is talking
         if (speaker < 0 && string.IsNullOrEmpty(line.speakerName) && castIndices.Count == 1)
             speaker = castIndices[0];
 
@@ -827,14 +752,12 @@ public class IntroCutscene : MonoBehaviour
 
     private void ShowCutsceneUI()
     {
-        // In tutorial mode the game must stay visible (grayed), so the opaque background is skipped
         if (dialogueBackground != null && !activeTutorial) dialogueBackground.SetActive(true);
         if (dialoguePanel != null) dialoguePanel.SetActive(true);
 
         int count = characters != null ? characters.Count : 0;
         if (charBase.Length != count) SetupCharacterState();
 
-        // Work out who appears in this cutscene
         castIndices.Clear();
         if (activeCast != null)
         {
@@ -852,7 +775,6 @@ public class IntroCutscene : MonoBehaviour
             }
         }
 
-        // Show the cast (dimmed; the first line lights up the speaker), hide everyone else
         for (int i = 0; i < count; i++)
         {
             Image img = characters[i] != null ? characters[i].image : null;
@@ -906,10 +828,6 @@ public class IntroCutscene : MonoBehaviour
         isTyping = false;
     }
 
-    // -------------------------------------------------------------------
-    // Tutorial mode (gray-out + highlight)
-    // -------------------------------------------------------------------
-
     private void BeginTutorialMode()
     {
         if (highlightTarget == null)
@@ -924,12 +842,9 @@ public class IntroCutscene : MonoBehaviour
         Canvas boonRoot = highlightTarget != null ? highlightTarget.GetComponentInParent<Canvas>() : null;
         if (boonRoot != null) boonRoot = boonRoot.rootCanvas;
 
-        // Everything involved is switched to Screen Space - Overlay for the duration (and restored after),
-        // so no other canvas (like the HUD) can ever draw above the gray screen.
         ForceOverlay(boonRoot);
         ForceOverlay(cutsceneCanvas);
 
-        // Find the topmost overlay canvas in the scene (including nested ones that override sorting)
         bool found = false;
         int bestValue = 0, bestLayerId = 0, bestOrder = 0;
         foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Exclude))
@@ -952,7 +867,6 @@ public class IntroCutscene : MonoBehaviour
         highlightLayer = found ? bestLayerId : 0;
         highlightOrder = baseOrder + 1;
 
-        // Gray overlay (blocks clicks on the game behind it)
         GameObject dimGo = new GameObject("TutorialDim");
         dimCanvas = dimGo.AddComponent<Canvas>();
         dimCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -972,14 +886,12 @@ public class IntroCutscene : MonoBehaviour
         dimImage.color = new Color(dimColor.r, dimColor.g, dimColor.b, 0f);
         dimImage.raycastTarget = true;
 
-        // The cutscene's own canvas goes above the highlighted boon UI
         if (cutsceneCanvas != null)
         {
             cutsceneCanvas.sortingLayerID = highlightLayer;
             cutsceneCanvas.sortingOrder = baseOrder + 2;
         }
 
-        // Prepare the boon UI to be raised above the overlay
         if (highlightTarget != null)
         {
             highlightCanvas = highlightTarget.GetComponent<Canvas>();
@@ -1002,7 +914,6 @@ public class IntroCutscene : MonoBehaviour
 
         SetHighlight(activeLines[0].highlightBoon);
 
-        // Clicking to continue must never throw a card
         pausedShooter = FindAnyObjectByType<CardShooter>();
         if (pausedShooter != null)
         {
@@ -1072,7 +983,6 @@ public class IntroCutscene : MonoBehaviour
         highlightCanvas = null;
         addedHighlightCanvas = false;
 
-        // Put the boon / cutscene canvases back exactly how they were
         foreach (SavedCanvas saved in savedCanvases)
         {
             if (saved.canvas == null) continue;
@@ -1122,28 +1032,23 @@ public class IntroCutscene : MonoBehaviour
         dimImage.color = end;
     }
 
-    // -------------------------------------------------------------------
-    // Fade
-    // -------------------------------------------------------------------
-
     private IEnumerator Fade(float targetAlpha, float duration)
     {
         if (fadeOverlay == null)
             yield break;
 
         fadeOverlay.gameObject.SetActive(true);
-        fadeOverlay.raycastTarget = true; // block clicks while fading
+        fadeOverlay.raycastTarget = true;
 
         float startAlpha = fadeOverlay.color.a;
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
-            // Clamp the step so one slow frame can't make the fade jump
             elapsed += Mathf.Min(Time.unscaledDeltaTime, 0.033f);
 
             float t = Mathf.Clamp01(elapsed / duration);
-            float eased = t * t * t * (t * (t * 6f - 15f) + 10f); // smootherstep
+            float eased = t * t * t * (t * (t * 6f - 15f) + 10f);
 
             SetOverlayAlpha(Mathf.Lerp(startAlpha, targetAlpha, eased));
             yield return null;

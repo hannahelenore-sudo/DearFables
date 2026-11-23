@@ -4,12 +4,8 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// Must live in a folder named "Editor".
 public static class BlueprintShopBuilder
 {
-    // ------------------------------------------------------------------
-    // Tools > Shop > Create Blueprint Shop UI
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Shop/Create Blueprint Shop UI")]
     public static void CreateUI()
     {
@@ -48,7 +44,6 @@ public static class BlueprintShopBuilder
         BlueprintShopUI ui = shopGO.AddComponent<BlueprintShopUI>();
         ui.BuildUI();
 
-        // Hook it up to any Blueprint Shop interactable that is waiting for it
         foreach (ShopInteractable si in Object.FindObjectsByType<ShopInteractable>())
             if (si.shopUI == null && si.GetComponent<BlueprintShopVisual>() != null) si.shopUI = ui;
 
@@ -56,20 +51,15 @@ public static class BlueprintShopBuilder
         Debug.Log("Blueprint Shop UI created. It is visible in the editor so you can style it; it hides itself when the game starts. Assign icons / sounds on the BlueprintShopUI component.");
     }
 
-    // ------------------------------------------------------------------
-    // Tools > Shop > Create Blueprint Shop (World)
-    // ------------------------------------------------------------------
     [MenuItem("Tools/Shop/Create Blueprint Shop (World)")]
     public static void CreateWorldShop()
     {
         GameObject shop = new GameObject("Blueprint Shop");
         Undo.RegisterCreatedObjectUndo(shop, "Create Blueprint Shop");
 
-        // Sprite 1: the structure (empty lot -> solar panel / windmill). Move / resize THIS object to place it.
         GameObject structure = new GameObject("Structure", typeof(SpriteRenderer));
         structure.transform.SetParent(shop.transform, false);
 
-        // Sprite 2: the shopkeeper
         GameObject keeper = new GameObject("Blueprint Shopkeeper", typeof(SpriteRenderer));
         keeper.transform.SetParent(shop.transform, false);
         keeper.transform.localPosition = new Vector3(1.5f, 0f, 0f);

@@ -50,7 +50,6 @@ public class TilemapEdgeWalls : MonoBehaviour
     {
         tilemap.CompressBounds();
 
-        // Container so the Hierarchy stays tidy
         GameObject container = new GameObject("EdgeWalls");
         container.transform.SetParent(tilemap.transform, false);
 
@@ -58,7 +57,6 @@ public class TilemapEdgeWalls : MonoBehaviour
 
         foreach (Vector3Int dir in Directions)
         {
-            // Walls along a left/right edge run vertically, up/down edges run horizontally
             Vector3Int along = (dir.x == 0) ? Vector3Int.right : Vector3Int.up;
             HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
 
@@ -66,7 +64,6 @@ public class TilemapEdgeWalls : MonoBehaviour
             {
                 if (!IsExposed(pos, dir) || visited.Contains(pos)) continue;
 
-                // Merge neighbouring exposed edges into one long wall
                 int count = 1;
                 visited.Add(pos);
 
@@ -78,8 +75,6 @@ public class TilemapEdgeWalls : MonoBehaviour
                     next += along;
                 }
 
-                // If there's a tile right past either end of the run, the wall turns an
-                // inner corner there (the neighbouring wall comes towards this one).
                 bool startConcave = tilemap.HasTile(pos - along);
                 bool endConcave = tilemap.HasTile(next);
 
@@ -88,7 +83,6 @@ public class TilemapEdgeWalls : MonoBehaviour
         }
     }
 
-    // A tile edge is exposed if this cell has a tile but the neighbour in "dir" doesn't
     bool IsExposed(Vector3Int pos, Vector3Int dir)
     {
         return tilemap.HasTile(pos) && !tilemap.HasTile(pos + dir);
@@ -99,7 +93,6 @@ public class TilemapEdgeWalls : MonoBehaviour
     {
         Vector3 startCenter = tilemap.GetCellCenterLocal(startCell);
 
-        // Step vectors in the tilemap's local space (handles cell swizzle, e.g. XZY)
         Vector3 dirStep = tilemap.GetCellCenterLocal(startCell + dir) - startCenter;
         Vector3 alongStep = tilemap.GetCellCenterLocal(startCell + along) - startCenter;
 
@@ -135,7 +128,6 @@ public class TilemapEdgeWalls : MonoBehaviour
     void CreateWallSprite(Transform wall, Vector3 dirStep, Vector3 alongStep, float length,
                           bool startConcave, bool endConcave)
     {
-        // Directions in world space
         Vector3 outward = tilemap.transform.TransformDirection(dirStep.normalized);
         Vector3 alongDir = tilemap.transform.TransformDirection(alongStep.normalized);
 
@@ -145,7 +137,6 @@ public class TilemapEdgeWalls : MonoBehaviour
         SpriteRenderer sr = spriteObj.AddComponent<SpriteRenderer>();
         sr.sprite = wallSprite;
 
-        // Sorting: sit just above the tilemap so the two never swap draw order
         TilemapRenderer tr = tilemap.GetComponent<TilemapRenderer>();
         if (drawAboveTilemap && tr != null)
         {
@@ -158,25 +149,18 @@ public class TilemapEdgeWalls : MonoBehaviour
             sr.sortingOrder = sortingOrder;
         }
 
-        // Tiled + Continuous: crops anything that doesn't fit inside sr.size
         sr.drawMode = SpriteDrawMode.Tiled;
         sr.tileMode = SpriteTileMode.Continuous;
 
         float scale = 1f;
         if (fitSpriteToCell)
         {
-            // One copy of the sprite = exactly one tile wide
             scale = alongStep.magnitude / wallSprite.bounds.size.x;
         }
 
-        // Height is limited by spriteHeight (crops if the sprite is taller)
-        // but never exceeds one copy of the sprite (no vertical repeating)
         float spriteNaturalHeight = wallSprite.bounds.size.y * scale;
         float finalHeight = Mathf.Min(spriteHeight, spriteNaturalHeight);
 
-        // Corner handling: since the sprite is pushed out by spriteOffset, grow it at outer
-        // corners (to meet the next wall's sprite) and shrink it at inner corners (so the
-        // two sprites don't cross each other).
         float startExt = startConcave ? -spriteOffset : spriteOffset;
         float endExt = endConcave ? -spriteOffset : spriteOffset;
         float spriteLength = Mathf.Max(length + startExt + endExt, 0.01f);
@@ -185,8 +169,6 @@ public class TilemapEdgeWalls : MonoBehaviour
         spriteObj.transform.localScale = new Vector3(scale, scale, 1f);
         sr.size = new Vector2(spriteLength / scale, finalHeight / scale);
 
-        // Stand the sprite upright on the floor edge, push it outward by spriteOffset
-        // (the collider is not affected), and slide it to account for the corner extension.
         spriteObj.transform.position = wall.position
                                        - outward * (wallThickness * 0.5f)
                                        + outward * spriteOffset

@@ -1,13 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// Put this on the Blueprint Shop object in the world. The shop has TWO sprites:
-///  1. The structure (target): empty lot / solar panel / windmill. It swaps to match what the player built.
-///  2. The shopkeeper (shopkeeperRenderer): never changes.
-/// Whatever sprite the structure swaps to is fitted into the same spot and size as the empty lot, so
-/// the structure stays where you placed it. Place and size the "empty" sprite in the scene, that is the reference.
-/// </summary>
 public class BlueprintShopVisual : MonoBehaviour
 {
     public enum FitMode
@@ -54,8 +47,8 @@ public class BlueprintShopVisual : MonoBehaviour
 
     private Vector3 baseScale = Vector3.one;
     private Vector3 basePos;
-    private Vector2 refSize = Vector2.one;     // size of the empty sprite, in the structure's parent space
-    private Vector2 refAnchor;                 // where its anchor point is, in the structure's parent space
+    private Vector2 refSize = Vector2.one;
+    private Vector2 refAnchor;
     private bool hasReference;
 
     private Sprite shownSprite;
@@ -81,7 +74,6 @@ public class BlueprintShopVisual : MonoBehaviour
             shopkeeperRenderer.sprite = shopkeeperSprite;
     }
 
-    // Remember the empty sprite's size and anchor spot (in the parent's space). Everything else is fitted to this.
     private void CaptureReference()
     {
         if (emptySprite == null) return;
@@ -143,7 +135,6 @@ public class BlueprintShopVisual : MonoBehaviour
         }
     }
 
-    // The scale that makes this sprite the same size as the empty sprite
     private Vector3 FittedScale(Sprite s)
     {
         if (!keepSize || !hasReference || s == emptySprite) return baseScale;
@@ -163,12 +154,9 @@ public class BlueprintShopVisual : MonoBehaviour
             default: x = y = Mathf.Min(sx, sy); break;
         }
 
-        // keep any flip the object had
         return new Vector3(x * Mathf.Sign(baseScale.x), y * Mathf.Sign(baseScale.y), baseScale.z);
     }
 
-    // Sets the scale AND moves the object so the anchor point of this sprite stays on the reference spot
-    // (sprites have different pivots, so without this the structure would jump around when it swaps).
     private void Place(Sprite s, Vector3 scale)
     {
         Transform t = target.transform;
@@ -196,7 +184,7 @@ public class BlueprintShopVisual : MonoBehaviour
             t += Time.unscaledDeltaTime;
             float x = Mathf.Clamp01(t / popDuration);
             float s = 1f + (popScale - 1f) * Mathf.Sin(x * Mathf.PI);
-            Place(shownSprite, shownScale * s); // re-anchored every frame so the pop grows from the feet
+            Place(shownSprite, shownScale * s);
             yield return null;
         }
         Place(shownSprite, shownScale);

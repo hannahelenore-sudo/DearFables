@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 public class SaveEntry
 {
     public string key;
-    public string kind;      // simple / list / dict
+    public string kind;
     public string value;
     public string[] items;
     public string[] keys;
@@ -31,29 +31,13 @@ public class SaveFile
     public List<QuestLog.Quest> quests = new List<QuestLog.Quest>();
 }
 
-// Tiny hidden object that lets the static SaveSystem run a coroutine after a scene loads
 public class SaveRunner : MonoBehaviour { }
 
-/// <summary>
-/// Save / load to 3 slots (JSON files in Application.persistentDataPath).
-///
-/// What is saved:
-///  - Every static field of PlayerProgress, BoonProgress, MoodManager, StructureProgress and TrinketInventory
-///    (numbers, bools, text, enums, and Lists / HashSets / Dictionaries of those; ScriptableObject lists such as owned trinkets by asset name)
-///  - The quest log
-///  - The player's position in the overworld
-/// Saving is only allowed in the scenes listed in SaveScenes (not in the middle of a card fight).
-/// To add another class's static data, add it to SavedTypes below.
-///
-/// From anywhere (e.g. a Continue button in the main menu):  SaveSystem.Load(1);
-/// </summary>
 public static class SaveSystem
 {
     public const int SlotCount = 3;
 
-    /// <summary>Scenes where saving is allowed.</summary>
     public static string[] SaveScenes = { "GameScene" };
-    /// <summary>Name of the player GameObject whose position is saved.</summary>
     public static string PlayerObjectName = "Player";
 
     private static readonly Type[] SavedTypes =
@@ -66,7 +50,7 @@ public static class SaveSystem
     };
 
     private static SaveFile pending;
-    private static SaveFile fresh; // the untouched starting values, used by New Game
+    private static SaveFile fresh;
     private static SaveRunner runner;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -77,7 +61,6 @@ public static class SaveSystem
         fresh = null;
     }
 
-    // Remember what a brand new game looks like, before anything has been played
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void TakeFreshSnapshot()
     {
@@ -98,14 +81,11 @@ public static class SaveSystem
         }
     }
 
-    /// <summary>Puts all saved data (stars, boons, trinkets, quests...) back to a brand new game.</summary>
     public static void ResetProgress()
     {
         if (fresh != null) ApplyEntries(fresh);
         QuestLog.ReplaceAll(null);
     }
-
-    // ------------------------------------------------------------------ public API
 
     public static bool CanSaveHere
     {
@@ -120,7 +100,6 @@ public static class SaveSystem
 
     public static bool HasSave(int slot) { return File.Exists(PathFor(slot)); }
 
-    /// <summary>Header info for a slot (scene, date, summary), or null when empty.</summary>
     public static SaveFile GetInfo(int slot) { return Read(slot); }
 
     public static bool Save(int slot)
@@ -168,7 +147,7 @@ public static class SaveSystem
         SaveFile f = Read(slot);
         if (f == null || string.IsNullOrEmpty(f.scene)) return false;
 
-        ResetProgress(); // anything the save does not mention goes back to its starting value
+        ResetProgress();
         ApplyEntries(f);
         QuestLog.ReplaceAll(f.quests);
 
@@ -178,8 +157,6 @@ public static class SaveSystem
         SceneManager.LoadScene(f.scene);
         return true;
     }
-
-    // ------------------------------------------------------------------ after the scene is loaded
 
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
@@ -193,7 +170,6 @@ public static class SaveSystem
 
     private static IEnumerator ApplyPosition(SaveFile f)
     {
-        // a few frames, so the scene's own Start() code does not move the player afterwards
         for (int i = 0; i < 3; i++) yield return null;
         MovePlayer(f);
         yield return new WaitForSecondsRealtime(0.3f);
@@ -221,8 +197,6 @@ public static class SaveSystem
         }
         runner.StartCoroutine(routine);
     }
-
-    // ------------------------------------------------------------------ files
 
     private static string PathFor(int slot)
     {
@@ -258,8 +232,6 @@ public static class SaveSystem
         }
         return "";
     }
-
-    // ------------------------------------------------------------------ reflection over static data
 
     private static IEnumerable<KeyValuePair<string, FieldInfo>> Fields()
     {

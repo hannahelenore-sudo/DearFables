@@ -5,10 +5,6 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// One trinket card inside the sidebar. Handles hover, click, drag and the little animations.
-/// Created and driven by TrinketSidebar - you only style the "ItemTemplate" object it clones.
-/// </summary>
 public class TrinketItemView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler,
     IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -96,10 +92,6 @@ public class TrinketItemView : MonoBehaviour, IPointerEnterHandler, IPointerExit
         Rect.localRotation = Quaternion.Euler(0f, 0f, dragTilt + juiceTilt);
     }
 
-    // ------------------------------------------------------------------
-    // Animations
-    // ------------------------------------------------------------------
-
     public void PlaySpawn()
     {
         if (animCo != null) StopCoroutine(animCo);
@@ -112,7 +104,6 @@ public class TrinketItemView : MonoBehaviour, IPointerEnterHandler, IPointerExit
         animCo = StartCoroutine(RemoveRoutine(done));
     }
 
-    /// <summary>The Balatro "bounce" when a trinket triggers. scale=false gives just a wobble (for a failed chance).</summary>
     public void PlayJuice(bool scale = true)
     {
         if (juiceCo != null) StopCoroutine(juiceCo);
@@ -169,10 +160,6 @@ public class TrinketItemView : MonoBehaviour, IPointerEnterHandler, IPointerExit
         juiceTilt = 0f;
         juiceCo = null;
     }
-
-    // ------------------------------------------------------------------
-    // Pointer events
-    // ------------------------------------------------------------------
 
     public void OnPointerEnter(PointerEventData e)
     {
